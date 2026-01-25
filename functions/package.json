@@ -1,0 +1,21 @@
+{
+  "private": true,
+  "name": "streax-bot-functions",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint ./src --ext .ts,.js",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "@google/generative-ai": "^0.24.1",
+    "puppeteer": "^21.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vitest": "^3.1.1",
+    "eslint": "^9.23.0"
+  }
+}
