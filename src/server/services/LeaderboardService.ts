@@ -1,4 +1,5 @@
 import { Logger } from '../Logger';
+import { CONFIG } from '../../shared/constants';
 
 export interface LeaderboardEntryInput {
   userKey: string; // t2_xxx or anon_...
@@ -19,7 +20,7 @@ interface FirestoreDocFields { [k: string]: any } // eslint-disable-line @typesc
  */
 export class LeaderboardService {
   private readonly baseUrl: string;
-  constructor(projectId: string = (process.env.FIRESTORE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || 'streax-bot-local')) {
+  constructor(projectId: string = (process.env.FIRESTORE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || CONFIG.FIREBASE.PROJECT_ID)) {
     this.baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
   }
 
@@ -66,7 +67,7 @@ export class LeaderboardService {
             nickname: f.nickname?.stringValue || entry.nickname,
           };
         }
-      } catch {/* none */}
+      } catch {/* none */ }
       const newTotal = (existing?.totalScore || 0) + entry.score;
       const body = {
         fields: {
@@ -98,7 +99,7 @@ export class LeaderboardService {
           totalScore: f.totalScore?.integerValue ? parseInt(f.totalScore.integerValue, 10) : 0,
         };
       });
-  out.sort((a: { totalScore: number }, b: { totalScore: number }) => b.totalScore - a.totalScore);
+      out.sort((a: { totalScore: number }, b: { totalScore: number }) => b.totalScore - a.totalScore);
       return out.slice(0, limit);
     } catch (e) {
       Logger.error('[LeaderboardService.listGlobalTotals] error', e);
@@ -127,17 +128,17 @@ export class LeaderboardService {
             submittedAt: f.submittedAt?.stringValue || '',
           };
         }
-      } catch {/* treat as none */}
+      } catch {/* treat as none */ }
       const better = !existing || (entry.score > existing.score) || (entry.score === existing.score && entry.timeTakenMs < existing.timeTakenMs);
       if (!better) return { ok: true, updated: false, previous: existing };
       const now = new Date().toISOString();
       const body = {
         fields: {
           userKey: { stringValue: entry.userKey },
-            nickname: { stringValue: entry.nickname },
-            score: { integerValue: String(entry.score) },
-            timeTakenMs: { integerValue: String(entry.timeTakenMs) },
-            submittedAt: { stringValue: now },
+          nickname: { stringValue: entry.nickname },
+          score: { integerValue: String(entry.score) },
+          timeTakenMs: { integerValue: String(entry.timeTakenMs) },
+          submittedAt: { stringValue: now },
         },
       };
       const writeRes = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -234,17 +235,17 @@ export class LeaderboardService {
       const url = `${this.baseUrl}/${coll}`;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any = await res.json();
-  const docs = data?.documents || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json();
+      const docs = data?.documents || [];
       const out: LeaderboardEntry[] = docs.map((d: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         const f: FirestoreDocFields = d.fields || {};
         return {
           userKey: f.userKey?.stringValue || '',
           nickname: f.nickname?.stringValue || '',
-            score: f.score?.integerValue ? parseInt(f.score.integerValue, 10) : 0,
-            timeTakenMs: f.timeTakenMs?.integerValue ? parseInt(f.timeTakenMs.integerValue, 10) : 0,
-            submittedAt: f.submittedAt?.stringValue || '',
+          score: f.score?.integerValue ? parseInt(f.score.integerValue, 10) : 0,
+          timeTakenMs: f.timeTakenMs?.integerValue ? parseInt(f.timeTakenMs.integerValue, 10) : 0,
+          submittedAt: f.submittedAt?.stringValue || '',
         };
       });
       // sort: score desc, timeTakenMs asc, submittedAt asc

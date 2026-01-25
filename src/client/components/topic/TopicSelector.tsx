@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import TopicButtonNew from './TopicButtonNew';
+import TopicButtonNew from './TopicButton';
 import './animations.css';
 import FirebaseTopics, { TopicDoc } from '../../services/FirebaseTopics';
 import { firebaseQuizService } from '../../services/FirebaseQuizService';
@@ -47,7 +47,7 @@ export const TopicSelector: React.FC<{
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
   // Derived popularity metrics
   const [popularSlugs, setPopularSlugs] = useState<Set<string>>(new Set());
-  
+
   // Set up Firestore listener for topics collection using FirebaseTopics service
   useEffect(() => {
     let unsub: (() => void) | null = null;
@@ -72,7 +72,7 @@ export const TopicSelector: React.FC<{
             const mergedMap: Record<string, TopicDoc> = {};
             fetched.forEach(t => { if (t.slug) mergedMap[t.slug] = t; });
             Object.values(optimisticRef.current).forEach(opt => { if (opt.slug && !mergedMap[opt.slug]) mergedMap[opt.slug] = opt; });
-            return Object.values(mergedMap).sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
+            return Object.values(mergedMap).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
           });
           setLoading(false);
         },
@@ -89,8 +89,8 @@ export const TopicSelector: React.FC<{
             hasQuiz: false,
             status: 'ready'
           }));
-            setTopics(mapped);
-            setLoading(false);
+          setTopics(mapped);
+          setLoading(false);
         }
       );
     } catch (e) {
@@ -141,18 +141,18 @@ export const TopicSelector: React.FC<{
               }
             }
           });
-          return Object.values(map).sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
+          return Object.values(map).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         });
       } catch (err) {
         // ignore polling errors
       }
     };
-  // initial poll + interval
-  void poll();
+    // initial poll + interval
+    void poll();
     const iv = setInterval(poll, 1500);
     return () => { cancelled = true; clearInterval(iv); };
   }, []);
-  
+
   // Search suggestions effect
   useEffect(() => {
     if (!query.trim()) {
@@ -160,37 +160,37 @@ export const TopicSelector: React.FC<{
       setInlineSuggestion('');
       return;
     }
-    
+
     // Filter topics that match the query (case-insensitive, ignore spaces)
     const normalizedQuery = query.trim().toLowerCase().replace(/\s+/g, '');
     const matches = topics
       .map(topic => topic.name)
-      .filter(name => 
+      .filter(name =>
         name.toLowerCase().replace(/\s+/g, '').includes(normalizedQuery)
       );
-    
+
     setSuggestions(matches.slice(0, 5)); // Limit to 5 suggestions
     const lower = query.toLowerCase();
     const prefixMatch = matches.find(n => n.toLowerCase().startsWith(lower));
     if (prefixMatch && prefixMatch.toLowerCase() !== lower) setInlineSuggestion(prefixMatch); else setInlineSuggestion('');
   }, [query, topics]);
-  
+
   // Handle highlighting a topic button
   const handleHighlightTopic = (topicName: string) => {
     setHighlightedTopic(topicName);
-    
+
     // Scroll to the topic button
     const topicRef = topicRefs.current[topicName];
     if (topicRef) {
       topicRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      
+
       // Remove highlight after animation completes
       setTimeout(() => {
         setHighlightedTopic(null);
       }, 2000);
     }
   };
-  
+
   // Handle search suggestion click
   const handleSuggestionClick = (suggestion: string) => {
     setQuery(suggestion);
@@ -220,13 +220,13 @@ export const TopicSelector: React.FC<{
       }
     }
   };
-  
+
   // Wrap onClose to clear exclusive state so popularity resumes next open
   const handleClose = () => {
     setExclusiveSlug(null); // reset exclusive highlight
     onClose?.();
   };
-  
+
   // Single quiz request guard
   const requestQuiz = async (topic: TopicDoc) => {
     if (generatingSlug) return; // Already generating
@@ -252,14 +252,14 @@ export const TopicSelector: React.FC<{
   const topicExists = topics.some(
     (topic) => topic.name.toLowerCase() === query.trim().toLowerCase()
   );
-  
+
   const canAddNewTopic = query.trim().length > 0 && !topicExists;
-  
+
   // Handle adding a new topic to Firestore
   async function handleAddTopic() {
     const topicName = query.trim();
     if (!topicName) return;
-    
+
     // If topic already exists, just highlight it
     if (topicExists) {
       const existingTopic = topics.find(
@@ -270,7 +270,7 @@ export const TopicSelector: React.FC<{
         return;
       }
     }
-    
+
     setAddingTopic(true);
     setProgress(5);
     try {
@@ -289,8 +289,8 @@ export const TopicSelector: React.FC<{
         });
         setProgress(60);
         if (!resp.ok) throw new Error('Generate failed');
-    const data = await resp.json();
-    console.log('[GenerateTopic] provider:', data.provider, data.fallbackReason ? `reason=${data.fallbackReason}` : '');
+        const data = await resp.json();
+        console.log('[GenerateTopic] provider:', data.provider, data.fallbackReason ? `reason=${data.fallbackReason}` : '');
         setProgress(85);
         // Optimistic add to local list if not already present (since snapshot may be unavailable in CSP)
         setTopics((prev) => {
@@ -323,7 +323,7 @@ export const TopicSelector: React.FC<{
     <div className="fixed inset-0 z-50 flex flex-col w-full min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black text-white">
 
       {/* Fixed Search Bar at Top */}
-  <div className="sticky top-0 z-10 w-full bg-slate-900/95 backdrop-blur-sm border-b border-white/10 shadow-lg px-4 sm:px-6 py-4 mb-5">
+      <div className="sticky top-0 z-10 w-full bg-slate-900/95 backdrop-blur-sm border-b border-white/10 shadow-lg px-4 sm:px-6 py-4 mb-5">
         <div className="max-w-4xl mx-auto flex gap-2 items-center">
           <div className="relative flex-1">
             <input
@@ -398,7 +398,7 @@ export const TopicSelector: React.FC<{
         )}
 
         {/* Content wrapper - top-aligned so it doesn't overlap the sticky header */}
-  <div className="w-full h-full flex items-start justify-center px-4 sm:px-5 pt-8 pb-24" style={{ paddingTop: 'calc(2rem + 35px)' }}>
+        <div className="w-full h-full flex items-start justify-center px-4 sm:px-5 pt-8 pb-24" style={{ paddingTop: 'calc(2rem + 35px)' }}>
           <div className="w-full max-w-4xl mx-auto">
             {!loading && topics.length === 0 && (
               <div className="text-center text-slate-400 py-10">
@@ -476,10 +476,10 @@ export const TopicSelector: React.FC<{
       </div>
 
       {/* Fixed footer at bottom */}
-  <div className="fixed bottom-0 left-0 right-0 py-8 px-6 pointer-events-none">
+      <div className="fixed bottom-0 left-0 right-0 py-8 px-6 pointer-events-none">
         {/* Separation line with glow */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent shadow-lg shadow-red-500/20"></div>
-        
+
         {/* Centered content with more top space */}
         <div className="w-full flex justify-center mt-2">
           <div className="inline-block px-6 py-3 rounded-lg backdrop-blur-md 

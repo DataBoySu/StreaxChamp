@@ -11,10 +11,12 @@ import { InteractiveRobot } from './components/InteractiveRobot';
 import { useLeaderboard } from './hooks/useLeaderboard';
 import { useLandingSummary } from './hooks/useLandingSummary';
 import HotTopics from './components/HotTopics';
+import { CONFIG } from '../shared/constants';
+import { firebaseQuizService } from './services/FirebaseQuizService';
 
-const QUIZ_DURATIONS = [15, 15, 15, 15, 15]; // All questions have 15 seconds
-const BONUS_QUIZ_DURATION = 15; // Bonus question also 15 seconds
-const NUM_QUESTIONS = 5;
+const QUIZ_DURATIONS = Array(CONFIG.GAME.DEFAULT_QUESTIONS_COUNT).fill(CONFIG.GAME.TIMER_DURATION);
+const BONUS_QUIZ_DURATION = CONFIG.GAME.BONUS_TIMER_DURATION;
+const NUM_QUESTIONS = CONFIG.GAME.DEFAULT_QUESTIONS_COUNT;
 
 export const App = () => {
   const theme = useTheme();
@@ -55,7 +57,7 @@ export const App = () => {
   const [usingRandomFallback, setUsingRandomFallback] = useState(false);
   const [authUser, setAuthUser] = useState<{ redditUsername: string; nickname: string } | null>(() => {
     try {
-      const raw = localStorage.getItem('streax.auth');
+      const raw = localStorage.getItem(CONFIG.STORAGE_KEYS.AUTH);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && parsed.redditUsername && parsed.nickname) return parsed;
@@ -70,11 +72,11 @@ export const App = () => {
   const [signupError] = useState<string | null>(null);
   // Background music state
   const [musicOn, setMusicOn] = useState<boolean>(() => {
-    try { const v = localStorage.getItem('streax.music'); return v === 'on'; } catch { return false; }
+    try { const v = localStorage.getItem(CONFIG.STORAGE_KEYS.MUSIC); return v === 'on'; } catch { return false; }
   });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
-    try { localStorage.setItem('streax.music', musicOn ? 'on' : 'off'); } catch {/* ignore */ }
+    try { localStorage.setItem(CONFIG.STORAGE_KEYS.MUSIC, musicOn ? 'on' : 'off'); } catch {/* ignore */ }
     const a = audioRef.current;
     if (!a) return;
     if (musicOn) {
@@ -1145,6 +1147,38 @@ export const App = () => {
     }
   }, [showScore, selectedTopic, usingRandomFallback, score]);
 
+  if (showTopicMenu) {
+    return (
+      <TopicSelector
+        onClose={() => setShowTopicMenu(false)}
+        onTopicReady={async (topic) => {
+          setSelectedTopic({ title: topic.title, slug: topic.slug });
+          setShowTopicMenu(false);
+          // If quiz data comes from the selector (e.g. newly generated), use it directly
+          if (topic.quiz && Array.isArray(topic.quiz.questions)) {
+            setSelectedTopicQuiz({ questions: topic.quiz.questions, bonus: topic.bonus || null });
+            setTopicQuizStatus('ready');
+            return;
+          }
+          // Otherwise fall back to fetch
+          setTopicQuizStatus('loading');
+          try {
+            const quiz = await firebaseQuizService.getOrGenerateTopicQuiz(topic.slug);
+            if (quiz && Array.isArray(quiz.questions)) {
+              setSelectedTopicQuiz({ questions: quiz.questions, bonus: quiz.bonus || null });
+              setTopicQuizStatus('ready');
+            } else {
+              setTopicQuizStatus('error');
+            }
+          } catch (err) {
+            console.error('Quiz fetch error:', err);
+            setTopicQuizStatus('error');
+          }
+        }}
+      />
+    );
+  }
+
   // Show loading screen while fetching quiz data
   if (loading && !selectedTopicQuiz) {
     return (
@@ -1157,40 +1191,20 @@ export const App = () => {
     );
   }
 
-  // Show message if no questions are available
-  if (!questions || questions.length === 0) {
+  // Show message if quiz requested but no questions available
+  if (quizStarted && (!questions || questions.length === 0)) {
     return (
       <div className="min-h-screen bg-primary text-primary flex items-center justify-center">
         <div className="text-center">
           <p className="text-lg text-warning mb-4">Quiz temporarily unavailable</p>
           <p className="text-sm">Please try again later</p>
+          <button onClick={resetQuiz} className="modern-button modern-button-secondary mt-4 px-4 py-2">Back to Menu</button>
         </div>
       </div>
     );
   }
 
-  // (moved) showTopicMenu handling will render later to keep hook order stable
-
-  if (showTopicMenu) {
-    return (
-      <div className="min-h-screen bg-base-100 p-6">
-        <TopicSelector
-          onClose={() => setShowTopicMenu(false)}
-          onTopicReady={(topic: { title: string; slug: string; quiz?: { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[] }; bonus?: { question: string; options: string[]; correctIndex: number } | null }) => {
-            setSelectedTopic({ title: topic.title, slug: topic.slug });
-            if (topic.quiz && Array.isArray(topic.quiz.questions)) {
-              setSelectedTopicQuiz({ questions: (topic.quiz.questions as SelectedTopicQuiz['questions']) || [], bonus: topic.bonus || null });
-            } else {
-              setSelectedTopicQuiz(null);
-            }
-            setTopicQuizStatus(topic.quiz ? 'ready' : 'error');
-            localStorage.setItem('streax:selectedTopic', JSON.stringify(topic));
-            setShowTopicMenu(false);
-          }}
-        />
-      </div>
-    );
-  }
+  // (moved showTopicMenu logic above)
 
   return (
     <div className="min-h-screen bg-primary text-primary p-2 md:p-4 lg:p-6">
@@ -1399,12 +1413,12 @@ export const App = () => {
                 {message.text && (
                   <motion.div
                     className={`p-3 md:p-6 rounded-lg mb-6 text-center font-medium mx-2 max-w-full overflow-hidden ${message.timesUp
-                        ? 'times-up-glow'
-                        : message.type === 'success'
-                          ? `bg-success/20 text-success border border-success/30 ${message.text.includes('Correct') || message.text.includes('Good') || message.text.includes('Great') || message.text.includes('Excellent') || message.text.includes('Ammazza') || message.text.includes('Unstoppable') || message.text.includes('Bonus') ? 'message-dramatic message-correct' : ''}`
-                          : message.type === 'error'
-                            ? `bg-error/20 text-error border border-error/30 ${message.text.includes('Incorrect') ? 'message-dramatic message-incorrect' : ''}`
-                            : 'bg-warning/20 text-warning border border-warning/30'
+                      ? 'times-up-glow'
+                      : message.type === 'success'
+                        ? `bg-success/20 text-success border border-success/30 ${message.text.includes('Correct') || message.text.includes('Good') || message.text.includes('Great') || message.text.includes('Excellent') || message.text.includes('Ammazza') || message.text.includes('Unstoppable') || message.text.includes('Bonus') ? 'message-dramatic message-correct' : ''}`
+                        : message.type === 'error'
+                          ? `bg-error/20 text-error border border-error/30 ${message.text.includes('Incorrect') ? 'message-dramatic message-incorrect' : ''}`
+                          : 'bg-warning/20 text-warning border border-warning/30'
                       }`}
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{
@@ -1549,26 +1563,7 @@ export const App = () => {
                         </button>
                       </motion.div>
 
-                      {/* When showTopicMenu is true we render a full-page Topic Selector (not a small popup) */}
-                      {showTopicMenu && (
-                        <div className="min-h-screen w-full bg-base-100 p-6">
-                          <TopicSelector
-                            onClose={() => setShowTopicMenu(false)}
-                            onTopicReady={(topic: { title: string; slug: string; quiz?: { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[] }; bonus?: { question: string; options: string[]; correctIndex: number } | null }) => {
-                              setSelectedTopic({ title: topic.title, slug: topic.slug });
-                              if (topic.quiz && Array.isArray(topic.quiz.questions)) {
-                                setSelectedTopicQuiz({ questions: (topic.quiz.questions as SelectedTopicQuiz['questions']) || [], bonus: topic.bonus || null });
-                                setTopicQuizStatus('ready');
-                              } else {
-                                setSelectedTopicQuiz(null);
-                                setTopicQuizStatus('error');
-                              }
-                              localStorage.setItem('streax:selectedTopic', JSON.stringify(topic));
-                              setShowTopicMenu(false);
-                            }}
-                          />
-                        </div>
-                      )}
+                      {/* Topic menu handled via early return above */}
                     </motion.div>
 
                     {/* Stats Display */}
@@ -1671,11 +1666,16 @@ export const App = () => {
                           </motion.span>
                         </span>
                         {selectedTopic && (
-                          <div className="mt-4 text-center text-sm text-secondary font-medium">
-                            {topicQuizStatus === 'idle' && 'Select a topic to generate quiz.'}
-                            {topicQuizStatus === 'loading' && 'Generating quiz… this can take up to 2 minutes.'}
-                            {topicQuizStatus === 'ready' && selectedTopicQuiz && 'Quiz ready!'}
-                            {topicQuizStatus === 'error' && 'Failed to generate quiz. Re-open topic selector to retry.'}
+                          <div className="mt-4 text-center">
+                            {topicQuizStatus === 'idle' && <span className="text-secondary text-sm">Select a topic to start.</span>}
+                            {topicQuizStatus === 'loading' && (
+                              <div className="flex flex-col items-center gap-2">
+                                <LoadingDots text="Thinking" />
+                                <span className="text-xs text-secondary animate-pulse">Gemini is researching and drafting questions...</span>
+                              </div>
+                            )}
+                            {topicQuizStatus === 'ready' && <span className="text-success text-sm font-bold">✓ Quiz Loaded</span>}
+                            {topicQuizStatus === 'error' && <span className="text-error text-sm">Failed to load quiz. Try another topic.</span>}
                           </div>
                         )}
 
@@ -1791,10 +1791,10 @@ export const App = () => {
                             onClick={() => handleBonusAnswer(answer, bonusQuestion?.correctAnswer || '')}
                             disabled={selectedAnswer !== null}
                             className={`quiz-option quiz-option-big ${selectedAnswer && answer === correctAnswer
-                                ? 'correct'
-                                : selectedAnswer === answer
-                                  ? 'incorrect'
-                                  : ''
+                              ? 'correct'
+                              : selectedAnswer === answer
+                                ? 'incorrect'
+                                : ''
                               }`}
                           >
                             <span className="relative z-10 font-bold text-left text-lg">
@@ -1987,10 +1987,10 @@ export const App = () => {
                               <motion.div
                                 key={i}
                                 className={`w-2 h-2 rounded-full ${i < currentQuestionIndex
-                                    ? 'bg-success'
-                                    : i === currentQuestionIndex
-                                      ? 'bg-accent'
-                                      : 'bg-border'
+                                  ? 'bg-success'
+                                  : i === currentQuestionIndex
+                                    ? 'bg-accent'
+                                    : 'bg-border'
                                   }`}
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
@@ -2030,10 +2030,10 @@ export const App = () => {
                             }
                             disabled={selectedAnswer !== null}
                             className={`quiz-option quiz-option-big ${selectedAnswer && answer === correctAnswer
-                                ? 'correct'
-                                : selectedAnswer === answer
-                                  ? 'incorrect'
-                                  : ''
+                              ? 'correct'
+                              : selectedAnswer === answer
+                                ? 'incorrect'
+                                : ''
                               }`}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
