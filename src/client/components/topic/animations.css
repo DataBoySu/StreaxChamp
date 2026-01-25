@@ -1,0 +1,89 @@
+@keyframes shake {
+  0% { transform: translateX(0); }
+  10% { transform: translateX(-5px); }
+  20% { transform: translateX(5px); }
+  30% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  50% { transform: translateX(-2px); }
+  60% { transform: translateX(2px); }
+  70% { transform: translateX(-1px); }
+  80% { transform: translateX(1px); }
+  90% { transform: translateX(-1px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes glow {
+  0% { box-shadow: 0 0 10px rgba(255, 69, 0, 0.5); }
+  50% { box-shadow: 0 0 30px rgba(255, 69, 0, 0.8), 0 0 50px rgba(255, 69, 0, 0.5); }
+  100% { box-shadow: 0 0 10px rgba(255, 69, 0, 0.5); }
+}
+
+.animate-shake {
+  animation: shake 0.8s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+.animate-glow {
+  animation: glow 1.5s ease-in-out infinite;
+}
+
+@keyframes subtle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+.animate-pulse-subtle {
+  animation: subtle-pulse 3s ease-in-out infinite;
+}
+
+/* Beacon / vibe effect: layered radial glow + scale + hue shift */
+@keyframes beacon-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255,140,0,0.55), 0 0 8px 2px rgba(255,97,0,0.6); transform: translateZ(0) scale(1); filter: hue-rotate(0deg); }
+  25% { box-shadow: 0 0 0 6px rgba(255,140,0,0.12), 0 0 18px 4px rgba(255,120,0,0.75); transform: scale(1.04); }
+  50% { box-shadow: 0 0 0 10px rgba(255,140,0,0.06), 0 0 26px 6px rgba(255,160,64,0.85); transform: scale(1.07); filter: hue-rotate(20deg); }
+  75% { box-shadow: 0 0 0 6px rgba(255,140,0,0.12), 0 0 18px 4px rgba(255,120,0,0.75); transform: scale(1.04); }
+  100% { box-shadow: 0 0 0 0 rgba(255,140,0,0.55), 0 0 8px 2px rgba(255,97,0,0.6); transform: scale(1); filter: hue-rotate(0deg); }
+}
+
+.vibe-beacon {
+  position: relative;
+  animation: beacon-pulse 2.4s cubic-bezier(.66,.0,.34,1) infinite;
+  background: radial-gradient(circle at 30% 25%, rgba(255,120,0,0.25), rgba(255,80,0,0.05) 60%), linear-gradient(145deg, rgba(40,25,10,0.7), rgba(20,15,10,0.5));
+  border: 1px solid rgba(255,140,0,0.55) !important;
+}
+
+/* Outer halo using pseudo-element */
+.vibe-beacon::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 14px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255,140,0,0.35), rgba(255,140,0,0) 70%);
+  filter: blur(8px) brightness(1.2);
+  opacity: 0.9;
+  animation: beacon-pulse 2.4s cubic-bezier(.66,.0,.34,1) infinite reverse;
+  mix-blend-mode: screen;
+}
+
+/* Subtle shimmer sweep */
+@keyframes shimmer-scan {
+  0% { transform: translateX(-120%) skewX(-8deg); opacity: 0; }
+  35% { opacity: 0.55; }
+  55% { opacity: 0.05; }
+  100% { transform: translateX(180%) skewX(-8deg); opacity: 0; }
+}
+
+.vibe-beacon::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0; width: 40%;
+  background: linear-gradient(105deg, rgba(255,255,255,0.18), rgba(255,200,150,0.05), rgba(255,255,255,0));
+  filter: blur(4px);
+  pointer-events: none;
+  animation: shimmer-scan 3.8s ease-in-out infinite;
+}
+
+/* Accessibility: reduce motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .vibe-beacon, .vibe-beacon::after, .vibe-beacon::before { animation: none !important; }
+}

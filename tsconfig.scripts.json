@@ -1,0 +1,13 @@
+{
+  "extends": "./tools/tsconfig-base.json",
+  "compilerOptions": {
+    "moduleResolution": "Node16",
+    "types": ["node"],
+    "outDir": "./dist/scripts",
+    "module": "CommonJS",
+    "target": "ES2022",
+    "skipLibCheck": true
+  },
+  "include": ["scripts/**/*.ts"],
+  "exclude": ["node_modules"]
+}
