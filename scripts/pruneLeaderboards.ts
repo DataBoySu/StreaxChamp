@@ -9,6 +9,7 @@
  * This stub outlines the approach and logs what WOULD be deleted.
  */
 import 'dotenv/config';
+import { CONFIG } from '../src/shared/constants';
 // Minimal Node globals declarations for lint context if @types/node absent
 declare const process: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -45,7 +46,7 @@ function olderThan(dateStr: string, cutoff: Date): boolean {
 }
 
 async function main() {
-  const projectId = process.env.FIRESTORE_PROJECT_ID || 'streax-bot-local';
+  const projectId = process.env.FIRESTORE_PROJECT_ID || CONFIG.FIREBASE.PROJECT_ID;
   const days = parseInt(process.env.PRUNE_DAYS || '', 10) || DAYS_DEFAULT;
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const topics = await listTopics(projectId);

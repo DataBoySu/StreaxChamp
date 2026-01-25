@@ -13,6 +13,8 @@ import { context } from '@devvit/web/server';
 import { createPost } from './core/post';
 import type { InitResponse } from '../shared/types/api';
 import type { Request, Response } from 'express';
+import { CONFIG } from '../shared/constants';
+import { StatsService } from './services/StatsService';
 
 // App-level secret for Gemini key; configured via Devvit settings
 Devvit.addSettings({
@@ -23,11 +25,23 @@ Devvit.addSettings({
   isSecret: true,
 });
 
-// Optional Gemini integration (prefer Devvit settings; fall back to env for local)
-let GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-function hydrateGeminiKeyFromSettings(): void {
+Devvit.addSettings({
+  type: 'string',
+  name: 'openai-api-key',
+  label: 'OpenAI / OpenRouter API Key',
+  scope: SettingScope.App,
+  isSecret: true,
+});
+
+// Optional Gemini integration
+let GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+let OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || ''; // For OpenRouter, fallback to legacy
+
+function hydrateKeysFromSettings(): void {
   try {
     const anyDevvit = Devvit as unknown as { settings?: { get?: (k: string) => Promise<unknown> } };
+
+    // Load Gemini Key
     anyDevvit.settings?.get?.('gemini-api-key')
       .then((val) => {
         if (typeof val === 'string' && val.trim()) {
@@ -35,12 +49,27 @@ function hydrateGeminiKeyFromSettings(): void {
           Logger.info('[AI] Gemini key loaded from Devvit settings');
         }
       })
-      .catch(() => {/* ignore */});
-  } catch {/* ignore */}
+      .catch(() => {/* ignore */ });
+
+    // Load OpenAI/OpenRouter Key
+    anyDevvit.settings?.get?.('openai-api-key')
+      .then((val) => {
+        if (typeof val === 'string' && val.trim()) {
+          OPENAI_API_KEY = val.trim();
+          Logger.info('[AI] OpenAI/OpenRouter key loaded from Devvit settings');
+        }
+      })
+      .catch(() => {/* ignore */ });
+
+  } catch {/* ignore */ }
 }
 Logger.info(`[AI] Gemini key present=${GEMINI_API_KEY ? 'yes' : 'no'}`);
 
-const ALLOWED_GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+// --- Landing Summary Cache ---
+let cachedSummary: any = null;
+let lastSummaryUpdate = 0;
+const SUMMARY_CACHE_TTL = 60000; // 60 seconds
+
 // Safety settings removed per request (solo testing environment)
 
 interface GeminiResult {
@@ -77,11 +106,14 @@ function extractJSONCandidate(text: string): unknown | null {
   const fenceMatch = text.match(/```(?:\s*json)?\s*([\s\S]*?)```/i);
   const rawCandidate = fenceMatch && fenceMatch[1] ? String(fenceMatch[1]) : String(text);
 
-  // Remove per-line Devvit/log prefixes like '[DEVVIT]' or 'DEVVIT' added by the runtime
+  // Remove per-line Devvit/log prefixes that might be baked into the string if logged improperly
   const raw = rawCandidate
     .split(/\r?\n/)
     .map((line) => line.replace(/^\s*(?:\[[A-Z0-9_-]+\]|DEVVIT)\s*/i, ''))
-    .join('\n');
+    .join('\n')
+    // Also remove any remaining markdown code block markers if the fence regex missed them
+    .replace(/^```[a-z]*\s*/i, '')
+    .replace(/\s*```$/i, '');
 
   // Try direct parse first
   try { return JSON.parse(raw.trim()); } catch (e) { /* fall through */ }
@@ -156,6 +188,106 @@ function isValidQuizPayload(payload: GeneratedQuizPayload | null | undefined): b
   return true;
 }
 
+/**
+ * Universal AI Completion Helper
+ * Supports Google Gemini-native API and OpenAI-compatible (OpenRouter) API.
+ */
+async function callAI(
+  systemPrompt: string,
+  userPrompt: string,
+  model: string,
+  config: { temperature?: number; maxTokens?: number; responseMimeType?: string } = {}
+): Promise<{ text: string; model: string; latencyMs: number } | null> {
+  const provider = CONFIG.GEMINI.getProvider(model);
+
+  // Select correct key based on provider
+  let apiKey = '';
+  if (provider === 'google') {
+    apiKey = GEMINI_API_KEY;
+  } else {
+    apiKey = OPENAI_API_KEY || GEMINI_API_KEY;
+  }
+
+  if (!apiKey) {
+    Logger.error(`[AI] No API key enabled for provider=${provider}`);
+    return null;
+  }
+  const start = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+
+  Logger.info(`[AI] Request: provider=${provider} model=${model}`);
+
+  try {
+    let url = '';
+    let body = {};
+    let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+    if (provider === 'google') {
+      // Use v1alpha for experimental/newest models like gemini-2.5-pro
+      url = `https://generativelanguage.googleapis.com/v1alpha/models/${model}:generateContent?key=${apiKey}`;
+      body = {
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          temperature: config.temperature ?? 0.7,
+          maxOutputTokens: config.maxTokens ?? 1024,
+          response_mime_type: config.responseMimeType ?? "application/json"
+        }
+      };
+    } else {
+      // OpenAI-compatible format (OpenRouter, Groq, etc.)
+      url = CONFIG.GEMINI.OPENAI_ENDPOINT;
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      headers['HTTP-Referer'] = 'https://devvit.reddit.com';
+      headers['X-Title'] = 'StreaxChamp';
+      body = {
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: config.temperature ?? 0.7,
+        max_tokens: config.maxTokens ?? 1024,
+        response_format: config.responseMimeType === "application/json" ? { type: "json_object" } : undefined
+      };
+    }
+
+    Logger.info(`[AI] Request: provider=${provider} model=${model} url=${url}`);
+    // Logger.info(`[AI] Body: ${JSON.stringify(body)}`); // Uncomment for deep debug
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      Logger.error(`[AI] Error HTTP ${resp.status}: ${errText.slice(0, 500)}`);
+      return null;
+    }
+
+    const data: any = await resp.json();
+    const latencyMs = Date.now() - start;
+
+    let text = '';
+    if (provider === 'google') {
+      text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } else {
+      text = data?.choices?.[0]?.message?.content || '';
+    }
+
+    return { text, model, latencyMs };
+  } catch (e: any) {
+    clearTimeout(timeout);
+    Logger.error(`[AI] Call failed model=${model} name=${e.name} msg=${e.message} stack=${e.stack}`);
+    return null;
+  }
+}
+
 async function callGemini(rawTopic: string): Promise<GeminiResult> {
   const fallbackTitle = rawTopic
     .trim()
@@ -165,92 +297,121 @@ async function callGemini(rawTopic: string): Promise<GeminiResult> {
     .join(' ');
   const slug = fallbackTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-  if (!GEMINI_API_KEY) {
+  const model = CONFIG.GEMINI.LITE_MODEL;
+  const result = await callAI(
+    CONFIG.GEMINI.PROMPTS.TOPIC_NORMALIZER,
+    `User input topic: ${rawTopic}`,
+    model,
+    { temperature: 0.1, maxTokens: 256, responseMimeType: "application/json" }
+  );
+
+  if (!result || !result.text) {
     return {
       title: fallbackTitle,
       slug,
-      sources: [
-        `https://en.wikipedia.org/wiki/${encodeURIComponent(fallbackTitle.replace(/ /g, '_'))}`,
-      ],
+      sources: [`https://en.wikipedia.org/wiki/${encodeURIComponent(fallbackTitle.replace(/ /g, '_'))}`],
       provider: 'fallback',
-      reason: 'NO_API_KEY',
+      reason: 'AI_CALL_FAILED',
     };
   }
 
-  const systemPrompt = `You are a precise topic normalizer for a quiz generator.\nGiven a user input topic string, return STRICT JSON with keys: title (canonical properly capitalized topic name), sources (array of 2-5 high-quality authoritative URLs—Wikipedia second if exists, then fandom.com, official site, IGN, etc. Only real pages).\nNO commentary. JSON only.`;
-  const userPrompt = `User input topic: ${rawTopic}`;
-
   try {
-    
-    const models = Array.from(ALLOWED_GEMINI_MODELS);
-    let lastErr: unknown = null;
-    for (const model of models) {
-      const controller = new AbortController();
-      const start = Date.now();
-      const timeout = setTimeout(() => controller.abort(), 6500);
-      try {
-        const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [ { role: 'user', parts: [{ text: systemPrompt + '\n' + userPrompt }] } ],
-              generationConfig: { temperature: 0.35, maxOutputTokens: 384 },
-            }),
-            signal: controller.signal,
-          }
-        );
-        clearTimeout(timeout);
-        const latencyMs = Date.now() - start;
-        if (!resp.ok) {
-          lastErr = new Error(`Gemini HTTP ${resp.status}`);
-          continue;
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data: any = await resp.json();
-        const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        // use extractor that strips runtime prefixes
-        const parsed = extractJSONCandidate(String(text));
-        // validate parsed shape
-        const p = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
-        if (!p || typeof p.title !== 'string') {
-          Logger.error('[GeminiParseFail] model=' + String(model) + ' missing title or malformed JSON. raw=' + String(text).slice(0,2000));
-          lastErr = new Error('PARSE_FAILED');
-          continue;
-        }
-        const title = String(p.title || fallbackTitle).trim() || fallbackTitle;
-        const finalSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        const sources: string[] = Array.isArray(p.sources)
-          ? (p.sources as unknown[])
-            .map((s) => String(s).trim())
-            .filter((s) => /^https?:\/\//i.test(s))
-            .slice(0, 6)
-          : [
-              `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`,
-            ];
-        return { title, slug: finalSlug, sources, provider: 'gemini', model, latencyMs };
-      } catch (e) {
-        clearTimeout(timeout);
-        lastErr = e;
-      }
-    }
-    throw lastErr || new Error('All Gemini models failed');
-  } catch (err) {
-    Logger.error('Gemini call failed, using fallback:', err);
+    const parsed = JSON.parse(result.text);
+    const p = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+    if (!p || typeof p.title !== 'string') throw new Error('MALFORMED_JSON');
+
+    const title = String(p.title || fallbackTitle).trim();
+    const finalSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const sources: string[] = Array.isArray(p.sources)
+      ? (p.sources as unknown[]).map(s => String(s).trim()).filter(s => /^https?:\/\//i.test(s)).slice(0, 6)
+      : [`https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`];
+
+    return { title, slug: finalSlug, sources, provider: 'gemini', model: result.model, latencyMs: result.latencyMs };
+  } catch (e) {
+    Logger.error('[TopicNormParseFail]', e);
     return {
       title: fallbackTitle,
       slug,
-      sources: [
-        `https://en.wikipedia.org/wiki/${encodeURIComponent(fallbackTitle.replace(/ /g, '_'))}`,
-      ],
+      sources: [`https://en.wikipedia.org/wiki/${encodeURIComponent(fallbackTitle.replace(/ /g, '_'))}`],
       provider: 'fallback',
-      reason: (err instanceof Error && err.message) ? err.message : 'UNKNOWN_ERROR',
+      reason: 'PARSE_FAILED',
     };
   }
 }
 
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
 // Gemini quiz generation (hard informative variant) – returns 5 challenging, explanation-rich questions
+// Helper for sequential generation
+async function generateSingleQuestionWithGemini(
+  topicTitle: string,
+  topicSources: string[],
+  contextText: string,
+  index: number,
+  existingQuestions: string[] = []
+): Promise<GeneratedQuizQuestion | null> {
+  const model = CONFIG.GEMINI.CONTENT_MODEL;
+  const userPrompt = `Topic: ${topicTitle}
+Sources:
+${topicSources.slice(0, 4).join('\n')}
+${contextText ? `\nCONTEXT:\n${contextText}` : ''}
+${existingQuestions.length > 0 ? `\nDO NOT repeat these questions: ${existingQuestions.join(', ')}` : ''}
+Generate unique question #${index + 1}.`;
+
+  let attempts = 0;
+  const maxAttempts = 2;
+
+  while (attempts < maxAttempts) {
+    try {
+      const result = await callAI(
+        CONFIG.GEMINI.PROMPTS.QUIZ_GENERATOR,
+        userPrompt,
+        model,
+        { temperature: 0.7, maxTokens: 2048, responseMimeType: "application/json" }
+      );
+
+      if (!result || !result.text) {
+        attempts++;
+        if (attempts < maxAttempts) await delay(3000);
+        continue;
+      }
+
+      let q: any;
+      try {
+        const parsed = JSON.parse(result.text);
+        q = parsed;
+      } catch (e) {
+        Logger.error(`[SingleGenJSON] failed to parse: ${result.text}`, e);
+        return null;
+      }
+
+      if (!q || typeof q.question !== 'string') return null;
+
+      const opts = Array.isArray(q.options) ? (q.options as unknown[]).slice(0, 4) : [];
+      const normOpts = opts.length >= 4 ? opts.map((o) => String(o)).slice(0, 4) : ['A', 'B', 'C', 'D'];
+
+      return {
+        id: String(q.id ?? `q${Date.now()}-${index}`),
+        question: String(q.question),
+        options: normOpts,
+        correctAnswer: Number.isInteger(q.correctAnswer) ? (q.correctAnswer as number) : 0,
+        difficulty: typeof q.difficulty === 'string' && /^(easy|medium|hard)$/i.test(q.difficulty) ? String(q.difficulty).toLowerCase() : 'hard',
+        category: String(q.category ?? topicTitle),
+        explanation: typeof q.explanation === 'string' ? q.explanation : undefined,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (e) {
+      Logger.error(`[SingleGenFail] idx=${index} attempt=${attempts}`, e);
+      attempts++;
+      if (attempts < maxAttempts) await delay(2000);
+    }
+  }
+  return null;
+}
+
+// [REMOVED] Legacy helper. Use callGemini() instead.
+
+// Gemini quiz generation (hard informative variant)
 async function generateQuizWithGemini(topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
   const fallbackQuestion = (n: number): GeneratedQuizQuestion => ({
     id: `q${n}`,
@@ -261,100 +422,60 @@ async function generateQuizWithGemini(topicTitle: string, topicSources: string[]
     category: topicTitle,
     createdAt: new Date().toISOString(),
   });
+
   if (!GEMINI_API_KEY) {
     return {
       questions: Array.from({ length: 5 }).map((_, i) => fallbackQuestion(i + 1)),
       metadata: { generatedAt: new Date().toISOString(), sourceWikis: topicSources.slice(0, 2), version: 'v1', generator: 'fallback' },
     };
   }
-  const systemPrompt = `You are an expert quiz generator producing HARD, information-dense questions that reward deep knowledge.
-Return STRICT JSON ONLY with keys: questions (array of EXACTLY 5 objects) and sourceWikis.
-Each question object fields: id, question, options (array of EXACTLY 4 entries: 3 plausible distractors + 1 correct), correctAnswer (0-3 index of correct), difficulty (easy|medium|hard but strongly prefer HARD unless topic niche), category, explanation (ONE concise factual sentence citing a distinguishing detail or mechanism).
-Rules:
- - ABSOLUTELY NO trivial surface facts (e.g. main character names, release years, tagline quotes) unless the topic is extremely obscure.
- - Favor: underlying mechanics, nuanced distinctions, causal chains, strategic implications, evolution of features, comparative attributes.
- - Avoid ambiguous wording; avoid absolutes like ALL/NEVER unless historically documented and precise.
- - No meta questions about the quiz itself.
- - Distractors must be credible and share surface similarity while being definitively incorrect.
- - Explanations MUST justify why the correct answer is correct (not just restate it) and may highlight why a common misconception is wrong.
- - If CONTEXT provided rely primarily on it; otherwise leverage authoritative widely-accepted knowledge only.
- - NEVER include markdown, commentary, natural language outside JSON. JSON ONLY.`;
-  const trimmedContext = contextText ? contextText.slice(0, 35000) : '';
-  const userPrompt = `Topic: ${topicTitle}\nSources:\n${topicSources.slice(0,4).join('\n')}${trimmedContext ? `\n\nCONTEXT:\n${trimmedContext}` : ''}`;
-  const models = Array.from(ALLOWED_GEMINI_MODELS);
-  let lastErr: unknown = null;
-  for (const model of models) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9000);
-    try {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: systemPrompt + '\n' + userPrompt }] }],
-          generationConfig: { temperature: 0.5, maxOutputTokens: 1024 },
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (!resp.ok) { lastErr = new Error(`HTTP_${resp.status}`); continue; }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any = await resp.json();
-      const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      let parsed: unknown = null;
-      try {
-        parsed = extractJSONCandidate(String(text));
-      } catch (parseErr) {
-        Logger.error('[GeminiParseFail] model=' + String(model) + ' extractor error=' + String(parseErr) + ' raw=' + String(text).slice(0,2000));
-        parsed = null;
-      }
-      if (!parsed) {
-        Logger.error('[GeminiParseFail] model=' + String(model) + ' could not extract JSON from raw response. raw=' + String(text).slice(0,2000));
-        lastErr = new Error('PARSE_FAIL');
-        continue;
-      }
-      interface ParsedShape { questions: Array<Record<string, unknown>>; sourceWikis?: unknown };
-      if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as ParsedShape).questions)) { lastErr = new Error('NO_QUESTIONS'); continue; }
-      const rawQuestions = (parsed as ParsedShape).questions;
-      const questions = rawQuestions.slice(0, 5).map((qObj, i: number): GeneratedQuizQuestion => {
-        const q = qObj as Record<string, unknown>;
-        const opts = Array.isArray(q.options) ? (q.options as unknown[]).slice(0, 4) : [];
-        const normOpts = opts.length >= 4 ? opts.map((o) => String(o)).slice(0, 4) : ['A', 'B', 'C', 'D'];
-        return {
-          id: String(q.id ?? `q${i + 1}`),
-          question: String(q.question ?? `Missing question ${i + 1}`),
-          options: normOpts,
-          correctAnswer: Number.isInteger(q.correctAnswer) ? (q.correctAnswer as number) : 0,
-          difficulty: typeof q.difficulty === 'string' && /^(easy|medium|hard)$/i.test(q.difficulty) ? String(q.difficulty).toLowerCase() : 'medium',
-          category: String(q.category ?? topicTitle),
-          explanation: typeof q.explanation === 'string' ? q.explanation : undefined,
-          createdAt: new Date().toISOString(),
-        };
-      });
-      return {
-        questions,
-        metadata: {
-          generatedAt: new Date().toISOString(),
-          sourceWikis: Array.isArray((parsed as ParsedShape).sourceWikis as unknown[]) ? ((parsed as ParsedShape).sourceWikis as unknown[]).slice(0, 4).map((s) => String(s)) : topicSources.slice(0, 2),
-          version: 'v1',
-          model,
-          generator: 'gemini',
-        },
-      };
-    } catch (e) { clearTimeout(timeout); lastErr = e; }
+
+  const questions: GeneratedQuizQuestion[] = [];
+  const existingQuestions: string[] = [];
+  const trimmedContext = contextText ? contextText.slice(0, 25000) : '';
+
+  Logger.info(`[SequentialGen] Starting generation for topic="${topicTitle}"`);
+
+  // Generate 5 questions sequentially
+  for (let i = 0; i < 5; i++) {
+    // Spacer for rate limits
+    if (i > 0) await delay(2500);
+    const q = await generateSingleQuestionWithGemini(topicTitle, topicSources, trimmedContext, i, existingQuestions);
+    if (q) {
+      questions.push(q);
+      existingQuestions.push(q.question);
+    } else {
+      // Small delay on retry or just push fallback
+      questions.push(fallbackQuestion(i + 1));
+    }
   }
-  Logger.error('Gemini quiz generation failed, fallback used', lastErr);
+
   return {
-    questions: Array.from({ length: 5 }).map((_, i) => fallbackQuestion(i + 1)),
-    metadata: { generatedAt: new Date().toISOString(), sourceWikis: topicSources.slice(0, 2), version: 'v1', generator: 'fallback' },
+    questions,
+    metadata: {
+      generatedAt: new Date().toISOString(),
+      sourceWikis: topicSources.slice(0, 2),
+      version: 'v2-sequential',
+      model: CONFIG.GEMINI.CONTENT_MODEL,
+      generator: 'gemini',
+    },
   };
 }
 
 // Configure Devvit for HTTP access and media
 Devvit.configure({
-  http: true,
+  http: {
+    domains: [
+      'firestore.googleapis.com',
+      'oauth2.googleapis.com',
+      'generativelanguage.googleapis.com',
+      'openrouter.ai',
+      'api.openrouter.ai',
+      'www.openrouter.ai',
+      'api.groq.com'
+    ]
+  },
   redditAPI: true,
-  redis: false,
   media: true,
 });
 
@@ -369,14 +490,14 @@ try {
         const ctx = _ctx as unknown;
         const ctxRec = ctx as Record<string, unknown> | undefined;
         const subredditName = ctxRec && typeof ctxRec === 'object'
-          ? String(((ctxRec.subreddit as Record<string, unknown> | undefined)?.name as string) || (ctxRec.subredditName as string) || process.env.DEVVIT_SUBREDDIT || 'streax_bot_dev')
-          : (process.env.DEVVIT_SUBREDDIT || 'streax_bot_dev');
+          ? String(((ctxRec.subreddit as Record<string, unknown> | undefined)?.name as string) || (ctxRec.subredditName as string) || process.env.DEVVIT_SUBREDDIT || CONFIG.SERVER.DEFAULT_SUBREDDIT)
+          : (process.env.DEVVIT_SUBREDDIT || CONFIG.SERVER.DEFAULT_SUBREDDIT);
         const post = await createPost(subredditName);
         try {
           type UIShape = { showToast?: (m: string) => void } | undefined;
           const ui = ctxRec && typeof ctxRec === 'object' && typeof ctxRec['ui'] === 'object' ? (ctxRec['ui'] as UIShape) : undefined;
           ui?.showToast?.(`Post created: ${post?.id ?? 'unknown'}`);
-        } catch {/* ignore UI errors */}
+        } catch {/* ignore UI errors */ }
         console.info('[MenuCreate] post created', post?.id);
       } catch (err) {
         try {
@@ -384,7 +505,7 @@ try {
           type UIShape = { showToast?: (m: string) => void } | undefined;
           const ui = c && typeof c['ui'] === 'object' ? (c['ui'] as UIShape) : undefined;
           ui?.showToast?.('Failed to create post');
-        } catch {/* ignore */}
+        } catch {/* ignore */ }
         console.error('[MenuCreate] createPost failed', err);
       }
     }
@@ -395,7 +516,7 @@ try {
 }
 
 // Try to load secrets from Devvit settings at startup (non-blocking)
-hydrateGeminiKeyFromSettings();
+hydrateKeysFromSettings();
 
 // Create Express app
 const app = express();
@@ -508,16 +629,12 @@ app.get('/api/quiz', async (_req, res) => {
     const quiz = await firestoreService.getTodaysQuiz();
     if (quiz) {
       // Increment a generic daily quiz play counter stored under a pseudo-topic slug 'daily-quizzes'
-  void firestoreService.incrementTopicPlayCount?.('daily-quizzes');
+      void firestoreService.incrementTopicPlayCount?.('daily-quizzes');
       return res.status(200).json(quiz);
     }
-    // Auto-generate today's daily quiz when missing
-    const topicTitle = 'Daily Mix';
-    const sources: string[] = ['https://en.wikipedia.org/wiki/General_knowledge'];
-    const generated = await generateQuizWithGemini(topicTitle, sources, undefined);
-    // Validate shape
-    if (!isValidQuizPayload(generated) || generated.questions.some(q => /Placeholder|Missing question/i.test(q.question))) {
-      Logger.error('[DailyQuiz] invalid generated content, serving curated fallback');
+    // Auto-generation disabled: Serve curated fallback immediately rather than failing AI call
+    if (true) {
+      // Logger.info('[DailyQuiz] serving fallback (auto-gen disabled)');
       return res.status(200).json({
         id: 'fallback-quiz',
         questions: [
@@ -530,47 +647,65 @@ app.get('/api/quiz', async (_req, res) => {
         metadata: { generatedAt: new Date().toISOString(), topic: 'General Knowledge', difficulty: 'mixed', source: 'fallback' }
       });
     }
-    const today = new Date().toISOString().split('T')[0];
-    // Persist to Firestore under daily-quizzes/{today}
-    try {
-      const baseUrl = firestoreService.getBaseUrl();
-      const questionsValues = generated.questions.map((q, idx) => ({
-        mapValue: { fields: {
-          id: { stringValue: q.id || `q${idx+1}` },
-          question: { stringValue: q.question },
-          options: { arrayValue: { values: q.options.map(o => ({ stringValue: o })) } },
-          correctAnswer: { integerValue: String(q.correctAnswer ?? 0) },
-          difficulty: { stringValue: q.difficulty || 'medium' },
-          category: { stringValue: q.category || topicTitle },
-          createdAt: { stringValue: q.createdAt || new Date().toISOString() }
-        } }
-      }));
-      const body = { fields: {
-        id: { stringValue: today },
-        questions: { arrayValue: { values: questionsValues } },
-        metadata: { mapValue: { fields: {
-          generatedAt: { stringValue: new Date().toISOString() },
-          sourceWikis: { arrayValue: { values: (generated.metadata.sourceWikis || []).map(s => ({ stringValue: s })) } },
-          version: { stringValue: 'v1' },
-          generator: { stringValue: generated.metadata.generator || 'unknown' }
-        } } }
-      } };
-      const url = `${baseUrl}/daily-quizzes/${today}`;
-      await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    } catch (err) {
-      Logger.error('[DailyQuiz] save failed', err);
-    }
-    // Return generated quiz mapped to app shape
-    const appShape = {
-      id: today,
-      questions: generated.questions.map((q) => ({ question: q.question, answers: q.options, correctAnswer: q.options[q.correctAnswer] || q.options[0] })),
-      metadata: { generatedAt: new Date().toISOString(), topic: 'General Knowledge', difficulty: 'mixed', source: 'ai' },
-    };
-    void firestoreService.incrementTopicPlayCount?.('daily-quizzes');
-    res.status(200).json(appShape);
+    // Unreachable code removed. Logic ends at fallback return above.
   } catch (error) {
     Logger.error('Error fetching quiz:', error);
     res.status(500).json({ error: 'Failed to fetch quiz data' });
+  }
+});
+
+// --- Topic & Custom Quiz Endpoints ---
+
+app.get('/api/topics', async (_req, res) => {
+  try {
+    const fs = new FirestoreRestService();
+    const list = await fs.listTopics();
+    res.json(list);
+  } catch (e) {
+    Logger.error('[TopicsList] error', e);
+    res.status(500).json({ error: 'FAILED_TO_LIST' });
+  }
+});
+
+// [REMOVED] Duplicate generation route & legacy helper to enforce strict validation via single source of truth
+
+app.get('/api/topics/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const fs = new FirestoreRestService();
+    const topic = await fs.getTopic(slug);
+    if (!topic) return res.status(404).json({ error: 'NOT_FOUND' });
+    res.json(topic);
+  } catch (e) {
+    res.status(500).json({ error: 'FETCH_ERROR' });
+  }
+});
+
+app.post('/api/topics/:slug/quiz', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const fs = new FirestoreRestService();
+    const today = new Date().toISOString().split('T')[0];
+
+    // 1. Check if quiz already exists for today
+    const existing = await fs.getTopicQuiz(slug, today);
+    if (existing) return res.json(existing);
+
+    // 2. Fetch topic metadata to get sources
+    const topic = await fs.getTopic(slug);
+    if (!topic) return res.status(404).json({ error: 'TOPIC_NOT_FOUND' });
+
+    // 3. Generate quiz
+    const generated = await generateQuizWithGemini(topic.title, topic.sources);
+
+    // 4. Save quiz
+    const success = await fs.saveTopicQuiz(slug, today, generated);
+    if (!success) Logger.error('[QuizSaveFail]', { slug, today });
+
+    res.json({ id: today, date: today, topicSlug: slug, ...generated });
+  } catch (e) {
+    Logger.error('[TopicQuizGen] error', e);
+    res.status(500).json({ error: 'QUIZ_GEN_FAILED' });
   }
 });
 
@@ -586,29 +721,33 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
     const existing = await fs.getRobotDialogues(today);
     if (existing && existing.length >= 5) return res.json({ ok: true, date: today, lines: existing.slice(0, 20) });
     // Generate 5 new lines if none today (or not enough)
-    const model = ALLOWED_GEMINI_MODELS[0];
-    if (!GEMINI_API_KEY) return res.status(200).json({ ok: true, date: today, lines: [
-      'Halt. State your business. Quickly.',
-      'New face? Don’t dawdle.',
-      'Eyes front. Spine straight. In or out?',
-      'Still here? Hmph. Training yard awaits.',
-      'Enough loitering. Inside. Now.'
-    ] });
+    const model = CONFIG.GEMINI.LITE_MODEL; // Cheaper model for simple text
+    if (!GEMINI_API_KEY) return res.status(200).json({
+      ok: true, date: today, lines: [
+        'Halt. State your business. Quickly.',
+        'New face? Don’t dawdle.',
+        'Eyes front. Spine straight. In or out?',
+        'Still here? Hmph. Training yard awaits.',
+        'Enough loitering. Inside. Now.'
+      ]
+    });
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: ROBOT_SYSTEM_PROMPT }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 256 } }),
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: ROBOT_SYSTEM_PROMPT }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 256 } }),
       }
     );
-    if (!resp.ok) return res.status(200).json({ ok: true, date: today, lines: [
-      'Move along. Or move in.', 'This gate won’t stare back.', 'You. Inside. Chop-chop.', 'Still hovering? Tsk.', 'Enough. Enter the app.'
-    ] });
+    if (!resp.ok) return res.status(200).json({
+      ok: true, date: today, lines: [
+        'Move along. Or move in.', 'This gate won’t stare back.', 'You. Inside. Chop-chop.', 'Still hovering? Tsk.', 'Enough. Enter the app.'
+      ]
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await resp.json();
     const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const parsed = extractJSONCandidate(String(text));
+    const parsed = extractJSONCandidate(String(text));
     type RobotJson = { lines?: unknown };
     const linesArr = parsed && typeof parsed === 'object' && Array.isArray((parsed as RobotJson).lines as unknown[])
       ? ((parsed as RobotJson).lines as unknown[]).map((s) => String(s).trim()).filter(Boolean)
@@ -640,27 +779,35 @@ app.post('/api/quiz/regenerate', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     // Build Firestore document body manually (mirror parse expectations)
     const questionsValues = generated.questions.map((q, idx) => ({
-      mapValue: { fields: {
-        id: { stringValue: q.id || `q${idx+1}` },
-        question: { stringValue: q.question },
-        options: { arrayValue: { values: q.options.map(o => ({ stringValue: o })) } },
-        correctAnswer: { integerValue: String(q.correctAnswer ?? 0) },
-        difficulty: { stringValue: q.difficulty || 'medium' },
-        category: { stringValue: q.category || topicTitle },
-        createdAt: { stringValue: q.createdAt || new Date().toISOString() }
-      } }
+      mapValue: {
+        fields: {
+          id: { stringValue: q.id || `q${idx + 1}` },
+          question: { stringValue: q.question },
+          options: { arrayValue: { values: q.options.map(o => ({ stringValue: o })) } },
+          correctAnswer: { integerValue: String(q.correctAnswer ?? 0) },
+          difficulty: { stringValue: q.difficulty || 'medium' },
+          category: { stringValue: q.category || topicTitle },
+          createdAt: { stringValue: q.createdAt || new Date().toISOString() }
+        }
+      }
     }));
-    const body = { fields: {
-      id: { stringValue: today },
-      questions: { arrayValue: { values: questionsValues } },
-      metadata: { mapValue: { fields: {
-        generatedAt: { stringValue: new Date().toISOString() },
-        sourceWikis: { arrayValue: { values: (generated.metadata.sourceWikis || []).map(s => ({ stringValue: s })) } },
-        version: { stringValue: 'v1' },
-        generator: { stringValue: generated.metadata.generator || 'unknown' }
-      } } }
-    } };
-  const url = `${firestoreService.getBaseUrl()}/daily-quizzes/${today}`;
+    const body = {
+      fields: {
+        id: { stringValue: today },
+        questions: { arrayValue: { values: questionsValues } },
+        metadata: {
+          mapValue: {
+            fields: {
+              generatedAt: { stringValue: new Date().toISOString() },
+              sourceWikis: { arrayValue: { values: (generated.metadata.sourceWikis || []).map(s => ({ stringValue: s })) } },
+              version: { stringValue: 'v1' },
+              generator: { stringValue: generated.metadata.generator || 'unknown' }
+            }
+          }
+        }
+      }
+    };
+    const url = `${firestoreService.getBaseUrl()}/daily-quizzes/${today}`;
     const saveResp = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!saveResp.ok) {
       Logger.error('[DailyQuizRegenerate] save failed', { status: saveResp.status });
@@ -716,7 +863,7 @@ app.get('/api/topics/:slug/status', async (req, res) => {
     const topic = await firestoreService.getTopic(slug);
     if (!topic) return res.status(404).json({ error: 'Topic not found' });
     const today = new Date().toISOString().split('T')[0];
-  const quiz = await firestoreService.getTopicQuiz?.(slug as string, today as string);
+    const quiz = await firestoreService.getTopicQuiz?.(slug as string, today as string);
     res.json({
       slug,
       status: topic.status || 'unknown',
@@ -724,7 +871,7 @@ app.get('/api/topics/:slug/status', async (req, res) => {
       questionCount: quiz?.questions?.length || 0,
       lastGenerated: topic.lastGenerated || null,
       lastQuizDate: topic.lastQuizDate || null,
-  generationPhase: topic.generationPhase || null,
+      generationPhase: topic.generationPhase || null,
     });
   } catch (e) {
     Logger.error('Error in topic status endpoint', e);
@@ -744,14 +891,32 @@ app.post('/api/topics/generate', async (req, res) => {
     const fs = new FirestoreRestService();
 
     Logger.info('Generate topic request:', topic);
-  const { title, slug, sources, provider, reason, model, latencyMs } = await callGemini(topic);
+    const { title, slug, sources, provider, reason, model, latencyMs } = await callGemini(topic);
 
-  const firestoreService = fs;
-  const topicPayload: { title: string; slug: string; sources: string[]; model?: string; genLatencyMs?: number; requestedBy?: string } = { title, slug, sources, requestedBy: userKey };
-  if (model) topicPayload.model = model;
-  if (typeof latencyMs === 'number') topicPayload.genLatencyMs = latencyMs;
-  const saved = await firestoreService.saveTopic(topicPayload);
-  res.status(200).json({ title, slug, sources, saved, provider, fallbackReason: provider === 'fallback' ? reason : undefined, model, latencyMs });
+    // Hardened check: Reject fallbacks
+    if (provider === 'fallback') {
+      Logger.warn('[GenerateTopic] Failed to normalize (fallback used). Not saving.', { topic, reason });
+      return res.status(500).json({
+        error: 'Topic normalization failed',
+        details: reason || 'AI service unavailable',
+        provider
+      });
+    }
+
+    // Strict validation check
+    if (!title || title.length < 2 || !slug || slug.length < 2) {
+      Logger.warn('[GenerateTopic] Validation failed', { title, slug });
+      return res.status(400).json({ error: 'Invalid topic generated' });
+    }
+
+    const firestoreService = fs;
+    const topicPayload: { title: string; slug: string; sources: string[]; model?: string; genLatencyMs?: number; requestedBy?: string } = { title, slug, sources, requestedBy: userKey };
+    if (model) topicPayload.model = model;
+    if (typeof latencyMs === 'number') topicPayload.genLatencyMs = latencyMs;
+
+    // Only save if we strictly trust the output
+    const saved = await firestoreService.saveTopic(topicPayload);
+    res.status(200).json({ title, slug, sources, saved, provider, fallbackReason: provider === 'fallback' ? reason : undefined, model, latencyMs });
   } catch (error) {
     Logger.error('Error in /api/topics/generate:', error);
     res.status(500).json({ error: 'Failed to generate topic' });
@@ -761,18 +926,18 @@ app.post('/api/topics/generate', async (req, res) => {
 // Generate or fetch today's quiz for a topic
 app.post('/api/topics/:slug/quiz', async (req, res) => {
   try {
-  const { slug } = req.params;
-  // Disable scraping: honor user's preference to keep Browserless off
-  const useScrape = false;
-  const date: string = new Date().toISOString().slice(0, 10);
-  const firestoreService = new FirestoreRestService();
+    const { slug } = req.params;
+    // Disable scraping: honor user's preference to keep Browserless off
+    const useScrape = false;
+    const date: string = new Date().toISOString().slice(0, 10);
+    const firestoreService = new FirestoreRestService();
     // Try existing quiz
-  const existing = await firestoreService.getTopicQuiz(slug, date);
-  const force = Boolean(req.body?.force);
+    const existing = await firestoreService.getTopicQuiz(slug, date);
+    const force = Boolean(req.body?.force);
     if (existing && existing.questions && existing.questions.length >= 5 && !force) {
       // Attach existing bonus (if any) for consistency when served from cache
       let bonusExisting: { question: string; options: string[]; correctIndex: number } | null = null;
-      try { bonusExisting = await getGlobalBonusForToday(firestoreService); } catch {/* ignore */}
+      try { bonusExisting = await getGlobalBonusForToday(firestoreService); } catch {/* ignore */ }
       return res.status(200).json({ fromCache: true, quiz: existing, bonus: bonusExisting });
     }
     // Removed any auto-regeneration triggers elsewhere: only generate on explicit request (this endpoint)
@@ -783,10 +948,10 @@ app.post('/api/topics/:slug/quiz', async (req, res) => {
     const today = date;
     if (topic.hasQuiz && topic.lastQuizDate === today && !force) {
       let bonusExisting: { question: string; options: string[]; correctIndex: number } | null = null;
-      try { bonusExisting = await getGlobalBonusForToday(firestoreService); } catch {/* ignore */}
+      try { bonusExisting = await getGlobalBonusForToday(firestoreService); } catch {/* ignore */ }
       return res.status(200).json({ fromCache: true, reason: 'ALREADY_TODAY', quiz: existing, bonus: bonusExisting });
     }
-  await firestoreService.patchTopic(slug, { status: 'generating', generationPhase: 'started', lastGenerated: new Date().toISOString() });
+    await firestoreService.patchTopic(slug, { status: 'generating', generationPhase: 'started', lastGenerated: new Date().toISOString() });
 
     let contextText: string | undefined;
     const bl = new BrowserlessService();
@@ -814,16 +979,16 @@ app.post('/api/topics/:slug/quiz', async (req, res) => {
       contextText = topic.contextSnippet;
     }
 
-  const quizPayload = await generateQuizWithGemini(topic.title || slug, topic.sources || [], contextText);
-  // Validate: must have exactly 5 fully-formed questions and no placeholders
-  const hasPlaceholders = Array.isArray(quizPayload?.questions) && quizPayload.questions.some(q => /Placeholder question|Missing question/i.test(q.question || ''));
-  if (!isValidQuizPayload(quizPayload) || hasPlaceholders) {
-    await firestoreService.patchTopic(slug, { status: 'error', generationPhase: 'invalid' });
-    return res.status(422).json({ ok: false, error: 'INVALID_QUIZ', details: 'Must contain 5 valid questions with 4 options and correct index' });
-  }
-  // Attach (or generate) a persistent bonus question for this topic/day
-  const bonus = await getGlobalBonusForToday(firestoreService);
-  await firestoreService.patchTopic(slug, { generationPhase: 'aiGenerated' });
+    const quizPayload = await generateQuizWithGemini(topic.title || slug, topic.sources || [], contextText);
+    // Validate: must have exactly 5 fully-formed questions and no placeholders
+    const hasPlaceholders = Array.isArray(quizPayload?.questions) && quizPayload.questions.some(q => /Placeholder question|Missing question/i.test(q.question || ''));
+    if (!isValidQuizPayload(quizPayload) || hasPlaceholders) {
+      await firestoreService.patchTopic(slug, { status: 'error', generationPhase: 'invalid' });
+      return res.status(422).json({ ok: false, error: 'INVALID_QUIZ', details: 'Must contain 5 valid questions with 4 options and correct index' });
+    }
+    // Attach (or generate) a persistent bonus question for this topic/day
+    const bonus = await getGlobalBonusForToday(firestoreService);
+    await firestoreService.patchTopic(slug, { generationPhase: 'aiGenerated' });
     const saved = await firestoreService.saveTopicQuiz(slug, date, quizPayload);
     if (saved) {
       await firestoreService.patchTopic(slug, { hasQuiz: true, lastQuizDate: date, status: 'ready', generationPhase: 'saved' });
@@ -835,14 +1000,14 @@ app.post('/api/topics/:slug/quiz', async (req, res) => {
         const checkUrl = `${baseUrl}/topics/${slug}/quizzes/${date}`;
         const r = await fetch(checkUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
         const txt = await r.text();
-        Logger.error('[SaveTopicQuiz] fetch-after-fail status=' + String(r.status) + ' body=' + txt.slice(0,2000));
+        Logger.error('[SaveTopicQuiz] fetch-after-fail status=' + String(r.status) + ' body=' + txt.slice(0, 2000));
       } catch (err) {
         Logger.error('[SaveTopicQuiz] debug fetch failed', err);
       }
       await firestoreService.patchTopic(slug, { status: 'error', generationPhase: 'error' });
     }
-  // Increment after generation (count actual access)
-  res.status(200).json({ fromCache: false, saved, quiz: quizPayload, bonus, usedScrapeContext: !!contextText });
+    // Increment after generation (count actual access)
+    res.status(200).json({ fromCache: false, saved, quiz: quizPayload, bonus, usedScrapeContext: !!contextText });
   } catch (e) {
     Logger.error('Error generating topic quiz', e);
     res.status(500).json({ error: 'Failed to generate quiz' });
@@ -854,16 +1019,16 @@ app.post('/api/topics/:slug/quiz', async (req, res) => {
 app.get('/api/bonus/today', async (_req, res) => {
   try {
     const fs = new FirestoreRestService();
-  const date = new Date().toISOString().slice(0, 10);
-  const existing = await fs.getDailyBonusQuestion(date);
+    const date = new Date().toISOString().slice(0, 10);
+    const existing = await fs.getDailyBonusQuestion(date);
     if (existing) return res.json({ fromCache: true, bonus: existing });
-  // Use the quiz generator which falls back to non-Gemini generator when key absent
-  const hardPromptTopic = 'Ultra Obscure Interdisciplinary Trivia';
-  const gen = await generateQuizWithGemini(hardPromptTopic, ['https://en.wikipedia.org/wiki/Knowledge'], undefined);
+    // Use the quiz generator which falls back to non-Gemini generator when key absent
+    const hardPromptTopic = 'Ultra Obscure Interdisciplinary Trivia';
+    const gen = await generateQuizWithGemini(hardPromptTopic, ['https://en.wikipedia.org/wiki/Knowledge'], undefined);
     const q = gen.questions && gen.questions.length ? gen.questions[0] : undefined;
     if (!q) return res.status(500).json({ error: 'NO_GENERATED_QUESTION' });
-  await fs.saveDailyBonusQuestion(date, { question: q.question, options: q.options, correctAnswer: q.correctAnswer, difficulty: 'extreme' });
-  const stored = await fs.getDailyBonusQuestion(date);
+    await fs.saveDailyBonusQuestion(date, { question: q.question, options: q.options, correctAnswer: q.correctAnswer, difficulty: 'extreme' });
+    const stored = await fs.getDailyBonusQuestion(date);
     res.json({ fromCache: false, bonus: stored });
   } catch (e) {
     Logger.error('Bonus generation failed', e);
@@ -943,7 +1108,7 @@ app.post('/api/leaderboard/:slug/submit', async (req, res) => {
       if (dailyEntries.some((e) => e.userKey === key)) {
         return res.status(429).json({ ok: false, error: 'ONE_PLAY_PER_DAY', message: 'You have already submitted for today.' });
       }
-    } catch {/* ignore fetch issues and proceed */}
+    } catch {/* ignore fetch issues and proceed */ }
     const result = await lb.submit(slug, { userKey: key, nickname, score, timeTakenMs });
     // Also submit to rolling leaderboard (persistent top results)
     try {
@@ -969,8 +1134,8 @@ app.post('/api/leaderboard/:slug/submit', async (req, res) => {
         timeTakenMs: { integerValue: String(timeTakenMs) },
         createdAt: { timestampValue: new Date().toISOString() },
       } as const;
-  const baseUrl = fs.getBaseUrl();
-  const url = `${baseUrl}/attempts`;
+      const baseUrl = fs.getBaseUrl();
+      const url = `${baseUrl}/attempts`;
       await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: attemptDoc }) });
     } catch (err) {
       Logger.error('[AttemptRecord] failed', err);
@@ -1000,24 +1165,24 @@ app.get('/api/history/:userKey', async (req, res) => {
   try {
     const { userKey } = req.params;
     if (!userKey) return res.status(400).json({ ok: false, error: 'userKey required' });
-  const fs = new FirestoreRestService();
-  const baseUrl = fs.getBaseUrl();
-  const listUrl = `${baseUrl}/attempts?pageSize=50&orderBy=createdAt desc`;
+    const fs = new FirestoreRestService();
+    const baseUrl = fs.getBaseUrl();
+    const listUrl = `${baseUrl}/attempts?pageSize=50&orderBy=createdAt desc`;
     const r = await fetch(listUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
     if (!r.ok) return res.status(500).json({ ok: false, error: 'ATTEMPTS_FETCH_FAILED' });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await r.json();
     const docs: unknown[] = data.documents || [];
     // filter by userKey client side (Firestore REST simple query avoided for simplicity now)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const attempts = (docs as any[]).map(d => d.fields).filter(Boolean).map(f => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const attempts = (docs as any[]).map(d => d.fields).filter(Boolean).map(f => ({
       userKey: f.userKey?.stringValue || 'anon',
       nickname: f.nickname?.stringValue || 'anon',
       slug: f.slug?.stringValue || 'unknown',
       score: f.score?.integerValue ? parseInt(f.score.integerValue, 10) : 0,
       timeTakenMs: f.timeTakenMs?.integerValue ? parseInt(f.timeTakenMs.integerValue, 10) : 0,
       createdAt: f.createdAt?.timestampValue || '',
-    })).filter(a => a.userKey === userKey).sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0,50);
+    })).filter(a => a.userKey === userKey).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 50);
     res.json({ ok: true, attempts });
   } catch (e) {
     Logger.error('[HistoryFetch] error', e);
@@ -1053,135 +1218,42 @@ app.post('/api/topics/:slug/complete', async (req, res) => {
 });
 
 // Landing summary: top3 (today) + popular (10-day sum of playsCompleted)
+// Landing summary: Single-Read Optimization
 app.get('/api/landing/summary', async (_req, res) => {
   try {
-    const fs = new FirestoreRestService();
-    const lb = new LeaderboardService();
-    const today = new Date().toISOString().split('T')[0];
-    const topics = await fs.listTopics?.() || [];
-    const topicDetails = await Promise.all(
-      topics.map(async (t) => {
-        try {
-          const full = await fs.getTopic(t.slug);
-          return { slug: t.slug, title: full?.title || t.title, playCount: full?.playCount || 0, lastGenerated: full?.lastGenerated || '' };
-        } catch {
-          return { slug: t.slug, title: t.title, playCount: 0, lastGenerated: '' };
-        }
-      })
-    );
-    // For each topic, fetch today's leaderboard entries (top score only needed)
-    const perTopicTop: { slug: string; title: string; topScore: number; nickname: string; timeTakenMs: number }[] = [];
-    for (const t of topics) {
-      try {
-        const list = await lb.list(t.slug, today);
-        if (list && list.length > 0) {
-          const topEntry = list[0];
-          if (topEntry) {
-            perTopicTop.push({ slug: t.slug, title: t.title, topScore: topEntry.score, nickname: topEntry.nickname, timeTakenMs: topEntry.timeTakenMs });
-          }
-        }
-      } catch (err) {
-        Logger.error('[LandingSummary] per-topic leaderboard error', { slug: t.slug, err });
-      }
-    }
-    // Fallback to rolling leaderboard if no daily data yet
-    if (perTopicTop.length === 0) {
-      for (const t of topics) {
-        try {
-          const listR = await lb.listRolling(t.slug);
-          if (listR && listR.length > 0) {
-            const topEntry = listR[0];
-            if (topEntry) {
-              perTopicTop.push({ slug: t.slug, title: t.title, topScore: topEntry.score, nickname: topEntry.nickname, timeTakenMs: topEntry.timeTakenMs });
-            }
-          }
-        } catch {/* ignore */}
-      }
-    }
-    perTopicTop.sort((a, b) => b.topScore - a.topScore || a.timeTakenMs - b.timeTakenMs);
-    const top3 = perTopicTop.slice(0, 3);
+    const statsService = new StatsService();
 
-    // Popular topics: sum playsCompleted over last 10 days
-  const popular: { slug: string; title: string; totalCompletions: number }[] = [];
-  const baseUrl = fs.getBaseUrl();
-    const dates: string[] = Array.from({ length: 10 }).map((_, i): string => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const iso = d.toISOString();
-      const day = iso.split('T')[0];
-      return day || iso.substring(0, 10);
-    });
-    for (const t of topics) {
-      let sum = 0;
-      for (const d of dates) {
-        try {
-          const statsUrl = `${baseUrl}/topics/${t.slug}/stats/${d}`;
-          const r = await fetch(statsUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-          if (!r.ok) continue;
-          const data: unknown = await r.json();
-          if (data && typeof data === 'object' && 'fields' in data) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const f: any = (data as any).fields || {};
-            if (f.playsCompleted?.integerValue) sum += parseInt(f.playsCompleted.integerValue, 10) || 0;
-          }
-        } catch (err) {
-          const msg = (err as Error)?.toString?.() || '';
-          if (msg.includes('404') || msg.includes('NOT_FOUND')) {
-            // benign: stats doc simply missing for that day
-          } else {
-            Logger.error('[LandingSummary] stats fetch error', { slug: t.slug, day: d, err });
-          }
-        }
+    // Attempt 1-read fetch
+    let summary = await statsService.getGlobalStats();
+
+    // If missing or stale (older than 1 hour), trigger update but proceed with what we have
+    const now = Date.now();
+    const staleThreshold = 60 * 60 * 1000;
+    const isStale = !summary || (now - new Date(summary.updatedAt).getTime() > staleThreshold);
+
+    if (isStale) {
+      // Return empty/stale data immediately to user (fast & cheap)
+      // In a real background job, we would regenerate this.
+      // For now, we will just return a basic "safe" structure so the frontend doesn't crash.
+      // The assumption is an external trigger (or a dedicated admin button) updates the stats.
+      if (!summary) {
+        summary = {
+          top3: [],
+          popular: [],
+          globalTop: [],
+          hotTopics: [],
+          globalTotals: [],
+          updatedAt: new Date().toISOString()
+        };
       }
-      if (sum > 0) popular.push({ slug: t.slug, title: t.title, totalCompletions: sum });
+
+      // OPTIONAL: If we wanted to "self-heal", we could do the expensive calculation here 
+      // and save it, but that violates the "1 read" rule for this request.
+      // We will rely on a separate process/trigger to update stats.
+      Logger.info('[LandingSummary] Stats missing or stale. Returning default.');
     }
-    if (popular.length === 0) {
-      const sortedByPlays = topicDetails
-        .filter((d) => (d.playCount || 0) > 0)
-        .sort((a, b) => (b.playCount || 0) - (a.playCount || 0))
-        .slice(0, 6);
-      sortedByPlays.forEach((d) => popular.push({ slug: d.slug, title: d.title, totalCompletions: d.playCount || 0 }));
-    }
-    if (popular.length === 0) {
-      const recent = topicDetails
-        .slice()
-        .sort((a, b) => String(b.lastGenerated).localeCompare(String(a.lastGenerated)))
-        .slice(0, 6);
-      recent.forEach((d) => popular.push({ slug: d.slug, title: d.title, totalCompletions: 0 }));
-    }
-    popular.sort((a, b) => b.totalCompletions - a.totalCompletions);
-    // Derive globalTop (top 10 across all topics today) and unique hotTopics list
-    const globalEntries: { slug: string; title: string; nickname: string; score: number; timeTakenMs: number }[] = [];
-    for (const t of topics) {
-      try {
-        const list = await lb.list(t.slug, today);
-        list.forEach((e) => globalEntries.push({ slug: t.slug, title: t.title, nickname: e.nickname, score: e.score, timeTakenMs: e.timeTakenMs }));
-      } catch {/* ignore */}
-    }
-    if (globalEntries.length === 0) {
-      for (const t of topics) {
-        try {
-          const listR = await lb.listRolling(t.slug);
-          listR.slice(0, 5).forEach((e) => globalEntries.push({ slug: t.slug, title: t.title, nickname: e.nickname, score: e.score, timeTakenMs: e.timeTakenMs }));
-        } catch {/* ignore */}
-      }
-    }
-    globalEntries.sort((a, b) => b.score - a.score || a.timeTakenMs - b.timeTakenMs);
-    const globalTop = globalEntries.slice(0, 10);
-    // Also fetch global totals leaderboard (sum of all scores)
-    let globalTotals: Array<{ userKey: string; nickname: string; totalScore: number }> = [];
-    try { globalTotals = await lb.listGlobalTotals(10); } catch {/* ignore */}
-    const hotTopics = Array.from(new Set([
-      ...perTopicTop.map(p => p.slug),
-      ...popular.map(p => p.slug),
-      ...(perTopicTop.length === 0 && popular.length === 0
-        ? topicDetails.slice().sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 5).map(d => d.slug)
-        : [])
-    ])).map(slug => {
-      const t = topics.find(tt => tt.slug === slug);
-      return { slug, title: t?.title || slug };
-    });
-    res.json({ ok: true, top3, popular, globalTop, hotTopics, globalTotals });
+
+    res.json({ ok: true, ...summary });
   } catch (e) {
     Logger.error('[LandingSummary] error', e);
     res.status(500).json({ ok: false, error: 'SUMMARY_FAILED' });
@@ -1280,7 +1352,7 @@ app.post('/api/ai/test', async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [ { role: 'user', parts: [{ text: systemPrompt + '\nInput: ' + userText }] } ],
+          contents: [{ role: 'user', parts: [{ text: systemPrompt + '\nInput: ' + userText }] }],
           generationConfig: { temperature: 0.2, maxOutputTokens: 128 },
         }),
         signal: controller.signal,

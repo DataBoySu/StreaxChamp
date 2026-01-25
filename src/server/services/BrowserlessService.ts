@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { CONFIG } from '../../shared/constants';
 
 export interface ScrapeSelectorResult {
   selector: string;
@@ -33,7 +34,7 @@ export class BrowserlessService {
 
   constructor() {
     this.token = process.env.BROWSERLESS_TOKEN || undefined;
-    this.region = process.env.BROWSERLESS_REGION || 'production-sfo';
+    this.region = process.env.BROWSERLESS_REGION || CONFIG.BROWSERLESS.DEFAULT_REGION;
     this.explicitEndpoint = process.env.BROWSERLESS_ENDPOINT || undefined; // Can be full URL (incl token)
   }
 
@@ -80,7 +81,7 @@ export class BrowserlessService {
     const rawText = await res.text();
     let json: any;
     try { json = JSON.parse(rawText); } catch {
-      throw new Error(`Non-JSON scrape response (status ${res.status}): ${rawText.slice(0,300)}`);
+      throw new Error(`Non-JSON scrape response (status ${res.status}): ${rawText.slice(0, 300)}`);
     }
     if (!res.ok) throw new Error(`Scrape failed HTTP_${res.status}`);
     const max = opts.maxCharsPerSelector ?? 4000;
@@ -140,7 +141,7 @@ export class BrowserlessService {
           sources.push({ url: u, bytes: txt.length });
           chunks.push(`URL: ${u}\n${txt.slice(0, 8000)}`);
         }
-      } catch {/* ignore */}
+      } catch {/* ignore */ }
       if (chunks.join('\n').length > maxTotalChars) break;
     }
     return { combined: chunks.join('\n\n').slice(0, maxTotalChars), sources };

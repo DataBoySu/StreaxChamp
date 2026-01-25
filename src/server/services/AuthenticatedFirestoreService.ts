@@ -2,6 +2,7 @@
  * Authenticated Firestore REST API service for Devvit
  * Uses service account authentication to access private Firestore projects
  */
+import { CONFIG } from '../../shared/constants';
 
 export interface QuizData {
   id: string;
@@ -23,7 +24,7 @@ export class AuthenticatedFirestoreService {
   private readonly projectId: string;
   private readonly baseUrl: string;
 
-  constructor(projectId: string = 'streax-bot-local') {
+  constructor(projectId: string = CONFIG.FIREBASE.PROJECT_ID) {
     this.projectId = projectId;
     this.baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
   }

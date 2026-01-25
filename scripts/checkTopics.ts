@@ -1,14 +1,15 @@
 /** Quick check: fetch topics using Firebase client SDK (unauthenticated) */
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { CONFIG } from '../src/shared/constants';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyAidW2UYWKJt-s6OXs7A9JGoMaXL-LkT9c',
-  authDomain: 'streax-bot-local.firebaseapp.com',
-  projectId: 'streax-bot-local',
-  storageBucket: 'streax-bot-local.firebasestorage.app',
-  messagingSenderId: '843988437750',
-  appId: '1:843988437750:web:02cd46061ab366eb3b7ad7',
+  apiKey: CONFIG.FIREBASE.API_KEY,
+  authDomain: CONFIG.FIREBASE.AUTH_DOMAIN,
+  projectId: CONFIG.FIREBASE.PROJECT_ID,
+  storageBucket: CONFIG.FIREBASE.STORAGE_BUCKET,
+  messagingSenderId: CONFIG.FIREBASE.MESSAGING_SENDER_ID,
+  appId: CONFIG.FIREBASE.APP_ID,
 };
 
 if (!getApps().length) initializeApp(firebaseConfig);

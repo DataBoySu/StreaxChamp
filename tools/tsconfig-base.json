@@ -17,12 +17,16 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "bundler",
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "sourceMap": true,
     "target": "ES2022",
-    "lib": ["DOM", "ES2023", "esnext.disposable"],
+    "lib": [
+      "DOM",
+      "ES2023",
+      "esnext.disposable"
+    ],
     "jsx": "react-jsx"
   }
 }

@@ -3,6 +3,8 @@ import React from 'react';
 interface Props {
   title: string;
   onClick?: () => void;
+  className?: string; // Add className prop for animations
+  compact?: boolean; // render smaller, non-stretched button
 }
 
 const buttonColors = [
@@ -16,48 +18,60 @@ const buttonColors = [
   { bg: 'linear-gradient(135deg, #ec4899 0%, #f472b6 100%)', shadow: 'rgba(236, 72, 153, 0.3)' }, // Pink
 ];
 
-export const TopicButton: React.FC<Props> = ({ title, onClick }) => {
+export const TopicButton: React.FC<Props> = ({ title, onClick, className = '', compact = false }) => {
   // Generate consistent color based on title hash
   const colorIndex = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % buttonColors.length;
-  const color = buttonColors[colorIndex] ?? buttonColors[0];
-  
+
+  // Default values
+  const defaultBg = 'linear-gradient(135deg, #ff4500 0%, #ff6b35 100%)';
+  const defaultShadow = 'rgba(0,0,0,0.2)';
+
+  // Safely get color values with non-nullable defaults
+  const background = buttonColors[colorIndex]?.bg || defaultBg;
+  const shadow = buttonColors[colorIndex]?.shadow || defaultShadow;
+
+  // compact mode: smaller, inline, doesn't force full width
+  const baseClass = compact
+    ? `group relative inline-flex h-14 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-103 focus:outline-none active:scale-95 overflow-hidden shadow-lg hover:shadow-2xl border-2 border-black/20 ${className}`
+    : `group relative w-full h-28 rounded-2xl font-semibold text-white transition-all duration-300 transform hover:scale-103 hover:-translate-y-1 focus:outline-none active:scale-95 overflow-hidden shadow-lg hover:shadow-2xl border-2 border-black/20 ${className}`;
+
   return (
     <button
       onClick={onClick}
-      className="group relative w-full h-32 rounded-2xl font-semibold text-white transition-all duration-300 transform hover:scale-105 hover:-translate-y-2 focus:outline-none active:scale-95 overflow-hidden shadow-lg hover:shadow-2xl"
+      className={baseClass}
       style={{
-        background: color.bg,
-        boxShadow: `0 12px 35px ${color.shadow}, 0 4px 15px rgba(0,0,0,0.1)`,
+        background: background,
+        boxShadow: `0 8px 16px ${shadow}, 0 2px 8px rgba(0,0,0,0.1)`,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.05) translateY(-8px)';
-        e.currentTarget.style.boxShadow = `0 20px 50px ${color.shadow}, 0 8px 25px rgba(0,0,0,0.2)`;
+        e.currentTarget.style.transform = 'scale(1.05) translateY(-4px)';
+        e.currentTarget.style.boxShadow = `0 12px 24px ${shadow}, 0 4px 12px rgba(0,0,0,0.2)`;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'scale(1) translateY(0)';
-        e.currentTarget.style.boxShadow = `0 12px 35px ${color.shadow}, 0 4px 15px rgba(0,0,0,0.1)`;
+        e.currentTarget.style.boxShadow = `0 8px 16px ${shadow}, 0 2px 8px rgba(0,0,0,0.1)`;
       }}
       aria-label={`Select topic ${title}`}
     >
-      {/* Hover overlay */}
-      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-2xl"></div>
-      
-      {/* Shimmer animation */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-        <div 
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-out"
+      {/* Glassy overlay */}
+      <div className="absolute inset-0 bg-white/5 group-hover:bg-white/10 transition-all duration-300"></div>
+
+      {/* Shimmer effect */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-20 translate-x-[-150%] group-hover:translate-x-[250%] transition-transform duration-1000 ease-out"
         />
       </div>
-      
+
       {/* Content */}
-      <div className="relative flex items-center justify-center h-full px-8">
-        <span className="text-3xl font-bold tracking-wide text-center leading-tight">
+      <div className="relative flex items-center justify-center h-full px-4 text-center">
+        <span className={`font-black tracking-tight leading-tight transition-all duration-300 ${title.length > 15 ? 'text-lg md:text-xl' : 'text-2xl md:text-3xl'}`}>
           {title}
         </span>
       </div>
-      
-      {/* Border highlight */}
-      <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/20 group-hover:ring-white/40 transition-all duration-300"></div>
+
+      {/* Glossy top highlight */}
+      <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent pointer-events-none"></div>
     </button>
   );
 };

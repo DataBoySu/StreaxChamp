@@ -2,6 +2,7 @@
  * Firestore REST API service for Devvit server-side operations
  * Uses HTTP fetch instead of Firebase SDK to work within Devvit's constraints
  */
+import { CONFIG } from '../../shared/constants';
 
 export interface QuizData {
   id: string;
@@ -23,7 +24,7 @@ export class FirestoreRestService {
   private readonly projectId: string;
   private readonly baseUrl: string;
 
-  constructor(projectId: string = (process.env.FIRESTORE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || 'streax-bot-local')) {
+  constructor(projectId: string = (process.env.FIRESTORE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || CONFIG.FIREBASE.PROJECT_ID)) {
     this.projectId = projectId;
     this.baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
   }
@@ -231,7 +232,7 @@ export class FirestoreRestService {
       const documentPath = `topics/${topic.slug}`;
       const url = `${this.baseUrl}/${documentPath}`;
 
-    const body = {
+      const body = {
         fields: {
           id: { stringValue: topic.slug },
           title: { stringValue: topic.title },
@@ -242,8 +243,8 @@ export class FirestoreRestService {
           lastGenerated: { stringValue: new Date().toISOString() },
           createdAt: { stringValue: new Date().toISOString() },
           hasQuiz: { booleanValue: false },
-      ...(topic.model ? { model: { stringValue: topic.model } } : {}),
-      ...(typeof topic.genLatencyMs === 'number' ? { genLatencyMs: { integerValue: String(Math.round(topic.genLatencyMs)) } } : {}),
+          ...(topic.model ? { model: { stringValue: topic.model } } : {}),
+          ...(typeof topic.genLatencyMs === 'number' ? { genLatencyMs: { integerValue: String(Math.round(topic.genLatencyMs)) } } : {}),
         },
       };
 
@@ -274,8 +275,8 @@ export class FirestoreRestService {
       const url = `${this.baseUrl}/topics`;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json();
       if (!data.documents) return [];
       return data.documents.map((d: any) => {
         const f = d.fields || {};
@@ -297,8 +298,8 @@ export class FirestoreRestService {
       const url = `${this.baseUrl}/topics/${slug}`;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json();
       const f = data.fields || {};
       // Recover title/slug if earlier patch calls erased them
       let title = f.title?.stringValue || f.id?.stringValue || '';
@@ -328,8 +329,8 @@ export class FirestoreRestService {
           };
         });
       }
-  const playCount = f.playCount?.integerValue ? Number(f.playCount.integerValue) : 0;
-  return { title, slug: recoveredSlug, sources, status, lastGenerated, generationPhase, questions, playCount };
+      const playCount = f.playCount?.integerValue ? Number(f.playCount.integerValue) : 0;
+      return { title, slug: recoveredSlug, sources, status, lastGenerated, generationPhase, questions, playCount };
     } catch (error) {
       return null;
     }
@@ -406,29 +407,29 @@ export class FirestoreRestService {
       const body = {
         fields: {
           id: { stringValue: date },
-            date: { stringValue: date },
-            topicSlug: { stringValue: slug },
-            questions: { arrayValue: { values: questionsValues } },
-            metadata: {
-              mapValue: {
-                fields: {
-                  generatedAt: { stringValue: quiz.metadata.generatedAt || nowIso },
-                  sourceWikis: { arrayValue: { values: (quiz.metadata.sourceWikis || []).map((s: string) => ({ stringValue: s })) } },
-                  version: { stringValue: quiz.metadata.version || 'v1' },
-                  ...(quiz.metadata.model ? { model: { stringValue: quiz.metadata.model } } : {}),
-                  ...(quiz.metadata.generator ? { generator: { stringValue: quiz.metadata.generator } } : {}),
-                  topicSlug: { stringValue: slug },
-                },
+          date: { stringValue: date },
+          topicSlug: { stringValue: slug },
+          questions: { arrayValue: { values: questionsValues } },
+          metadata: {
+            mapValue: {
+              fields: {
+                generatedAt: { stringValue: quiz.metadata.generatedAt || nowIso },
+                sourceWikis: { arrayValue: { values: (quiz.metadata.sourceWikis || []).map((s: string) => ({ stringValue: s })) } },
+                version: { stringValue: quiz.metadata.version || 'v1' },
+                ...(quiz.metadata.model ? { model: { stringValue: quiz.metadata.model } } : {}),
+                ...(quiz.metadata.generator ? { generator: { stringValue: quiz.metadata.generator } } : {}),
+                topicSlug: { stringValue: slug },
               },
             },
-            uploadedAt: { stringValue: nowIso },
-            integrity: {
-              mapValue: {
-                fields: {
-                  questionCount: { integerValue: String(quiz.questions.length) },
-                },
+          },
+          uploadedAt: { stringValue: nowIso },
+          integrity: {
+            mapValue: {
+              fields: {
+                questionCount: { integerValue: String(quiz.questions.length) },
               },
             },
+          },
         },
       };
       const res = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -451,7 +452,7 @@ export class FirestoreRestService {
       try {
         const existingRes = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
         if (existingRes.ok) existing = await existingRes.json();
-      } catch {}
+      } catch { }
       const existingFields = existing?.fields || {};
       const ensure = (key: string, val: any) => {
         if (!existingFields[key] && !(key in fields)) {
@@ -526,7 +527,7 @@ export class FirestoreRestService {
       const data: any = await res.json();
       const f = data.fields || {};
       const question = f.question?.stringValue || '';
-  const options = (f.options?.arrayValue?.values || []).map((v: { stringValue?: string }) => v.stringValue || '').slice(0, 4);
+      const options = (f.options?.arrayValue?.values || []).map((v: { stringValue?: string }) => v.stringValue || '').slice(0, 4);
       const correctAnswer = Number(f.correctAnswer?.integerValue ?? 0);
       const difficulty = f.difficulty?.stringValue || 'hard';
       const generatedAt = f.generatedAt?.stringValue || new Date().toISOString();
