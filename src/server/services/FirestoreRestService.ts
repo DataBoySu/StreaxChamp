@@ -29,6 +29,48 @@ export class FirestoreRestService {
     this.baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
   }
 
+  // --- Circuit Breaker State (Global) ---
+  public static dbCircuitOpen = false;
+  public static dbRequestsSinceTrip = 0;
+  public static dbHealingAttempted = false;
+  public static readonly CIRCUIT_RETRY_THRESHOLD = 5;
+
+  /**
+   * Health check: Send minimal request to Firestore to verify availability
+   */
+  static async checkHealth(): Promise<boolean> {
+    try {
+      const fs = new FirestoreRestService();
+      const url = `${fs.getBaseUrl()}/health-check-dummy/test`;
+      const resp = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      // 404 is OK (doc doesn't exist), 200 is OK, 401/403 means auth issues (still "reachable")
+      return resp.status === 404 || resp.status === 200 || resp.status === 401 || resp.status === 403;
+    } catch {
+      return false;
+    }
+  }
+
+  static async attemptHealing(): Promise<{ healed: boolean; final: boolean }> {
+    if (!this.dbCircuitOpen) return { healed: true, final: false };
+
+    this.dbRequestsSinceTrip++;
+    if (this.dbRequestsSinceTrip >= this.CIRCUIT_RETRY_THRESHOLD) {
+      const healthy = await this.checkHealth();
+      if (healthy) {
+        this.dbCircuitOpen = false;
+        this.dbRequestsSinceTrip = 0;
+        this.dbHealingAttempted = false;
+        return { healed: true, final: false };
+      } else {
+        this.dbHealingAttempted = true;
+        return { healed: false, final: true };
+      }
+    }
+
+    if (this.dbHealingAttempted) return { healed: false, final: true };
+    return { healed: false, final: false };
+  }
+
   /**
    * Safe accessor for the constructed base URL.
    * Use this instead of reaching into the instance via casts.
