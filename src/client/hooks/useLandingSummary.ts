@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useBackoffPolling } from './useBackoffPolling';
 
 export interface LandingTopEntry {
   slug: string;
@@ -20,6 +21,9 @@ export interface LandingSummaryData {
   globalTotals?: { userKey: string; nickname: string; totalScore: number }[];
 }
 
+const CACHE_KEY = 'streax.landingSummary';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 export const useLandingSummary = (enabled: boolean) => {
   const [data, setData] = useState<LandingSummaryData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,6 +32,20 @@ export const useLandingSummary = (enabled: boolean) => {
 
   const fetchSummary = useCallback(async () => {
     if (!enabled) return;
+
+    // Strict cache check - if fresh, don't fetch
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { ts: number; summary: LandingSummaryData };
+        if (parsed && parsed.ts && Date.now() - parsed.ts < CACHE_TTL) {
+          // Cache is fresh, skip fetch entirely
+          if (!data) setData(parsed.summary);
+          return;
+        }
+      }
+    } catch {/* ignore */ }
+
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -47,10 +65,10 @@ export const useLandingSummary = (enabled: boolean) => {
           globalTotals: json.globalTotals || []
         };
         setData(summary);
-        // Cache hotTopics & timestamp (other fields optional) with 5 min TTL
+        // Cache with timestamp
         try {
           const cache = { ts: Date.now(), summary };
-          localStorage.setItem('streax.landingSummary', JSON.stringify(cache));
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
         } catch {/* ignore */ }
       }
     } catch (e) {
@@ -58,26 +76,29 @@ export const useLandingSummary = (enabled: boolean) => {
     } finally {
       setLoading(false);
     }
-  }, [enabled]);
+  }, [enabled, data]);
 
+  // Load initial cache immediately
   useEffect(() => {
     if (!enabled) return;
-    // Immediate cached hotTopics if fresh (<5 min)
     try {
-      const raw = localStorage.getItem('streax.landingSummary');
+      const raw = localStorage.getItem(CACHE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as { ts: number; summary: LandingSummaryData };
-        if (parsed && parsed.ts && Date.now() - parsed.ts < 5 * 60 * 1000) {
+        if (parsed && parsed.ts && Date.now() - parsed.ts < CACHE_TTL) {
           setData(parsed.summary);
         }
       }
     } catch {/* ignore */ }
-    void fetchSummary();
-    const iv = setInterval(() => {
-      void fetchSummary();
-    }, 1500);
-    return () => { abortRef.current?.abort(); clearInterval(iv); };
-  }, [enabled, fetchSummary]);
+  }, [enabled]);
 
-  return { data, loading, error, refresh: fetchSummary };
+  // Use exponential backoff polling
+  const { reset } = useBackoffPolling(fetchSummary, {
+    enabled,
+    initialInterval: 3000,
+    maxInterval: 60000,
+    backoffMultiplier: 1.5,
+  });
+
+  return { data, loading, error, refresh: reset };
 };
