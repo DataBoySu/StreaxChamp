@@ -45,6 +45,55 @@ Logger.info(`[AI] Gemini key present=${GEMINI_API_KEY ? 'yes' : 'no'}`);
 
 // Safety settings removed per request (solo testing environment)
 
+// --- Circuit Breakers ---
+// If any critical service fails once, we switch to "Banter Mode" and stop trying.
+// After N requests, we attempt a health check to see if services are back.
+let aiCircuitOpen = false;
+let dbCircuitOpen = false;
+let aiRequestsSinceTrip = 0;
+let dbRequestsSinceTrip = 0;
+let aiHealingAttempted = false; // Track if we already tried to heal AI
+let dbHealingAttempted = false; // Track if we already tried to heal DB
+const CIRCUIT_RETRY_THRESHOLD = 5; // After 5 user interactions, attempt healing
+
+// Health check: Send minimal request to Gemini to verify availability
+async function checkGeminiHealth(): Promise<boolean> {
+    if (!GEMINI_API_KEY) return false;
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000); // 3s timeout for health check
+        const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI.LITE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+                    generationConfig: { maxOutputTokens: 10 }
+                }),
+                signal: controller.signal
+            }
+        );
+        clearTimeout(timeout);
+        return resp.ok;
+    } catch {
+        return false;
+    }
+}
+
+// Health check: Send minimal request to Firestore to verify availability
+async function checkFirestoreHealth(): Promise<boolean> {
+    try {
+        const fs = new FirestoreRestService();
+        const url = `${fs.getBaseUrl()}/health-check-dummy/test`;
+        const resp = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+        // 404 is OK (doc doesn't exist), 200 is OK, 401/403 means auth issues (still "reachable")
+        return resp.status === 404 || resp.status === 200 || resp.status === 401 || resp.status === 403;
+    } catch {
+        return false;
+    }
+}
+
 interface GeminiResult {
     title: string;
     slug: string;
@@ -245,6 +294,7 @@ async function callGemini(rawTopic: string): Promise<GeminiResult> {
         return { title, slug: finalSlug, sources, provider: 'gemini', model, latencyMs };
     } catch (err) {
         Logger.error('Gemini call failed, using fallback:', err);
+        aiCircuitOpen = true; // Trip the breaker
         return {
             title: fallbackTitle,
             slug,
@@ -599,6 +649,7 @@ app.get('/api/quiz', async (_req, res) => {
         // Unreachable code removed. Logic ends at fallback return above.
     } catch (error) {
         Logger.error('Error fetching quiz:', error);
+        dbCircuitOpen = true;
         res.status(500).json({ error: 'Failed to fetch quiz data' });
     }
 });
@@ -667,13 +718,71 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
     try {
         const today = new Date().toISOString().slice(0, 10);
 
+        // 1. CIRCUIT BREAKER CHECKS WITH HEALING
+        // DB Circuit: Check if we should attempt healing
+        if (dbCircuitOpen) {
+            dbRequestsSinceTrip++;
+            if (dbRequestsSinceTrip >= CIRCUIT_RETRY_THRESHOLD) {
+                Logger.info(`[CircuitBreaker] DB healing attempt (${dbRequestsSinceTrip} requests since trip)`);
+                const dbHealthy = await checkFirestoreHealth();
+                if (dbHealthy) {
+                    Logger.info('[CircuitBreaker] DB is back! Closing circuit.');
+                    dbCircuitOpen = false;
+                    dbRequestsSinceTrip = 0;
+                    // Fall through to normal flow
+                } else {
+                    Logger.warn('[CircuitBreaker] DB still down after healing attempt - giving up');
+                    dbHealingAttempted = true; // Mark that we tried and failed
+                    return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.PERMANENTLY_DOWN });
+                }
+            } else {
+                // If we already tried healing and it failed, show final message
+                if (dbHealingAttempted) {
+                    return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.PERMANENTLY_DOWN });
+                }
+                return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.DB_OFFLINE });
+            }
+        }
+
+        // AI Circuit: Check if we should attempt healing
+        if (aiCircuitOpen) {
+            aiRequestsSinceTrip++;
+            if (aiRequestsSinceTrip >= CIRCUIT_RETRY_THRESHOLD) {
+                Logger.info(`[CircuitBreaker] AI healing attempt (${aiRequestsSinceTrip} requests since trip)`);
+                const aiHealthy = await checkGeminiHealth();
+                if (aiHealthy) {
+                    Logger.info('[CircuitBreaker] AI is back! Closing circuit.');
+                    aiCircuitOpen = false;
+                    aiRequestsSinceTrip = 0;
+                    // Fall through to normal flow
+                } else {
+                    Logger.warn('[CircuitBreaker] AI still down after healing attempt - giving up');
+                    aiHealingAttempted = true; // Mark that we tried and failed
+                    return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.PERMANENTLY_DOWN });
+                }
+            } else {
+                // If we already tried healing and it failed, show final message
+                if (aiHealingAttempted) {
+                    return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.PERMANENTLY_DOWN });
+                }
+                return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
+            }
+        }
+
         // Check RAM cache first (zero DB/AI calls if cached)
         if (ROBOT_DIALOGUE_CACHE && ROBOT_DIALOGUE_CACHE.date === today) {
             return res.json({ ok: true, date: today, lines: ROBOT_DIALOGUE_CACHE.lines, cached: true });
         }
 
         const fs = new FirestoreRestService();
-        const existing = await fs.getRobotDialogues(today);
+        let existing;
+        try {
+            existing = await fs.getRobotDialogues(today);
+        } catch (e) {
+            Logger.error('[Robot] DB Check Failed -> Trip Breaker', e);
+            dbCircuitOpen = true;
+            return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.DB_OFFLINE });
+        }
         if (existing && existing.length >= 5) {
             // Cache in RAM for subsequent requests
             ROBOT_DIALOGUE_CACHE = { date: today, lines: existing.slice(0, 20) };
@@ -681,28 +790,33 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
         }
         // Generate 5 new lines if none today (or not enough)
         const model = CONFIG.GEMINI.LITE_MODEL; // Cheaper model for simple text
-        if (!GEMINI_API_KEY) return res.status(200).json({
-            ok: true, date: today, lines: [
-                'Halt. State your business. Quickly.',
-                'New face? Do not dawdle.',
-                'Eyes front. Spine straight. In or out?',
-                'Still here? Hmph. Training yard awaits.',
-                'Enough loitering. Inside. Now.'
-            ]
-        });
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: ROBOT_SYSTEM_PROMPT }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 256 } }),
-            }
-        );
-        if (!resp.ok) return res.status(200).json({
-            ok: true, date: today, lines: [
-                'Move along. Or move in.', 'This gate will not stare back.', 'You. Inside. Chop-chop.', 'Still hovering? Tsk.', 'Enough. Enter the app.'
-            ]
-        });
+        if (!GEMINI_API_KEY) {
+            Logger.warn('[Robot] No API Key -> Trip AI Breaker');
+            aiCircuitOpen = true;
+            return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
+        }
+
+        let resp;
+        try {
+            resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: ROBOT_SYSTEM_PROMPT }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 256 } }),
+                }
+            );
+        } catch (e) {
+            Logger.error('[Robot] AI Network Fail -> Trip Breaker', e);
+            aiCircuitOpen = true;
+            return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
+        }
+
+        if (!resp.ok) {
+            Logger.warn(`[Robot] AI Status Fail ${resp.status} -> Trip Breaker`);
+            aiCircuitOpen = true;
+            return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = await resp.json();
         const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -712,15 +826,51 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
             ? ((parsed as RobotJson).lines as unknown[]).map((s) => String(s).trim()).filter(Boolean)
             : [];
         const clean = sanitizeLines(linesArr).slice(0, 5);
-        const fsOk = await new FirestoreRestService().saveRobotDialogues(today, clean);
-        const finalLines = (fsOk ? clean : sanitizeLines(linesArr)).slice(0, 20);
+
+        // VALIDATION: Only save to Firestore if we have 5 valid lines
+        if (clean.length < 5) {
+            Logger.warn(`[Robot] AI returned insufficient lines (${clean.length}/5) -> Trip Breaker`);
+            aiCircuitOpen = true;
+            return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
+        }
+
+        // Additional quality check: ensure each line is meaningful
+        const validLines = clean.filter(line => line.length >= 10 && line.length <= 80);
+        if (validLines.length < 5) {
+            Logger.warn(`[Robot] AI returned low-quality lines (${validLines.length}/5 valid) -> Trip Breaker`);
+            aiCircuitOpen = true;
+            return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
+        }
+
+        // Save to Firestore
+        const fsOk = await new FirestoreRestService().saveRobotDialogues(today, validLines);
+        if (!fsOk) {
+            Logger.warn('[Robot] DB Save Failed -> Trip Breaker');
+            dbCircuitOpen = true;
+            // Still return the generated lines this time, but future requests will use DB_OFFLINE
+        }
 
         // Cache in RAM for subsequent requests
-        ROBOT_DIALOGUE_CACHE = { date: today, lines: finalLines };
+        ROBOT_DIALOGUE_CACHE = { date: today, lines: validLines };
 
-        res.json({ ok: true, date: today, lines: finalLines });
+        res.json({ ok: true, date: today, lines: validLines });
     } catch (e) {
         Logger.error('[RobotDialogues] error', e);
+        // Determine if it was AI or DB error to set specific flags if needed
+        // For now, if the top-level catch hits, it's ambiguous, but we can assume DB if AI calls were wrapped.
+        // But since we are here, we can just check if it was likely an AI error or DB error.
+        // Simplification: just return a generic error or the offline banter if we know which one failed.
+
+        // If we are here, something major failed.
+        // Let's assume DB failure if we haven't set AI failure explicitly yet, or checking the error object.
+        // But for "checking once", we should set the flag corresponding to what failed.
+        // Since this try/catch wraps BOTH FS and AI calls, it's tricky.
+
+        // Strategy: We rely on the specific catch blocks or flags set during execution if possible.
+        // But this block catches EVERYTHING.
+        // Let's safe-fail to "System Malfunction" (generic) or triggering one of the breakers?
+        // Actually, if we are in this catch block, we can't easily distinguish without checking error.
+
         res.status(500).json({ ok: false, error: 'ROBOT_DIALOGUES_FAILED' });
     }
 });
