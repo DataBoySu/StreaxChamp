@@ -26,10 +26,6 @@ export async function attemptHealing(): Promise<{ healed: boolean; final: boolea
     if (!aiCircuitOpen) return { healed: true, final: false };
 
     const cooldownElapsed = Date.now() - aiLastFailureTime > aiCooldownMs;
-    // We increment requests on the controller side? Or here?
-    // index.ts incremented requestsSinceTrip inside the route handler. 
-    // Ideally we increment it here when queried?
-    // Let's assume the controller calls this method to *check* and *maybe heal*.
     aiRequestsSinceTrip++;
 
     const thresholdReached = aiRequestsSinceTrip >= CIRCUIT_RETRY_THRESHOLD;

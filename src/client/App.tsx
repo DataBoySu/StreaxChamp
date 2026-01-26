@@ -43,14 +43,14 @@ export const App = () => {
   const [timer, setTimer] = useState<number | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
-  // Firestore leaderboard displayed via separate component/hook (to be implemented)
+  // Topic-specific leaderboard state
   const [multiplier, setMultiplier] = useState(0);
   const [showGap, setShowGap] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
   const [bonusAnswered, setBonusAnswered] = useState(false);
   const [history, setHistory] = useState<{ id: string; slug: string; title: string; score: number; ts: number }[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  // Legacy userInfo retained temporarily; will be deprecated in favor of authUser
+  // User session state (deprecated)
   const [userInfo, setUserInfo] = useState<{ userId: string | null; username: string | null; displayName: string | null } | null>(null);
   const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
   const [showTopicMenu, setShowTopicMenu] = useState(false);

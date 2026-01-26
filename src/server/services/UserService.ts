@@ -2,13 +2,10 @@ import { FirestoreRestService } from './FirestoreRestService';
 import { Logger } from '../Logger';
 import { User } from '../../shared/types/user';
 
-// Collections design:
-// users/{userId} => { userId, nickname, createdAt, quizCount, interests }
-// nicknames/{nicknameLower} => { userId, nickname }
+// Schema: users/{userId}, nicknames/{nicknameLower}
 
 /**
  * Service for managing user profiles and nickname reservations in Firestore.
- * Handles atomic registration across nicknames and user collections.
  */
 export class UserService {
   private fs: FirestoreRestService;

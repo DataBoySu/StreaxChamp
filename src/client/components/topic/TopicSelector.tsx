@@ -302,10 +302,11 @@ export const TopicSelector: React.FC<{
   return (
     <div className="fixed inset-0 z-50 flex flex-col w-full min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black text-white">
 
-      {/* Fixed Search Bar at Top */}
-      <div className="sticky top-0 z-10 w-full bg-slate-900/95 backdrop-blur-sm border-b border-white/10 shadow-lg px-4 sm:px-6 py-4 mb-5">
-        <div className="max-w-4xl mx-auto flex gap-2 items-center">
-          <div className="relative flex-1">
+      {/* Search Bar Header */}
+      <div className="sticky top-0 z-10 w-full bg-slate-900/95 backdrop-blur-sm border-b border-white/10 shadow-lg px-4 py-4 mb-5">
+        <div className="max-w-[90%] mx-auto flex gap-2 items-center">
+          {/* Search Input */}
+          <div className="relative flex-[8]">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -313,38 +314,45 @@ export const TopicSelector: React.FC<{
               placeholder="Search or add topics..."
               className="w-full rounded-lg bg-slate-800/70 border border-slate-600/40 
                       focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 
-                      outline-none px-5 py-3 text-lg placeholder-slate-400 font-mono tracking-wide"
+                      outline-none px-4 py-3 text-lg placeholder-slate-400 font-mono tracking-wide"
               aria-label="Search or add topics"
               autoComplete="off"
             />
             {inlineSuggestion && inlineSuggestion.toLowerCase() !== query.toLowerCase() && (
-              <div className="pointer-events-none absolute inset-0 flex items-center px-5 text-lg font-mono tracking-wide select-none" style={{ color: 'rgba(255,255,255,0.25)' }} aria-hidden>
+              <div className="pointer-events-none absolute inset-0 flex items-center px-4 text-lg font-mono tracking-wide select-none" style={{ color: 'rgba(255,255,255,0.25)' }} aria-hidden>
                 <span>{query}<span style={{ color: 'rgba(255,255,255,0.35)' }}>{inlineSuggestion.slice(query.length)}</span></span>
               </div>
             )}
           </div>
-          {query.trim().length > 0 && (
+
+          {/* Close Action */}
+          <div className="flex-[1] flex justify-center">
             <button
-              disabled={addingTopic || !canAddNewTopic}
-              onClick={handleAddTopic}
-              className="px-5 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 
-                      disabled:bg-slate-600 disabled:opacity-50 text-white font-semibold 
-                      transition-colors duration-200 whitespace-nowrap"
+              onClick={handleClose}
+              className="p-3 rounded-lg bg-slate-800/80 border border-white/10 text-slate-300 hover:bg-red-500/20 hover:text-white transition-all transform hover:rotate-90"
+              aria-label="Close"
             >
-              {addingTopic ? 'Adding...' : (topicExists ? 'Find Topic' : 'Add Topic')}
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
             </button>
-          )}
-          {/* Close button - Absolute positioned to avoid flex clipping */}
-          <button
-            onClick={handleClose}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all transform hover:rotate-90"
-            aria-label="Close"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+          </div>
+
+          {/* Submit/Add Action */}
+          <div className="flex-[1] flex justify-end">
+            {query.trim().length > 0 && (
+              <button
+                disabled={addingTopic || !canAddNewTopic}
+                onClick={handleAddTopic}
+                className="w-full px-3 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 
+                        disabled:bg-slate-600 disabled:opacity-50 text-white font-semibold 
+                        transition-colors duration-200 whitespace-nowrap overflow-hidden text-ellipsis"
+              >
+                {addingTopic ? '...' : (topicExists ? 'Go' : 'Add')}
+              </button>
+            )}
+          </div>
         </div>
         {/* Visible glowing red separator for clear header/content distinction */}
         <div className="w-full mt-3">

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { getDevvitUserId } from '../context/userContext';
 import { Logger } from '../Logger';
+import { getDevvitUserId } from '../context/userContext';
 import { UserService } from '../services/UserService';
 import { reddit } from '@devvit/web/server';
 
@@ -79,16 +79,22 @@ export class UserController {
     }
 
     /**
-     * (Legacy) Gets the simplified current user info from the Reddit API.
+     * Retrieves basic authenticated user info for client persistence.
      */
     static async getCurrentUser(_req: Request, res: Response) {
         try {
-            const username = await reddit.getCurrentUsername();
+            const username = await reddit.getCurrentUsername().catch(() => null);
             if (username) {
-                return res.json({ userId: username, username, displayName: username, isLoggedIn: true });
+                return res.json({
+                    userId: username,
+                    username,
+                    displayName: username,
+                    isLoggedIn: true
+                });
             }
             return res.json({ userId: null, username: null, displayName: null, isLoggedIn: false });
         } catch (e) {
+            Logger.error('[getCurrentUser] failure', e);
             return res.status(200).json({ userId: null, username: null, displayName: null, isLoggedIn: false });
         }
     }

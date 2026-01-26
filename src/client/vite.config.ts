@@ -14,6 +14,11 @@ export default defineConfig({
         chunkFileNames: '[name].js',
         assetFileNames: '[name][extname]',
         sourcemapFileNames: '[name].js.map',
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-utils': ['framer-motion', 'lucide-react', 'clsx', 'tailwind-merge'],
+          'vendor-firebase': ['firebase/app', 'firebase/firestore'],
+        },
       },
     },
   },
