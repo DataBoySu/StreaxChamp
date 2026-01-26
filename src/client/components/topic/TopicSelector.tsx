@@ -334,13 +334,16 @@ export const TopicSelector: React.FC<{
               {addingTopic ? 'Adding...' : (topicExists ? 'Find Topic' : 'Add Topic')}
             </button>
           )}
-          {/* Close button */}
+          {/* Close button - Absolute positioned to avoid flex clipping */}
           <button
             onClick={handleClose}
-            className="ml-2 mr-4 px-4 py-2 rounded-md text-sm border border-white/15 hover:bg-white/10"
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all transform hover:rotate-90"
             aria-label="Close"
           >
-            ✕
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
           </button>
         </div>
         {/* Visible glowing red separator for clear header/content distinction */}
@@ -359,7 +362,8 @@ export const TopicSelector: React.FC<{
       {/* Main content area - flex-1 to take available space between header and footer */}
       <div className="flex-1 w-full max-w-full overflow-y-auto">
         {/* Loading indicator */}
-        {(loading || addingTopic) && (
+        {/* Loading indicator (unified for topic & quiz gen) */}
+        {(loading || addingTopic || generatingSlug) && (
           <div className="w-full max-w-4xl mx-auto px-5 pt-6 pb-2">
             <div className="bg-slate-800/60 rounded-lg p-4 mb-5">
               <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
@@ -369,7 +373,9 @@ export const TopicSelector: React.FC<{
                 />
               </div>
               <div className="mt-3 text-center text-sm text-slate-400">
-                {addingTopic ? (progress < 90 ? 'Generating topic with AI...' : 'Finalizing...') : 'Loading topics...'}
+                {addingTopic
+                  ? (progress < 90 ? 'Generating topic with AI...' : 'Finalizing...')
+                  : (generatingSlug ? 'Generating specific quiz...' : 'Loading topics...')}
               </div>
             </div>
             {/* Spacer to avoid overlap with footer note while loading */}
