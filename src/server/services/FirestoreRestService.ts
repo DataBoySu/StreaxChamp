@@ -82,6 +82,65 @@ export class FirestoreRestService {
   }
 
   /**
+   * Save today's quiz to Firestore at daily-quizzes/{date}
+   */
+  async saveTodaysQuiz(quiz: { questions: any[]; metadata: Record<string, any> }): Promise<boolean> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const documentPath = `daily-quizzes/${today}`;
+      const url = `${this.baseUrl}/${documentPath}`;
+      const nowIso = new Date().toISOString();
+
+      const questionsValues = quiz.questions.map((q, idx) => ({
+        mapValue: {
+          fields: {
+            id: { stringValue: q.id || `q${idx + 1}` },
+            question: { stringValue: q.question },
+            options: { arrayValue: { values: q.options.map((o: string) => ({ stringValue: o })) } },
+            correctAnswer: { integerValue: String(q.correctAnswer ?? 0) },
+            difficulty: { stringValue: q.difficulty || 'medium' },
+            category: { stringValue: q.category || 'General' },
+            ...(q.explanation ? { explanation: { stringValue: q.explanation } } : {}),
+            createdAt: { stringValue: q.createdAt || nowIso },
+          },
+        },
+      }));
+
+      const body = {
+        fields: {
+          id: { stringValue: today },
+          questions: { arrayValue: { values: questionsValues } },
+          metadata: {
+            mapValue: {
+              fields: {
+                generatedAt: { stringValue: quiz.metadata.generatedAt || nowIso },
+                sourceWikis: { arrayValue: { values: (quiz.metadata.sourceWikis || []).map((s: string) => ({ stringValue: s })) } },
+                version: { stringValue: quiz.metadata.version || 'v1' },
+                model: { stringValue: quiz.metadata.model || 'gemini' },
+                generator: { stringValue: quiz.metadata.generator || 'system' },
+                topic: { stringValue: quiz.metadata.topic || 'General Knowledge' },
+                difficulty: { stringValue: quiz.metadata.difficulty || 'mixed' },
+                source: { stringValue: 'system' }
+              },
+            },
+          },
+          updatedAt: { stringValue: nowIso },
+        },
+      };
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Parse Firestore document format to our QuizData format
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

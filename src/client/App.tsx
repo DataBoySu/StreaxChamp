@@ -1331,6 +1331,33 @@ export const App = () => {
               {/* Background Effects */}
               <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-success/5 pointer-events-none" />
 
+              {/* Close/Quit Button */}
+              {(quizStarted || selectedTopic || usingRandomFallback) && (
+                <button
+                  onClick={() => {
+                    setQuizStarted(false);
+                    setScore(0);
+                    setConsecutiveCorrectAnswers(0);
+                    setCurrentQuestionIndex(0);
+                    setShowScore(false);
+                    setSelectedTopic(null);
+                    setSelectedTopicQuiz(null);
+                    setTopicQuizStatus('idle'); // Reset status so it doesn't show "Quiz Loaded" immediately
+                    setUsingRandomFallback(false);
+                    setMessage({ text: '', type: '', timesUp: false });
+                    setTimerActive(false);
+                    setTimeLeft(0);
+                  }}
+                  className="absolute top-4 right-4 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors z-50 border border-white/10 hover:border-white/20"
+                  title="Quit Quiz"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              )}
+
               {/* Multiplier and Streak Effects */}
               <AnimatePresence>
                 {multiplier > 0 && showGap && (
