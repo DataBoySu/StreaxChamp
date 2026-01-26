@@ -150,7 +150,7 @@ interface GeminiResult {
     title: string;
     slug: string;
     sources: string[];
-    provider: 'gemini' | 'fallback';
+    provider: 'gemini';
     reason?: string;
     model?: string;
     latencyMs?: number;
@@ -270,25 +270,15 @@ async function callGemini(rawTopic: string): Promise<GeminiResult> {
         .split(/\s+/)
         .map((w: string) => (w[0] ? w[0].toUpperCase() + w.slice(1) : w))
         .join(' ');
-    const slug = fallbackTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
     if (!GEMINI_API_KEY) {
-        return {
-            title: fallbackTitle,
-            slug,
-            sources: [
-                `https://en.wikipedia.org/wiki/${encodeURIComponent(fallbackTitle.replace(/ /g, '_'))}`,
-            ],
-            provider: 'fallback',
-            reason: 'NO_API_KEY',
-        };
+        throw AppError.aiFailure('NO_API_KEY');
     }
 
     const systemPrompt = CONFIG.GEMINI.PROMPTS.TOPIC_NORMALIZER;
     const userPrompt = `User input topic: ${rawTopic}`;
 
     try {
-
         const model = CONFIG.GEMINI.LITE_MODEL; // Cheapest model for normalization
         Logger.info(`[TopicNorm] Calling Gemini model=${model} for topic="${rawTopic}"`);
         const controller = new AbortController();
@@ -346,17 +336,10 @@ async function callGemini(rawTopic: string): Promise<GeminiResult> {
             ];
         return { title, slug: finalSlug, sources, provider: 'gemini', model, latencyMs };
     } catch (err) {
-        Logger.error('Gemini call failed, using fallback:', err);
+        Logger.error('Gemini call failed, strict error mode enabled:', err);
         aiCircuitOpen = true; // Trip the breaker
-        return {
-            title: fallbackTitle,
-            slug,
-            sources: [
-                `https://en.wikipedia.org/wiki/${encodeURIComponent(fallbackTitle.replace(/ /g, '_'))}`,
-            ],
-            provider: 'fallback',
-            reason: (err instanceof Error && err.message) ? err.message : 'UNKNOWN_ERROR',
-        };
+        const msg = (err as Error)?.message || 'UNKNOWN_GEMINI_ERROR';
+        throw AppError.aiFailure(msg);
     }
 }
 
@@ -472,21 +455,9 @@ Generate unique question #${index + 1}.`;
 // Gemini quiz generation (hard informative variant)
 async function generateQuizWithGemini(topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
     await validateGeminiKey();
-    const fallbackQuestion = (n: number): GeneratedQuizQuestion => ({
-        id: `q${n}`,
-        question: `Placeholder question ${n} about ${topicTitle}?`,
-        options: ['Option A', 'Option B', 'Option C', 'Option D'],
-        correctAnswer: 0,
-        difficulty: 'medium',
-        category: topicTitle,
-        createdAt: new Date().toISOString(),
-    });
 
     if (!GEMINI_API_KEY) {
-        return {
-            questions: Array.from({ length: 5 }).map((_, i) => fallbackQuestion(i + 1)),
-            metadata: { generatedAt: new Date().toISOString(), sourceWikis: topicSources.slice(0, 2), version: 'v1', generator: 'fallback' },
-        };
+        throw AppError.aiFailure('NO_API_KEY');
     }
 
     const questions: GeneratedQuizQuestion[] = [];
@@ -499,14 +470,24 @@ async function generateQuizWithGemini(topicTitle: string, topicSources: string[]
     for (let i = 0; i < 5; i++) {
         // Spacer for rate limits
         if (i > 0) await delay(2500);
-        const q = await generateSingleQuestionWithGemini(topicTitle, topicSources, trimmedContext, i, existingQuestions);
-        if (q) {
-            questions.push(q);
-            existingQuestions.push(q.question);
-        } else {
-            // Small delay on retry or just push fallback
-            questions.push(fallbackQuestion(i + 1));
+
+        try {
+            const q = await generateSingleQuestionWithGemini(topicTitle, topicSources, trimmedContext, i, existingQuestions);
+            if (q) {
+                questions.push(q);
+                existingQuestions.push(q.question);
+            } else {
+                Logger.warn(`[SequentialGen] Failed to generate question ${i + 1}`);
+            }
+        } catch (e) {
+            Logger.error(`[SequentialGen] Error generating question ${i + 1}`, e);
         }
+    }
+
+    // STRICT VALIDATION: Must have 5 questions
+    if (questions.length < 5) {
+        Logger.error(`[QuizGenFail] Only generated ${questions.length}/5 valid questions. Aborting.`);
+        throw AppError.aiFailure(`INSUFFICIENT_QUESTIONS: ${questions.length}/5`);
     }
 
     return {
@@ -514,7 +495,7 @@ async function generateQuizWithGemini(topicTitle: string, topicSources: string[]
         metadata: {
             generatedAt: new Date().toISOString(),
             sourceWikis: topicSources.slice(0, 2),
-            version: 'v2-sequential',
+            version: 'v2-strict',
             model: CONFIG.GEMINI.CONTENT_MODEL,
             generator: 'gemini',
         },
@@ -676,35 +657,54 @@ app.get<{ postId: string }, InitResponse | { status: string; message: string }>(
 );
 
 // API endpoint to get quiz data
+// API endpoint to get quiz data
 app.get('/api/quiz', async (_req, res) => {
     try {
+        await validateGeminiKey();
         const firestoreService = new FirestoreRestService();
+
+        // 1. Try fetching today's quiz from DB
         const quiz = await firestoreService.getTodaysQuiz();
         if (quiz) {
             // Increment a generic daily quiz play counter stored under a pseudo-topic slug 'daily-quizzes'
             void firestoreService.incrementTopicPlayCount?.('daily-quizzes');
             return res.status(200).json(quiz);
         }
-        // Auto-generation disabled: Serve curated fallback immediately rather than failing AI call
-        if (true) {
-            // Logger.info('[DailyQuiz] serving fallback (auto-gen disabled)');
-            return res.status(200).json({
-                id: 'fallback-quiz',
-                questions: [
-                    { question: 'What is the capital of France?', answers: ['London', 'Berlin', 'Paris', 'Madrid'], correctAnswer: 'Paris' },
-                    { question: 'Which planet is known as the Red Planet?', answers: ['Venus', 'Mars', 'Jupiter', 'Saturn'], correctAnswer: 'Mars' },
-                    { question: 'Which company developed the game Minecraft?', answers: ['Valve', 'Mojang', 'Epic Games', 'Bethesda'], correctAnswer: 'Mojang' },
-                    { question: 'What is the hardest natural substance on Earth?', answers: ['Gold', 'Iron', 'Diamond', 'Quartz'], correctAnswer: 'Diamond' },
-                    { question: 'Which ocean is the largest?', answers: ['Atlantic', 'Indian', 'Arctic', 'Pacific'], correctAnswer: 'Pacific' }
-                ],
-                metadata: { generatedAt: new Date().toISOString(), topic: 'General Knowledge', difficulty: 'mixed', source: 'fallback' }
-            });
+
+        // 2. Not found? Generate FRESH via Gemini (Strict Mode)
+        Logger.db('[DailyQuiz] Cache Miss - No quiz found for today. Initiating AI generation...', { date: new Date().toISOString().slice(0, 10) });
+
+        const generated = await generateQuizWithGemini('General Knowledge', ['https://en.wikipedia.org/wiki/General_knowledge']);
+
+        // 3. Save to Firestore
+        const saved = await firestoreService.saveTodaysQuiz({
+            questions: generated.questions,
+            metadata: {
+                ...generated.metadata,
+                topic: 'General Knowledge',
+                difficulty: 'mixed'
+            }
+        });
+
+        if (!saved) {
+            throw new Error('Failed to save generated daily quiz to Firestore');
         }
-        // Unreachable code removed. Logic ends at fallback return above.
+
+        Logger.ai('[DailyQuiz] AI Generation Successful', { topic: 'General Knowledge', questionCount: generated.questions.length });
+        Logger.db('[DailyQuiz] Saving generated quiz to Firestore', { persistence: 'daily-collection' });
+
+        // 4. Return the new quiz
+        const today = new Date().toISOString().slice(0, 10);
+        return res.status(200).json({
+            id: today,
+            questions: generated.questions,
+            metadata: generated.metadata
+        });
+
     } catch (error) {
-        Logger.error('Error fetching quiz:', error);
-        dbCircuitOpen = true;
-        res.status(500).json({ error: 'Failed to fetch quiz data' });
+        Logger.error('Error fetching/generating daily quiz:', error);
+        dbCircuitOpen = true; // or aiCircuitOpen depending on error? generic catch means 500.
+        res.status(500).json({ error: 'System Unavailable: Failed to load daily quiz.' });
     }
 });
 
@@ -826,12 +826,14 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
 
         // Check RAM cache first (zero DB/AI calls if cached)
         if (ROBOT_DIALOGUE_CACHE && ROBOT_DIALOGUE_CACHE.date === today) {
+            Logger.cache('[Robot] RAM Cache Hit', { date: today });
             return res.json({ ok: true, date: today, lines: ROBOT_DIALOGUE_CACHE.lines, cached: true });
         }
 
         const fs = new FirestoreRestService();
         let existing;
         try {
+            Logger.db('[Robot] Checking Firestore for existing dialogues', { date: today });
             existing = await fs.getRobotDialogues(today);
         } catch (e) {
             Logger.error('[Robot] DB Check Failed -> Trip Breaker', e);
@@ -853,6 +855,7 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
 
         let resp;
         try {
+            Logger.ai('[Robot] Requesting new dialogues from Gemini', { model });
             resp = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
                 {
@@ -898,6 +901,7 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
         }
 
         // Save to Firestore
+        Logger.db('[Robot] Saving validated dialogues to Firestore', { count: validLines.length });
         const fsOk = await new FirestoreRestService().saveRobotDialogues(today, validLines);
         if (!fsOk) {
             Logger.warn('[Robot] DB Save Failed -> Trip Breaker');
@@ -1062,15 +1066,7 @@ app.post('/api/topics/generate', async (req, res) => {
         Logger.info('Generate topic request:', topic);
         const { title, slug, sources, provider, reason, model, latencyMs } = await callGemini(topic);
 
-        // Hardened check: Reject fallbacks
-        if (provider === 'fallback') {
-            Logger.warn('[GenerateTopic] Failed to normalize (fallback used). Not saving.', { topic, reason });
-            return res.status(500).json({
-                error: 'Topic normalization failed',
-                details: reason || 'AI service unavailable',
-                provider
-            });
-        }
+
 
         // Strict validation check
         if (!title || title.length < 2 || !slug || slug.length < 2) {
@@ -1085,7 +1081,7 @@ app.post('/api/topics/generate', async (req, res) => {
 
         // Only save if we strictly trust the output
         const saved = await firestoreService.saveTopic(topicPayload);
-        res.status(200).json({ title, slug, sources, saved, provider, fallbackReason: provider === 'fallback' ? reason : undefined, model, latencyMs });
+        res.status(200).json({ title, slug, sources, saved, provider, model, latencyMs });
     } catch (error) {
         Logger.error('Error in /api/topics/generate:', error);
         res.status(500).json({ error: 'Failed to generate topic' });
@@ -1104,6 +1100,7 @@ app.post('/api/topics/:slug/quiz', async (req, res) => {
         const existing = await firestoreService.getTopicQuiz(slug, date);
         const force = Boolean(req.body?.force);
         if (existing && existing.questions && existing.questions.length >= 5 && !force) {
+            Logger.cache('[TopicQuiz] Serving from Firestore Cache', { slug, date });
             // Attach existing bonus (if any) for consistency when served from cache
             let bonusExisting: { question: string; options: string[]; correctIndex: number } | null = null;
             try { bonusExisting = await getGlobalBonusForToday(firestoreService); } catch {/* ignore */ }
@@ -1116,6 +1113,7 @@ app.post('/api/topics/:slug/quiz', async (req, res) => {
         // If topic has lastQuizDate today and hasQuiz true, short-circuit without regeneration
         const today = date;
         if (topic.hasQuiz && topic.lastQuizDate === today && !force) {
+            Logger.cache('[TopicQuiz] Topic marked as having quiz today (Metadata Cache)', { slug });
             let bonusExisting: { question: string; options: string[]; correctIndex: number } | null = null;
             try { bonusExisting = await getGlobalBonusForToday(firestoreService); } catch {/* ignore */ }
             return res.status(200).json({ fromCache: true, reason: 'ALREADY_TODAY', quiz: existing, bonus: bonusExisting });
@@ -1148,6 +1146,7 @@ app.post('/api/topics/:slug/quiz', async (req, res) => {
             contextText = topic.contextSnippet;
         }
 
+        Logger.ai('[TopicQuiz] Generating quiz with Gemini', { topic: topic.title || slug, hasContext: !!contextText });
         const quizPayload = await generateQuizWithGemini(topic.title || slug, topic.sources || [], contextText);
         // Validate: must have exactly 5 fully-formed questions and no placeholders
         const hasPlaceholders = Array.isArray(quizPayload?.questions) && quizPayload.questions.some(q => /Placeholder question|Missing question/i.test(q.question || ''));
@@ -1158,6 +1157,8 @@ app.post('/api/topics/:slug/quiz', async (req, res) => {
         // Attach (or generate) a persistent bonus question for this topic/day
         const bonus = await getGlobalBonusForToday(firestoreService);
         await firestoreService.patchTopic(slug, { generationPhase: 'aiGenerated' });
+
+        Logger.db('[TopicQuiz] Saving generated quiz', { slug, questions: quizPayload.questions.length });
         const saved = await firestoreService.saveTopicQuiz(slug, date, quizPayload);
         if (saved) {
             await firestoreService.patchTopic(slug, { hasQuiz: true, lastQuizDate: date, status: 'ready', generationPhase: 'saved' });

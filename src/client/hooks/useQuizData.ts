@@ -83,58 +83,13 @@ export const useQuizData = (): UseQuizDataResult => {
       setQuestions(quizData.questions);
       return;
     } catch (err) {
-      // Failed to fetch quiz data - fall back to curated questions
-
-      // Use fallback questions
-  setConnectionStatus('fallback');
-      setError(null); // Don't show error for expected behavior
-      setLastUpdated(new Date().toISOString());
-
-      // Enhanced fallback questions - these are still great questions!
-      const mockQuestions: AppQuestion[] = [
-        {
-          question:
-            "In the Souls series, what is the name of the 'Lord of Cinder' who links the fire in the first game?",
-          answers: ['Gwyn', 'Artorias', 'Sif', 'Havel'],
-          correctAnswer: 'Gwyn',
-          difficulty: 'medium',
-          category: 'Gaming Lore',
-        },
-        {
-          question:
-            "What is the capital of the fictional kingdom of Hyrule in 'The Legend of Zelda' series?",
-          answers: ['Kakariko Village', 'Hyrule Castle Town', 'Korok Forest', "Zora's Domain"],
-          correctAnswer: 'Hyrule Castle Town',
-          difficulty: 'easy',
-          category: 'Gaming Lore',
-        },
-        {
-          question: "Who is the main protagonist of the 'Mass Effect' series?",
-          answers: ['Commander Shepard', 'Garrus Vakarian', "Liara T'Soni", "Tali'Zorah"],
-          correctAnswer: 'Commander Shepard',
-          difficulty: 'easy',
-          category: 'Gaming Characters',
-        },
-        {
-          question:
-            "What is the name of the protagonist's ship in 'Star Wars: Knights of the Old Republic'?",
-          answers: ['Ebon Hawk', 'Millennium Falcon', 'Slave I', 'Razor Crest'],
-          correctAnswer: 'Ebon Hawk',
-          difficulty: 'medium',
-          category: 'Gaming Items',
-        },
-        {
-          question:
-            "In the world of 'Warhammer 40,000', what is the name of the Emperor's elite bodyguards?",
-          answers: ['Adeptus Custodes', 'Space Marines', 'Inquisition', 'Astra Militarum'],
-          correctAnswer: 'Adeptus Custodes',
-          difficulty: 'hard',
-          category: 'Gaming Lore',
-        },
-      ];
-
-      setQuestions(mockQuestions);
-      // Using curated gaming questions as fallback
+      // Strict Mode: No fallback.
+      console.error('Quiz fetch failed:', err);
+      // In strict mode, we want the UI to show an error, not pretend everything is fine.
+      setConnectionStatus('error');
+      // Set a friendly but firm error message
+      setError('System Unavailable: Daily Quiz could not be loaded.');
+      setQuestions([]);
     } finally {
       setLoading(false);
     }
