@@ -12,10 +12,9 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
   const [lines, setLines] = useState<string[]>([]);
   const [exhausted, setExhausted] = useState(false);
   const [globalMousePosition, setGlobalMousePosition] = useState({ x: 0, y: 0 });
+  const [progress, setProgress] = useState(0); // Progress bar (0-100)
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
-  // Manual adjustment (pixels). Negative moves bubble left, positive moves right.
-  const MANUAL_BUBBLE_OFFSET = -8; // tweak this value to nudge bubble horizontally
 
   // Fetch daily robot dialogues (up to 20) from server
   useEffect(() => {
@@ -50,11 +49,11 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
     const handleMouseMove = (event: MouseEvent) => {
       const centerX = window.innerWidth / 2;
       const centerY = window.innerHeight / 2;
-      
+
       // Calculate relative position from center (-1 to 1)
       const relativeX = (event.clientX - centerX) / (window.innerWidth / 2);
       const relativeY = (event.clientY - centerY) / (window.innerHeight / 2);
-      
+
       setGlobalMousePosition({ x: relativeX, y: relativeY });
     };
 
@@ -83,10 +82,10 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
   // Calculate eye position for the visor display
   const getEyeOffset = () => {
     const maxMove = 8;
-    
+
     // Use global mouse Y position for vertical eye movement
     const verticalOffset = globalMousePosition.y * maxMove;
-    
+
     // Use local mouse X position for horizontal eye movement
     const horizontalOffset = (mousePosition.x / 100) * maxMove;
 
@@ -102,7 +101,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
 
   // Cycle through messages when hovered
   useEffect(() => {
-    if (isHovered) {
+    if (isHovered && !exhausted) {
       const interval = window.setInterval(() => {
         setCurrentMessage((prev) => {
           const next = prev + 1;
@@ -110,15 +109,34 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
             setExhausted(true);
             return prev; // stop advancing
           }
+          setProgress(0); // Reset progress when advancing
           return next;
         });
-  }, 5000);
+      }, 3000); // Shortened from 5000ms to 3000ms
       return () => clearInterval(Number(interval));
     }
-  }, [isHovered, messages.length]);
+  }, [isHovered, messages.length, exhausted]);
+
+  // Progress bar animation (fills up to 100% over 3 seconds)
+  useEffect(() => {
+    if (isHovered && !exhausted) {
+      setProgress(0);
+      const startTime = Date.now();
+      const duration = 3000;
+      const frame = () => {
+        const elapsed = Date.now() - startTime;
+        const newProgress = Math.min((elapsed / duration) * 100, 100);
+        setProgress(newProgress);
+        if (elapsed < duration) {
+          requestAnimationFrame(frame);
+        }
+      };
+      requestAnimationFrame(frame);
+    }
+  }, [isHovered, currentMessage, exhausted]);
 
   return (
-  <motion.div
+    <motion.div
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -132,13 +150,13 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
       animate={{
         x: robotHorizontalOffset
       }}
-  transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-  onMouseMove={handleMouseMove}
-  onMouseEnter={() => setIsHovered(true)}
-  onMouseLeave={() => setIsHovered(false)}
+      transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Robot Head - Futuristic Design */}
-  <div ref={headRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '140px' }}>
+      <div ref={headRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '140px' }}>
         {/* Speech Bubble moved to the parent container so left:50% reliably centers over the head */}
         <AnimatePresence>
           {isHovered && (
@@ -147,11 +165,11 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
               initial={{ opacity: 0, scale: 0.8, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 10 }}
-                style={{
+              style={{
                 position: 'absolute',
-                top: -36,
+                top: -40, // Adjusted for better centering
                 left: '50%',
-                transform: `translateX(calc(-50% + ${MANUAL_BUBBLE_OFFSET}px))`,
+                transform: `translateX(-50%)`, // Pure center, no manual offset needed
                 backgroundColor: '#7c3aed',
                 color: 'white',
                 padding: '8px 12px',
@@ -162,10 +180,26 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
                 whiteSpace: 'nowrap',
                 maxWidth: 'unset',
                 boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
-                textAlign: 'center'
+                textAlign: 'center',
+                overflow: 'hidden', // For progress bar
               }}
             >
-              {messages[currentMessage]}
+              {/* Translucent progress bar */}
+              {!exhausted && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    height: '3px',
+                    width: `${progress}%`,
+                    background: 'rgba(255, 255, 255, 0.4)',
+                    transition: 'width 0.1s linear',
+                    borderRadius: '0 0 12px 12px'
+                  }}
+                />
+              )}
+              <span style={{ position: 'relative', zIndex: 1 }}>{messages[currentMessage]}</span>
               <div
                 style={{
                   position: 'absolute',
@@ -365,27 +399,27 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
         </motion.div>
       </div>
 
-        {/* Exhausted message overlay (nudge into app) */}
-        <AnimatePresence>
-          {exhausted && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              style={{
-                marginTop: 12,
-                color: '#f59e0b',
-                background: 'rgba(17,24,39,0.6)',
-                border: '1px solid rgba(245,158,11,0.5)',
-                padding: '6px 10px',
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-            >
-              That’s all you get. Inside with you — the real challenge awaits.
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Exhausted message overlay (nudge into app) */}
+      <AnimatePresence>
+        {exhausted && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              marginTop: 12,
+              color: '#f59e0b',
+              background: 'rgba(17,24,39,0.6)',
+              border: '1px solid rgba(245,158,11,0.5)',
+              padding: '6px 10px',
+              borderRadius: 8,
+              fontSize: 12,
+            }}
+          >
+            That’s all you get. Inside with you — the real challenge awaits.
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Robot Neck/Body */}
       <motion.div
@@ -434,10 +468,10 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
       </motion.div>
 
       {/* System online text */}
-      <div style={{ 
-        fontFamily: 'monospace', 
-        color: '#00ff88', 
-        textShadow: '0 0 5px #00ff88', 
+      <div style={{
+        fontFamily: 'monospace',
+        color: '#00ff88',
+        textShadow: '0 0 5px #00ff88',
         fontSize: 11,
         whiteSpace: 'nowrap',
         marginTop: 12

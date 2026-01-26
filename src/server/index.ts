@@ -41,7 +41,59 @@ function hydrateGeminiKeyFromSettings(): void {
             .catch(() => {/* ignore */ });
     } catch {/* ignore */ }
 }
-Logger.info(`[AI] Gemini key present=${GEMINI_API_KEY ? 'yes' : 'no'}`);
+// --- Gemini API Key Validation (Chunk 3.7) ---
+// Validate Gemini API key at server startup to catch invalid keys early
+let geminiKeyValidated = false;
+let geminiKeyWorks = false;
+
+async function validateGeminiKey(): Promise<boolean> {
+    // Only validate once per server session to prevent rate limiting
+    if (geminiKeyValidated) return geminiKeyWorks;
+    geminiKeyValidated = true;
+
+    if (!GEMINI_API_KEY) {
+        Logger.error('[AI] ❌ No Gemini API key configured');
+        geminiKeyWorks = false;
+        aiCircuitOpen = true; // Pre-trip circuit breaker
+        return false;
+    }
+
+    try {
+        Logger.info('[AI] Validating Gemini API key...');
+        const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI.LITE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: 'test' }] }],
+                    generationConfig: { maxOutputTokens: 5 }
+                }),
+                signal: AbortSignal.timeout(5000) // 5s timeout for startup validation
+            }
+        );
+
+        if (resp.ok) {
+            Logger.info('[AI] ✅ Gemini API key validated successfully');
+            geminiKeyWorks = true;
+            return true;
+        } else {
+            const status = resp.status;
+            Logger.error(`[AI] ❌ Gemini API key invalid: HTTP ${status}`);
+            geminiKeyWorks = false;
+            aiCircuitOpen = true; // Pre-trip circuit breaker
+            return false;
+        }
+    } catch (e) {
+        Logger.error('[AI] ❌ Gemini API key validation failed:', e);
+        geminiKeyWorks = false;
+        aiCircuitOpen = true; // Pre-trip circuit breaker
+        return false;
+    }
+}
+
+// Run validation lazily on first request
+// void validateGeminiKey();
 
 // Safety settings removed per request (solo testing environment)
 
@@ -211,6 +263,7 @@ function isValidQuizPayload(payload: GeneratedQuizPayload | null | undefined): b
 }
 
 async function callGemini(rawTopic: string): Promise<GeminiResult> {
+    await validateGeminiKey();
     const fallbackTitle = rawTopic
         .trim()
         .toLowerCase()
@@ -418,6 +471,7 @@ Generate unique question #${index + 1}.`;
 
 // Gemini quiz generation (hard informative variant)
 async function generateQuizWithGemini(topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
+    await validateGeminiKey();
     const fallbackQuestion = (n: number): GeneratedQuizQuestion => ({
         id: `q${n}`,
         question: `Placeholder question ${n} about ${topicTitle}?`,
@@ -716,6 +770,7 @@ Return STRICT JSON: { "lines": ["...","...","...","...","..."] } and NOTHING els
 
 app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
     try {
+        await validateGeminiKey();
         const today = new Date().toISOString().slice(0, 10);
 
         // 1. CIRCUIT BREAKER CHECKS WITH HEALING
