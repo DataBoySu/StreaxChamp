@@ -133,6 +133,7 @@ npm run dev
 > [!WARNING]
 > This project uses an gRPC-over-REST bridge for Firestore. Ensure your project ID matches the one in your Google Cloud Console. 
 
+
 > [!INFO]
 > Custom topics take ~1-3 minutes to generate and verify via AI before they appear in the "Ready" state. Be patient! (˶ᵔ ᵕ ᵔ˶)
 
