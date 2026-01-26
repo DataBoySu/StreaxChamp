@@ -7,11 +7,7 @@
       "domains": [
         "firestore.googleapis.com",
         "oauth2.googleapis.com",
-        "generativelanguage.googleapis.com",
-        "openrouter.ai",
-        "api.openrouter.ai",
-        "www.openrouter.ai",
-        "api.groq.com"
+        "generativelanguage.googleapis.com"
       ]
     },
     "redis": true

@@ -3,7 +3,6 @@
  * Uses HTTP fetch instead of Firebase SDK to work within Devvit's constraints
  */
 import { CONFIG } from '../../shared/constants';
-import { Logger } from '../Logger';
 
 export interface QuizData {
   id: string;
@@ -18,13 +17,6 @@ export interface QuizData {
     difficulty: string;
     source: string;
   };
-}
-
-export class QuotaError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'QuotaError';
-  }
 }
 
 export class FirestoreRestService {
@@ -45,24 +37,6 @@ export class FirestoreRestService {
     return this.baseUrl;
   }
 
-  public async fetchWithQuotaCheck(url: string, options: RequestInit): Promise<Response> {
-    const res = await fetch(url, options);
-    if (!res.ok) {
-      const text = await res.text();
-      Logger.info(`[Firestore] FAILED: status=${res.status} url=${url} body=${text.slice(0, 200)}`);
-
-      if (res.status === 429 || text.toLowerCase().includes('quota') || text.toLowerCase().includes('rate limit')) {
-        Logger.error(`[Firestore] QUOTA DETECTED! status=${res.status}`);
-        throw new QuotaError(`Firestore Quota Exceeded (${res.status}): ${text.slice(0, 500)}`);
-      }
-
-      // Re-wrap the body so subsequent callers can read it if needed
-      // (Though usually they won't if we don't return it)
-      return new Response(text, { status: res.status, statusText: res.statusText, headers: res.headers });
-    }
-    return res;
-  }
-
   /**
    * Get today's quiz from Firestore using REST API
    */
@@ -72,7 +46,7 @@ export class FirestoreRestService {
       const documentPath = `daily-quizzes/${today}`;
       const url = `${this.baseUrl}/${documentPath}`;
 
-      const response = await this.fetchWithQuotaCheck(url, {
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -96,7 +70,6 @@ export class FirestoreRestService {
       // Parse Firestore document format
       return this.parseFirestoreDocument(data);
     } catch (error) {
-      if (error instanceof QuotaError) throw error;
       // Error fetching quiz
 
       // Be more specific about why the connection failed
@@ -172,7 +145,7 @@ export class FirestoreRestService {
         },
       };
 
-      const response = await this.fetchWithQuotaCheck(url, {
+      const response = await fetch(url, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -192,7 +165,6 @@ export class FirestoreRestService {
       // Successfully saved config
       return true;
     } catch (error) {
-      if (error instanceof QuotaError) throw error;
       // Error saving subreddit config
       return false;
     }
@@ -206,7 +178,7 @@ export class FirestoreRestService {
       // Testing connection to Firestore
 
       // Try a simple list operation to test connectivity
-      const response = await this.fetchWithQuotaCheck(`${this.baseUrl}/test-connection`, {
+      const response = await fetch(`${this.baseUrl}/test-connection`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -237,9 +209,6 @@ export class FirestoreRestService {
       }
     } catch (error) {
       // Connection test error
-      if (error instanceof QuotaError) {
-        return { success: false, error: 'QUOTA_EXCEEDED' };
-      }
 
       if (error instanceof TypeError && error.message.includes('fetch')) {
         return {
@@ -279,7 +248,7 @@ export class FirestoreRestService {
         },
       };
 
-      const response = await this.fetchWithQuotaCheck(url, {
+      const response = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -291,7 +260,6 @@ export class FirestoreRestService {
 
       return true;
     } catch (error) {
-      if (error instanceof QuotaError) throw error;
       return false;
     }
   }
@@ -305,7 +273,7 @@ export class FirestoreRestService {
       // Firestore REST API does not have a straightforward collection list via documents path in all cases,
       // but we attempt a list using the collection's documents endpoint.
       const url = `${this.baseUrl}/topics`;
-      const res = await this.fetchWithQuotaCheck(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
@@ -318,7 +286,6 @@ export class FirestoreRestService {
         return { title, slug, sources };
       });
     } catch (error) {
-      if (error instanceof QuotaError) throw error;
       return [];
     }
   }
@@ -329,7 +296,7 @@ export class FirestoreRestService {
   async getTopic(slug: string): Promise<any | null> {
     try {
       const url = `${this.baseUrl}/topics/${slug}`;
-      const res = await this.fetchWithQuotaCheck(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
@@ -365,7 +332,6 @@ export class FirestoreRestService {
       const playCount = f.playCount?.integerValue ? Number(f.playCount.integerValue) : 0;
       return { title, slug: recoveredSlug, sources, status, lastGenerated, generationPhase, questions, playCount };
     } catch (error) {
-      if (error instanceof QuotaError) throw error;
       return null;
     }
   }
@@ -376,7 +342,7 @@ export class FirestoreRestService {
   async getTopicQuiz(slug: string, date: string): Promise<any | null> {
     try {
       const url = `${this.baseUrl}/topics/${slug}/quizzes/${date}`;
-      const res = await this.fetchWithQuotaCheck(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
@@ -412,8 +378,7 @@ export class FirestoreRestService {
           };
         })(),
       };
-    } catch (error) {
-      if (error instanceof QuotaError) throw error;
+    } catch {
       return null;
     }
   }
@@ -467,10 +432,9 @@ export class FirestoreRestService {
           },
         },
       };
-      const res = await this.fetchWithQuotaCheck(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       return res.ok;
-    } catch (error) {
-      if (error instanceof QuotaError) throw error;
+    } catch {
       return false;
     }
   }
@@ -486,7 +450,7 @@ export class FirestoreRestService {
       // Fetch existing to preserve baseline if doc missing some core fields
       let existing: any = null;
       try {
-        const existingRes = await this.fetchWithQuotaCheck(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+        const existingRes = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
         if (existingRes.ok) existing = await existingRes.json();
       } catch { }
       const existingFields = existing?.fields || {};
@@ -514,10 +478,9 @@ export class FirestoreRestService {
       const maskParams = updateMask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
       const patchUrl = `${url}?${maskParams}`;
       const body = { fields };
-      const res = await this.fetchWithQuotaCheck(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       return res.ok;
-    } catch (error) {
-      if (error instanceof QuotaError) throw error;
+    } catch {
       return false;
     }
   }
@@ -530,7 +493,7 @@ export class FirestoreRestService {
   async incrementTopicPlayCount(slug: string): Promise<void> {
     try {
       const url = `${this.baseUrl}/topics/${slug}`;
-      const getRes = await this.fetchWithQuotaCheck(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      const getRes = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!getRes.ok) return; // Topic missing; do nothing.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await getRes.json();
@@ -545,9 +508,8 @@ export class FirestoreRestService {
           updatedAt: { stringValue: new Date().toISOString() },
         },
       };
-      await this.fetchWithQuotaCheck(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    } catch (error) {
-      if (error instanceof QuotaError) throw error;
+      await fetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } catch {
       // Silent failure acceptable for non-critical metric
     }
   }
@@ -559,7 +521,7 @@ export class FirestoreRestService {
   async getDailyBonusQuestion(date: string): Promise<{ id: string; question: string; options: string[]; correctAnswer: number; difficulty: string; generatedAt: string } | null> {
     try {
       const url = `${this.baseUrl}/dailyBonus/${date}`;
-      const res = await this.fetchWithQuotaCheck(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
@@ -570,8 +532,7 @@ export class FirestoreRestService {
       const difficulty = f.difficulty?.stringValue || 'hard';
       const generatedAt = f.generatedAt?.stringValue || new Date().toISOString();
       return { id: date, question, options, correctAnswer, difficulty, generatedAt };
-    } catch (error) {
-      if (error instanceof QuotaError) throw error;
+    } catch {
       return null;
     }
   }
@@ -593,10 +554,9 @@ export class FirestoreRestService {
           generatedAt: { stringValue: nowIso },
         },
       };
-      const res = await this.fetchWithQuotaCheck(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       return res.ok;
-    } catch (error) {
-      if (error instanceof QuotaError) throw error;
+    } catch {
       return false;
     }
   }
@@ -607,15 +567,14 @@ export class FirestoreRestService {
   async getRobotDialogues(date: string): Promise<string[] | null> {
     try {
       const url = `${this.baseUrl}/robotDialogues/${date}`;
-      const res = await this.fetchWithQuotaCheck(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
       const f = data.fields || {};
       const lines = (f.lines?.arrayValue?.values || []).map((v: { stringValue?: string }) => v.stringValue || '').filter((s: string) => s && s.trim());
       return lines.length ? lines.slice(0, 50) : null;
-    } catch (error) {
-      if (error instanceof QuotaError) throw error;
+    } catch {
       return null;
     }
   }
@@ -635,10 +594,9 @@ export class FirestoreRestService {
           count: { integerValue: String(Math.min(lines.length, 50)) },
         },
       };
-      const res = await this.fetchWithQuotaCheck(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       return res.ok;
-    } catch (error) {
-      if (error instanceof QuotaError) throw error;
+    } catch {
       return false;
     }
   }
