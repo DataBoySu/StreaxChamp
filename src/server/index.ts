@@ -240,109 +240,112 @@ function isValidQuizPayload(payload: GeneratedQuizPayload | null | undefined): b
     return true;
 }
 
-async function callGemini(rawTopic: string): Promise<GeminiResult> {
+// Helper: Slugify (Unified)
+const slugify = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+// Helper: Title Case
+const toTitleCase = (s: string) => s.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+
+// Unified Generator: Normalize + Sources + Quiz in ONE call
+async function generateUnifiedContent(rawTopic: string): Promise<{ topic: any, quiz: any, model: string, latencyMs: number }> {
     await validateGeminiKey();
-    const fallbackTitle = rawTopic
-        .trim()
-        .toLowerCase()
-        .split(/\s+/)
-        .map((w: string) => (w[0] ? w[0].toUpperCase() + w.slice(1) : w))
-        .join(' ');
+    if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');
 
-    if (!GEMINI_API_KEY) {
-        throw AppError.aiFailure('NO_API_KEY');
-    }
-
-    const systemPrompt = CONFIG.GEMINI.PROMPTS.TOPIC_NORMALIZER;
-    const userPrompt = `User input topic: ${rawTopic}`;
+    const model = CONFIG.GEMINI.CONTENT_MODEL || 'gemini-1.5-flash';
+    const start = Date.now();
+    Logger.ai(`[UnifiedGen] Starting atomic generation for input="${rawTopic}"`, { model });
 
     try {
-        const model = CONFIG.GEMINI.LITE_MODEL; // Cheapest model for normalization
-        Logger.info(`[TopicNorm] Calling Gemini model=${model} for topic="${rawTopic}"`);
-        const controller = new AbortController();
-        const start = Date.now();
-        const timeout = setTimeout(() => controller.abort(), 6500);
         const resp = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    system_instruction: { parts: [{ text: systemPrompt }] },
-                    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+                    system_instruction: { parts: [{ text: CONFIG.GEMINI.PROMPTS.UNIFIED_GENERATOR }] },
+                    contents: [{ role: 'user', parts: [{ text: rawTopic }] }],
                     generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 512, // Increased from 256 to prevent truncation
+                        temperature: 0.3, // Low temp for factual accuracy
+                        maxOutputTokens: 16384, // High token limit
                         response_mime_type: "application/json",
                         response_schema: {
                             type: "object",
                             properties: {
-                                title: { type: "string" },
-                                sources: { type: "array", items: { type: "string" } }
+                                topic: {
+                                    type: "object",
+                                    properties: {
+                                        title: { type: "string" },
+                                        slug: { type: "string" },
+                                        sources: { type: "array", items: { type: "string" } }
+                                    },
+                                    required: ["title", "sources"]
+                                },
+                                quiz: {
+                                    type: "object",
+                                    properties: {
+                                        questions: {
+                                            type: "array",
+                                            items: {
+                                                type: "object",
+                                                properties: {
+                                                    question: { type: "string" },
+                                                    options: { type: "array", items: { type: "string" } },
+                                                    correctAnswer: { type: "number" },
+                                                    difficulty: { type: "string" },
+                                                    category: { type: "string" },
+                                                    explanation: { type: "string" }
+                                                },
+                                                required: ["question", "options", "correctAnswer", "difficulty", "category"]
+                                            }
+                                        }
+                                    },
+                                    required: ["questions"]
+                                }
                             },
-                            required: ["title", "sources"]
+                            required: ["topic", "quiz"]
                         }
-                    },
-                }),
-                signal: controller.signal,
+                    }
+                })
             }
         );
-        clearTimeout(timeout);
-        const latencyMs = Date.now() - start;
+
         if (!resp.ok) {
-            throw new Error(`Gemini HTTP ${resp.status}`);
+            const txt = await resp.text();
+            throw new Error(`Gemini HTTP ${resp.status}: ${txt.slice(0, 100)}`);
         }
-        // In native JSON mode, we extract values from the response payload
+
         const data: any = await resp.json();
-        const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const parsed = extractJSONCandidate(text);
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const parsed = extractJSONCandidate(text) as { topic: any, quiz: any };
+        const latencyMs = Date.now() - start;
 
-        // validate parsed shape
-        const p = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
-        if (!p || typeof p.title !== 'string') {
-            Logger.error('[GeminiParseFail] model=' + String(model) + ' missing title or malformed JSON. raw=' + String(text).slice(0, 1000));
-            throw new Error('PARSE_FAILED');
+        // Strict Validation: Sources
+        if (!parsed?.topic?.sources || !Array.isArray(parsed.topic.sources) || parsed.topic.sources.length === 0) {
+            Logger.warn('[UnifiedGen] Rejected: No sources found', { input: rawTopic });
+            throw new AppError('NO_SOURCES_FOUND', 422);
         }
-        const title = String(p.title || fallbackTitle).trim() || fallbackTitle;
-        const finalSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        const sources: string[] = Array.isArray(p.sources)
-            ? (p.sources as unknown[])
-                .map((s) => String(s).trim())
-                .filter((s) => /^https?:\/\//i.test(s))
-                .slice(0, 6)
-            : [
-                `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`,
-            ];
 
-        Logger.ai(`[TopicNorm] Gemini matched: "${title}" (Sources: ${sources.length})`, { model, latencyMs });
-        return { title, slug: finalSlug, sources, provider: 'gemini', model, latencyMs };
-    } catch (err) {
-        const status = (err as any)?.status;
-        const msg = (err as any)?.message || 'UNKNOWN_GEMINI_ERROR';
+        // Strict Validation: Questions
+        const qList = parsed.quiz?.questions;
+        if (!Array.isArray(qList) || qList.length < 5) {
+            Logger.warn('[UnifiedGen] Rejected: Insufficient questions', { count: qList?.length });
+            throw new AppError('INSUFFICIENT_QUESTIONS', 422);
+        }
 
-        if (status === 429 || status === 500) {
-            Logger.warn(`[AI] Critical Failure (${status}): Tripping circuit for 120s cooldown.`);
-            aiLastFailureTime = Date.now();
+        return { topic: parsed.topic, quiz: parsed.quiz, model, latencyMs };
+
+    } catch (e: any) {
+        Logger.error('[UnifiedGen] Failed', e);
+        if (e.status === 429 || e.status === 500) {
             aiCircuitOpen = true;
-        } else {
-            aiCircuitOpen = true; // Generic trip
+            aiLastFailureTime = Date.now();
         }
-
-        Logger.error('Gemini call failed, strict error mode enabled:', err);
-        throw AppError.aiFailure(msg);
+        throw e instanceof AppError ? e : AppError.aiFailure(e.message);
     }
 }
-
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
-// Gemini quiz generation (hard informative variant) – returns 5 challenging, explanation-rich questions
-// Helper for sequential generation
-// Gemini quiz generation (Batch Mode: 5 questions at once)
-// Replaces sequential single-question generation to avoid rate limits and improve consistency
-// [CLEANUP] generateQuizWithGemini_OLD removed.
-
-// Gemini quiz generation (Smart Batch Mode: Accumulate & Retry)
-// Generates 5 questions. If some fail, keeps valid ones and requests remainder.
 async function generateQuizWithGemini(topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
     await validateGeminiKey();
     if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');
@@ -1107,39 +1110,73 @@ app.get('/api/topics/:slug/status', async (req, res) => {
 });
 
 // Generate a topic: call Gemini (stub for v1), save topic doc to Firestore
+// Generate a topic: call Unified Pipeline
 app.post('/api/topics/generate', async (req, res) => {
     try {
         const { topic, userKey } = req.body || {};
-        if (!topic || typeof topic !== 'string') {
-            return res.status(400).json({ error: 'Topic is required' });
-        }
-        // NOTE: Per-user generation quota enforcement removed — allow generation requests
-        // Keep `userKey` optional for telemetry; do not require it or persist per-user counters here.
+        if (!topic || typeof topic !== 'string') return res.status(400).json({ error: 'Topic is required' });
+
         const fs = new FirestoreRestService();
 
-        Logger.info('Generate topic request:', topic);
-        const { title, slug, sources, provider, reason, model, latencyMs } = await callGemini(topic);
+        // 1. Call Unified Generator
+        Logger.info('[Generate] starting atomic pipeline', { input: topic });
+        const { topic: topicData, quiz: quizData, model, latencyMs } = await generateUnifiedContent(topic);
 
+        const title = toTitleCase(topicData.title); // Ensure case consistency
+        const slug = topicData.slug || slugify(title);
+        const sources = topicData.sources;
 
+        // 2. Save Topic (Atomic)
+        const topicPayload: any = {
+            title,
+            slug,
+            sources,
+            model,
+            genLatencyMs: latencyMs,
+            requestedBy: userKey,
+            hasQuiz: true, // Pre-generated!
+            status: 'ready',
+            lastQuizDate: new Date().toISOString().slice(0, 10),
+            generationPhase: 'unified_complete'
+        };
 
-        // Strict validation check
-        if (!title || title.length < 2 || !slug || slug.length < 2) {
-            Logger.warn('[GenerateTopic] Validation failed', { title, slug });
-            return res.status(400).json({ error: 'Invalid topic generated' });
-        }
+        const savedTopic = await fs.saveTopic(topicPayload);
+        Logger.db(`[Generate] Saved Topic: "${title}"`, { saved: !!savedTopic });
 
-        const firestoreService = fs;
-        const topicPayload: { title: string; slug: string; sources: string[]; model?: string; genLatencyMs?: number; requestedBy?: string } = { title, slug, sources, requestedBy: userKey };
-        if (model) topicPayload.model = model;
-        if (typeof latencyMs === 'number') topicPayload.genLatencyMs = latencyMs;
+        // 3. Save Quiz (Atomic - immediately after topic)
+        const today = new Date().toISOString().slice(0, 10);
+        const questions: GeneratedQuizQuestion[] = quizData.questions.map((q: any, idx: number) => ({
+            id: `q${Date.now()}-${idx}`,
+            question: q.question,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            difficulty: q.difficulty,
+            category: q.category,
+            explanation: q.explanation,
+            createdAt: new Date().toISOString()
+        }));
 
-        // Only save if we strictly trust the output
-        const saved = await firestoreService.saveTopic(topicPayload);
-        Logger.db(`[GenerateTopic] Topic stored in Firestore: "${title}" (Slug: ${slug})`, { saved: !!saved });
-        res.status(200).json({ title, slug, sources, saved, provider, model, latencyMs });
-    } catch (error) {
+        const quizPayload: GeneratedQuizPayload = {
+            questions: questions.slice(0, 5),
+            metadata: {
+                generatedAt: new Date().toISOString(),
+                sourceWikis: sources.slice(0, 2),
+                version: 'v4-unified',
+                model,
+                generator: 'gemini' as any // Force cast to satisfy "gemini" | "fallback" union if strictly typed
+            }
+        };
+
+        const savedQuiz = await fs.saveTopicQuiz(slug, today, quizPayload);
+        Logger.db(`[Generate] Saved Quiz for "${title}"`, { saved: !!savedQuiz });
+
+        res.status(200).json({ title, slug, sources, saved: !!savedTopic, provider: 'unified', model, latencyMs });
+
+    } catch (error: any) {
         Logger.error('Error in /api/topics/generate:', error);
-        res.status(500).json({ error: 'Failed to generate topic' });
+        // Map Application Errors to HTTP codes
+        const code = error instanceof AppError ? error.statusCode : 500;
+        res.status(code).json({ error: error.message || 'Failed to generate topic' });
     }
 });
 

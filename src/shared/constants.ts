@@ -66,7 +66,7 @@ export const CONFIG = {
         /** Cheapest model for simple tasks like normalization & categorization */
         LITE_MODEL: 'gemini-2.5-flash',
         /** Capable model for complex reasoning and creative generation */
-        CONTENT_MODEL: 'gemini-3-flash',
+        CONTENT_MODEL: 'gemini-2.5-flash',
         PROMPTS: {
             TOPIC_NORMALIZER: `SYSTEM ROLE: You are a headless DATA PROCESSING UNIT. Your ONLY function is to normalize strings into JSON.
                                 CONSTRAINTS:
@@ -85,7 +85,43 @@ export const CONFIG = {
                             - NO EXPLANATIONS OUTSIDE THE "explanation" FIELD.
                             - START WITH { AND END WITH }.
                             SCHEMA: {"questions": [{"id": "uuid", "question": "...", "options": ["...", "...", "...", "..."], "correctAnswer": 0_3, "difficulty": "...", "category": "...", "explanation": "..."}]}
-                            GOAL: 5 challenging, unique, and medically/factually accurate questions.`
+                            GOAL: 5 challenging, unique, and factually accurate questions.`,
+
+            UNIFIED_GENERATOR: `SYSTEM ROLE: You are a KNOWLEDGE GRAPH & QUIZ ENGINE.
+                                INPUT: A raw user topic string which may be deformed.
+                                MISSION:
+                                1. IDENTIFY the entity from raw user topic string. Fix spelling/typos.
+                                2. VERIFY the entity exists. Must be a specific, factual topic (game, movie, show, history).
+                                3. GATHER 5 credible sources (Wikipedia, Fextralife, Fandom, official wikis and sites).
+                                4. GENERATE 5 high-quality, diverse, challenging trivia questions about it.
+                                5. OUTPUT as a single Atomic JSON object.
+
+                                CONSTRAINTS:
+                                - If topic is nonsense or not a real factory entity, strict sources > 0 check will fail it.
+                                - SOURCES MUST BE VALID URLs.
+                                - QUESTIONS must be non-repetitive and non-general.
+                                - NO PREAMBLE. START WITH { AND END WITH }.
+
+                                SCHEMA:
+                                {
+                                  "topic": {
+                                    "title": "Canonical Title",
+                                    "slug": "kebab-case-slug",
+                                    "sources": ["url1", "url2", "url3"]
+                                  },
+                                  "quiz": {
+                                    "questions": [
+                                      {
+                                        "question": "...",
+                                        "options": ["A", "B", "C", "D"],
+                                        "correctAnswer": "A" | "B" | "C" | "D",
+                                        "difficulty": "medium or high",
+                                        "category": "Lore/Gameplay/History/etc",
+                                        "explanation": "Concise fact."
+                                      }
+                                    ]
+                                  }
+                                }`
         }
     },
 };
