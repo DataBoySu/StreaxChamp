@@ -142,4 +142,6 @@ npm run dev
 See [License](LICENSE.md) for more information.
 
 ---
-<p align="center">Made with ❤️ for the Reddit Developer Community (˶˃ ᵕ ˂˶)</p>
+<p align="center">
+Made with ❤️ for the Reddit Developer Community (˶˃ ᵕ ˂˶)
+</p>
