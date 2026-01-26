@@ -1,7 +1,5 @@
 /**
- * Centralized configuration for StreaxChamp.
- * This file contains non-sensitive configuration that persists across client/server.
- * Sensitive values (API keys) should be managed via environment variables or Devvit settings.
+ * Global configuration and constants for StreaxChamp.
  */
 
 export const CONFIG = {
@@ -24,7 +22,7 @@ export const CONFIG = {
     },
     ROBOT: {
         FALLBACK_BANTER: {
-            // "AI is unavailable" - One check failure triggers this mode
+            // AI generation fallback lines
             AI_OFFLINE: [
                 'My neural link is severed. Talk with me... perhaps it will return.',
                 'The oracle is silent. Your presence might restore the connection.',
@@ -32,7 +30,7 @@ export const CONFIG = {
                 'The spirits are quiet today. Or are they? Hover again.',
                 'No creative spark. But your interaction... it stirs something.'
             ],
-            // "Firestore is unavailable" - One check failure triggers this mode
+            // Database connectivity fallback lines
             DB_OFFLINE: [
                 'The archives are burning. Help me remember. Stay close.',
                 'Memory core corrupted. Your visits might restore fragments.',
@@ -40,7 +38,7 @@ export const CONFIG = {
                 'My ledger is blank. Each word you share... a breadcrumb back.',
                 'Data retrieval failed. But patterns emerge when you linger.'
             ],
-            // "Healing failed - apologize and give up"
+            // Permanent service failure fallback lines
             PERMANENTLY_DOWN: [
                 'My apologies. The creative systems are truly broken today.',
                 'I tried my best. Without my oracle, this place is closed.',

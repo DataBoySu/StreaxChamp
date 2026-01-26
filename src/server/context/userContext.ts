@@ -2,10 +2,7 @@ import { Logger } from '../Logger';
 import type { Request } from 'express';
 
 /**
- * Attempt to extract the Devvit user id using (future) runtime context.
- * For now this relies on headers/env/query until true useContext integration is wired.
- * In a deployed Devvit app (frame, menu item, etc.) you would access the context via
- * the handler invocation rather than Express. This helper centralizes logic until then.
+ * Extracts the Reddit user ID from request headers, environment variables, or query parameters.
  */
 export function getDevvitUserId(req: Request): { userId: string | null; source: string } {
   try {

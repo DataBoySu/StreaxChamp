@@ -112,10 +112,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
 
   const eyeOffset = getEyeOffset();
 
-  // Bubble is attached to the head element; position is static relative to head.
-  // We intentionally remove dynamic viewport-shift logic to keep the bubble
-  // visually attached (centered) above the robot head. If overflow occurs on
-  // very small screens we can add clamping later.
+  // Speech bubble is visually attached above the robot head.
 
   // Cycle through messages when hovered
   useEffect(() => {
@@ -130,7 +127,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
           setProgress(0); // Reset progress when advancing
           return next;
         });
-      }, 3000); // Shortened from 5000ms to 3000ms
+      }, 3000);
       return () => clearInterval(Number(interval));
     }
   }, [isHovered, messages.length, exhausted]);
@@ -509,7 +506,6 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
       }}>
         SYSTEM ONLINE - USER: {username.toUpperCase()}
       </div>
-      {/* tip line removed per request */}
     </motion.div>
   );
 };

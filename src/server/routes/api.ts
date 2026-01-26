@@ -36,14 +36,6 @@ router.post('/users/signup', UserController.signup);
 router.get('/user', UserController.getCurrentUser); // Legacy/Simple
 
 // --- Init (System/Context) ---
-// Kept inline or moved? Moving logic to inline here or helper since it uses 'context' which is global
-// Actually, let's move the logic to a handler function here to keep it clean, 
-// or export a static method in UserController if we want to share it. 
-// For now, I'll implement it here or separate SystemController?
-// Detailed implementation plan didn't specify SystemController.
-// I'll implement it as an inline handler here for now to strictly follow "cleanup index.ts", 
-// but referencing UserController for shared logic if needed. 
-// Actually, looking at the code, it just gets postId and username.
 router.get('/init', async (_req, res) => {
     const { postId } = context as { postId?: string };
 
@@ -54,15 +46,23 @@ router.get('/init', async (_req, res) => {
     }
 
     try {
-        const username = await reddit.getCurrentUsername();
+        let username: string | null = null;
+
+        // Retrieve current username from Devvit context with fallback to null on failure
+        const currentName = await reddit.getCurrentUsername().catch((err: any) => {
+            console.warn('[Init] getCurrentUsername failed, defaulting to null:', err?.message);
+            return null;
+        });
+        username = currentName || null;
+
         res.json({
             type: 'init',
             postId: postId,
-            username: username ?? null,
+            username: username,
         });
     } catch (error: any) {
         console.error(`API Init Error for post ${postId}:`, error);
-        res.status(400).json({ status: 'error', message: error.message || 'Unknown error' });
+        res.status(200).json({ type: 'init', postId, username: null, error: error.message });
     }
 });
 

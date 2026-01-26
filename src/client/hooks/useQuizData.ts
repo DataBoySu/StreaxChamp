@@ -83,9 +83,7 @@ export const useQuizData = (): UseQuizDataResult => {
       setQuestions(quizData.questions);
       return;
     } catch (err) {
-      // Strict Mode: No fallback.
-      console.error('Quiz fetch failed:', err);
-      // In strict mode, we want the UI to show an error, not pretend everything is fine.
+      // Update state for failed quiz retrieval
       setConnectionStatus('error');
       // Set a friendly but firm error message
       setError('System Unavailable: Daily Quiz could not be loaded.');
