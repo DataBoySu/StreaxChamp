@@ -4,14 +4,21 @@ import { Logger } from '../Logger';
 import { generateQuizWithGemini } from '../services/GeminiService';
 import { validateGeminiKey } from '../services/GeminiService';
 
+/**
+ * Controller for managing quizzes, including daily bonus questions and full daily/topic quizzes.
+ */
 export class QuizController {
+    /**
+     * Retrieves the daily bonus question (Extreme difficulty).
+     * Attempts to fetch from Firestore first, falling back to Gemini generation.
+     */
     static async getDailyBonus(_req: Request, res: Response) {
         try {
             await validateGeminiKey();
             const fs = new FirestoreRestService();
             const date = new Date().toISOString().slice(0, 10);
 
-            // 1. Try Fetch
+            // Fetch from cache
             const existing = await fs.getDailyBonusQuestion(date);
             if (existing && Array.isArray(existing.options) && existing.options.length === 4) {
                 return res.json({
@@ -21,12 +28,11 @@ export class QuizController {
                 });
             }
 
-            // 2. Generate (If missing)
-            // Use existing generator but grab just one question
+            // Generate if missing
             const gen = await generateQuizWithGemini('Ultra Obscure Interdisciplinary Trivia', ['https://en.wikipedia.org/wiki/Knowledge'], undefined);
             const q = gen.questions && gen.questions.length ? gen.questions[0] : undefined;
 
-            if (!q) return res.json(null); // Failed to gen
+            if (!q) return res.json(null);
 
             const opts = Array.isArray(q.options) ? q.options.slice(0, 4) : [];
             if ((q.question || '').trim() && opts.length === 4) {
@@ -50,25 +56,25 @@ export class QuizController {
         }
     }
 
+    /**
+     * Retrieves the official daily quiz.
+     * Generates a fresh set of questions via AI if none exists for today.
+     */
     static async getDailyQuiz(_req: Request, res: Response) {
         try {
             await validateGeminiKey();
             const firestoreService = new FirestoreRestService();
 
-            // 1. Try fetching today's quiz from DB
             const quiz = await firestoreService.getTodaysQuiz();
             if (quiz) {
-                // Increment a generic daily quiz play counter
                 void firestoreService.incrementTopicPlayCount?.('daily-quizzes');
                 return res.status(200).json(quiz);
             }
 
-            // 2. Not found? Generate FRESH via Gemini (Strict Mode)
-            Logger.db('[DailyQuiz] Cache Miss - No quiz found for today. Initiating AI generation...', { date: new Date().toISOString().slice(0, 10) });
-
+            // Cache Miss: Generate via AI
+            Logger.db('[DailyQuiz] Cache Miss - Initiating AI generation...', { date: new Date().toISOString().slice(0, 10) });
             const generated = await generateQuizWithGemini('General Knowledge', ['https://en.wikipedia.org/wiki/General_knowledge']);
 
-            // 3. Save to Firestore
             const saved = await firestoreService.saveTodaysQuiz({
                 questions: generated.questions,
                 metadata: {
@@ -79,16 +85,14 @@ export class QuizController {
             });
 
             if (!saved) {
-                throw new Error('Failed to save generated daily quiz to Firestore');
+                throw new Error('Failed to save manual daily quiz');
             }
 
-            Logger.ai('[DailyQuiz] AI Generation Successful', { topic: 'General Knowledge', questionCount: generated.questions.length });
-            Logger.db('[DailyQuiz] Saving generated quiz to Firestore', { persistence: 'daily-collection' });
+            Logger.ai('[DailyQuiz] AI Generation Successful', { topic: 'General Knowledge' });
 
-            // 4. Return the new quiz
-            const today = new Date().toISOString().slice(0, 10);
+            const todayResult = new Date().toISOString().slice(0, 10);
             return res.status(200).json({
-                id: today,
+                id: todayResult,
                 questions: generated.questions,
                 metadata: generated.metadata
             });
@@ -99,29 +103,33 @@ export class QuizController {
         }
     }
 
+    /**
+     * Retrieves or generates a quiz for a specific topic.
+     */
     static async getTopicQuiz(req: Request, res: Response) {
         try {
-            const slug = String(req.params.slug || '');
-            if (!slug) return res.status(400).json({ error: 'Slug required' });
+            const rawSlug = req.params.slug;
+            if (!rawSlug || typeof rawSlug !== 'string') return res.status(400).json({ error: 'Slug required' });
+            const slug: string = rawSlug;
+
             const fs = new FirestoreRestService();
             const today = new Date().toISOString().split('T')[0];
 
-            // 1. Check if quiz already exists for today
             const existing = await fs.getTopicQuiz(slug, today);
             if (existing) return res.json(existing);
 
-            // 2. Fetch topic metadata to get sources
-            const topic = await fs.getTopic(slug);
-            if (!topic) return res.status(404).json({ error: 'TOPIC_NOT_FOUND' });
+            const topicBase = await fs.getTopic(slug);
+            if (!topicBase) return res.status(404).json({ error: 'TOPIC_NOT_FOUND' });
 
-            // 3. Generate quiz
-            const generated = await generateQuizWithGemini(topic.title, topic.sources);
+            const generatedTopic = await generateQuizWithGemini(
+                String(topicBase.title || 'General Knowledge'),
+                Array.isArray(topicBase.sources) ? topicBase.sources : []
+            );
 
-            // 4. Save quiz
-            const success = await fs.saveTopicQuiz(slug, today, generated);
-            if (!success) Logger.error('[QuizSaveFail]', { slug, today });
+            const successStatus = await fs.saveTopicQuiz(slug, today, generatedTopic);
+            if (!successStatus) Logger.error('[QuizSaveFail]', { slug, today });
 
-            res.json({ id: today, date: today, topicSlug: slug, ...generated });
+            res.json({ id: today, date: today, topicSlug: slug, ...generatedTopic });
         } catch (e) {
             Logger.error('[TopicQuizGen] error', e);
             res.status(500).json({ error: 'QUIZ_GEN_FAILED' });
