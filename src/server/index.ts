@@ -15,6 +15,7 @@ import type { InitResponse } from '../shared/types/api';
 import type { Request, Response, NextFunction } from 'express';
 import { CONFIG } from '../shared/constants';
 import { AppError } from './utils/AppError';
+import { requestLogger } from './middleware/requestLogger';
 
 // App-level secret for Gemini key; configured via Devvit settings
 Devvit.addSettings({
@@ -468,6 +469,9 @@ const app = express();
 
 // Middleware for JSON body parsing
 app.use(express.json());
+
+// Request/Response logging middleware (logs all API calls)
+app.use(requestLogger);
 
 // --- User Auth (nickname) Endpoints ---
 // Devvit user context proxy: attempts to derive a userId. In real Devvit deployment, replace mock logic.
