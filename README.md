@@ -8,7 +8,7 @@ StreaxChamp is a high-performance, immersive quiz application built on the [Redd
 
 ## (ฅ•ω•ฅ) Key Features
 
-- **Infinite AI Quizzes** 🧠: Powered by `gemini-1.5-flash` for rapid, diverse trivia generation.
+- **Infinite AI Quizzes** 🧠: Powered by `gemini` for rapid, diverse trivia generation.
 - **Dynamic Mascot** 🤖: An interactive robot companion with AI-driven banter and state-aware animations.
 - **Topic Marketplace** 🛒: Browse "Hot Topics" or generate your own custom trivia field in seconds.
 - **Leaderboards** 🏆: Competitive ranking system persisted via Firestore REST.
@@ -139,7 +139,7 @@ npm run dev
 ---
 
 ## (ฅ•ω•ฅ) License
-Distributed under the MIT License. See `LICENSE` for more information.
+See [License](LICENSE.md) for more information.
 
 ---
 <p align="center">Made with ❤️ for the Reddit Developer Community (˶˃ ᵕ ˂˶)</p>
