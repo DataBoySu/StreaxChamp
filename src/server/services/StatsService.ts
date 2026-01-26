@@ -1,4 +1,5 @@
-import { FirestoreRestService } from './FirestoreRestService';
+import { FirestoreRestService, QuotaError } from './FirestoreRestService';
+import { Logger } from '../Logger';
 
 export interface AppStats {
     top3: Array<{ slug: string; title: string; topScore: number; nickname: string; timeTakenMs: number }>;
@@ -25,10 +26,15 @@ export class StatsService {
     async getGlobalStats(): Promise<AppStats | null> {
         try {
             const url = `${this.fs.getBaseUrl()}/${this.STATS_COLLECTION}/${this.STATS_DOC_ID}`;
-            const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+            const res = await this.fs.fetchWithQuotaCheck(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
 
             if (!res.ok) {
-                if (res.status === 404) return null; // No stats generated yet
+                if (res.status === 404) {
+                    Logger.info('[StatsService] Global stats document not found (404). This is normal if never generated.');
+                    return null;
+                }
+                const text = await res.text();
+                Logger.error(`[StatsService] GET stats failed: status=${res.status} body=${text.slice(0, 100)}`);
                 return null;
             }
 
@@ -82,7 +88,12 @@ export class StatsService {
             };
 
             return stats;
-        } catch {
+        } catch (e) {
+            if (e instanceof Error && e.name === 'QuotaError') {
+                Logger.error(`[StatsService] FIRESTORE QUOTA EXCEEDED (429/message). Error: ${e.message}`);
+                throw e; // Rethrow so caller knows!
+            }
+            Logger.error(`[StatsService] Unexpected error type: ${e instanceof Error ? e.name : typeof e}. msg: ${e instanceof Error ? e.message : String(e)}`);
             return null;
         }
     }

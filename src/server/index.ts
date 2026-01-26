@@ -15,6 +15,7 @@ import type { InitResponse } from '../shared/types/api';
 import type { Request, Response } from 'express';
 import { CONFIG } from '../shared/constants';
 import { StatsService } from './services/StatsService';
+import { AIService, AIQuotaError, AIModelNotFoundError } from './services/AIService';
 
 // App-level secret for Gemini key; configured via Devvit settings
 Devvit.addSettings({
@@ -63,7 +64,10 @@ function hydrateKeysFromSettings(): void {
 
   } catch {/* ignore */ }
 }
-Logger.info(`[AI] Gemini key present=${GEMINI_API_KEY ? 'yes' : 'no'}`);
+if (!globalThis.hasLoggedGemini) {
+  Logger.info(`[AI] Gemini key present=${GEMINI_API_KEY ? 'yes' : 'no'}`);
+  (globalThis as any).hasLoggedGemini = true;
+}
 
 // --- Landing Summary Cache ---
 let cachedSummary: any = null;
@@ -157,6 +161,8 @@ function sanitizeLines(lines: string[]): string[] {
 }
 
 // Global daily bonus (same for all topics)
+let globalBonusCooldown = 0;
+
 async function getGlobalBonusForToday(fs: FirestoreRestService): Promise<{ question: string; options: string[]; correctIndex: number } | null> {
   try {
     const date = new Date().toISOString().slice(0, 10);
@@ -164,7 +170,12 @@ async function getGlobalBonusForToday(fs: FirestoreRestService): Promise<{ quest
     if (existing && Array.isArray(existing.options) && existing.options.length === 4) {
       return { question: existing.question, options: existing.options, correctIndex: Math.min(Math.max(existing.correctAnswer, 0), 3) };
     }
-    const gen = await generateQuizWithGemini('Ultra Obscure Interdisciplinary Trivia', ['https://en.wikipedia.org/wiki/Knowledge'], undefined);
+
+    // Safety cooldown
+    if (Date.now() < globalBonusCooldown) return null;
+
+    const aiService = new AIService(GEMINI_API_KEY, OPENAI_API_KEY);
+    const gen = await generateQuizWithGemini(aiService, 'Ultra Obscure Interdisciplinary Trivia', ['https://en.wikipedia.org/wiki/Knowledge'], undefined);
     const q = gen.questions && gen.questions.length ? gen.questions[0] : undefined;
     if (!q) return null;
     const opts = Array.isArray(q.options) ? q.options.slice(0, 4) : [];
@@ -174,7 +185,11 @@ async function getGlobalBonusForToday(fs: FirestoreRestService): Promise<{ quest
       if (saved) return { question: saved.question, options: saved.options, correctIndex: Math.min(Math.max(saved.correctAnswer, 0), 3) };
     }
     return null;
-  } catch {
+  } catch (e: any) {
+    if (e instanceof AIQuotaError || (e as Error).name === 'QuotaError') {
+      globalBonusCooldown = Date.now() + 5 * 60 * 1000;
+      Logger.error('[GlobalBonus] Quota hit. 5m backoff.');
+    }
     return null;
   }
 }
@@ -188,105 +203,7 @@ function isValidQuizPayload(payload: GeneratedQuizPayload | null | undefined): b
   return true;
 }
 
-/**
- * Universal AI Completion Helper
- * Supports Google Gemini-native API and OpenAI-compatible (OpenRouter) API.
- */
-async function callAI(
-  systemPrompt: string,
-  userPrompt: string,
-  model: string,
-  config: { temperature?: number; maxTokens?: number; responseMimeType?: string } = {}
-): Promise<{ text: string; model: string; latencyMs: number } | null> {
-  const provider = CONFIG.GEMINI.getProvider(model);
-
-  // Select correct key based on provider
-  let apiKey = '';
-  if (provider === 'google') {
-    apiKey = GEMINI_API_KEY;
-  } else {
-    apiKey = OPENAI_API_KEY || GEMINI_API_KEY;
-  }
-
-  if (!apiKey) {
-    Logger.error(`[AI] No API key enabled for provider=${provider}`);
-    return null;
-  }
-  const start = Date.now();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
-
-  Logger.info(`[AI] Request: provider=${provider} model=${model}`);
-
-  try {
-    let url = '';
-    let body = {};
-    let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-
-    if (provider === 'google') {
-      // Use v1alpha for experimental/newest models like gemini-2.5-pro
-      url = `https://generativelanguage.googleapis.com/v1alpha/models/${model}:generateContent?key=${apiKey}`;
-      body = {
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        generationConfig: {
-          temperature: config.temperature ?? 0.7,
-          maxOutputTokens: config.maxTokens ?? 1024,
-          response_mime_type: config.responseMimeType ?? "application/json"
-        }
-      };
-    } else {
-      // OpenAI-compatible format (OpenRouter, Groq, etc.)
-      url = CONFIG.GEMINI.OPENAI_ENDPOINT;
-      headers['Authorization'] = `Bearer ${apiKey}`;
-      headers['HTTP-Referer'] = 'https://devvit.reddit.com';
-      headers['X-Title'] = 'StreaxChamp';
-      body = {
-        model: model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: config.temperature ?? 0.7,
-        max_tokens: config.maxTokens ?? 1024,
-        response_format: config.responseMimeType === "application/json" ? { type: "json_object" } : undefined
-      };
-    }
-
-    Logger.info(`[AI] Request: provider=${provider} model=${model} url=${url}`);
-    // Logger.info(`[AI] Body: ${JSON.stringify(body)}`); // Uncomment for deep debug
-
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      Logger.error(`[AI] Error HTTP ${resp.status}: ${errText.slice(0, 500)}`);
-      return null;
-    }
-
-    const data: any = await resp.json();
-    const latencyMs = Date.now() - start;
-
-    let text = '';
-    if (provider === 'google') {
-      text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } else {
-      text = data?.choices?.[0]?.message?.content || '';
-    }
-
-    return { text, model, latencyMs };
-  } catch (e: any) {
-    clearTimeout(timeout);
-    Logger.error(`[AI] Call failed model=${model} name=${e.name} msg=${e.message} stack=${e.stack}`);
-    return null;
-  }
-}
+// [REMOVED] Legacy helper. Use AIService instead.
 
 async function callGemini(rawTopic: string): Promise<GeminiResult> {
   const fallbackTitle = rawTopic
@@ -298,7 +215,8 @@ async function callGemini(rawTopic: string): Promise<GeminiResult> {
   const slug = fallbackTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
   const model = CONFIG.GEMINI.LITE_MODEL;
-  const result = await callAI(
+  const aiService = new AIService(GEMINI_API_KEY, OPENAI_API_KEY);
+  const result = await aiService.callAI(
     CONFIG.GEMINI.PROMPTS.TOPIC_NORMALIZER,
     `User input topic: ${rawTopic}`,
     model,
@@ -341,14 +259,13 @@ async function callGemini(rawTopic: string): Promise<GeminiResult> {
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-// Gemini quiz generation (hard informative variant) – returns 5 challenging, explanation-rich questions
-// Helper for sequential generation
 async function generateSingleQuestionWithGemini(
   topicTitle: string,
   topicSources: string[],
   contextText: string,
   index: number,
-  existingQuestions: string[] = []
+  existingQuestions: string[] = [],
+  aiService: AIService
 ): Promise<GeneratedQuizQuestion | null> {
   const model = CONFIG.GEMINI.CONTENT_MODEL;
   const userPrompt = `Topic: ${topicTitle}
@@ -363,7 +280,7 @@ Generate unique question #${index + 1}.`;
 
   while (attempts < maxAttempts) {
     try {
-      const result = await callAI(
+      const result = await aiService.callAI(
         CONFIG.GEMINI.PROMPTS.QUIZ_GENERATOR,
         userPrompt,
         model,
@@ -412,7 +329,8 @@ Generate unique question #${index + 1}.`;
 // [REMOVED] Legacy helper. Use callGemini() instead.
 
 // Gemini quiz generation (hard informative variant)
-async function generateQuizWithGemini(topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
+// Gemini quiz generation (hard informative variant)
+async function generateQuizWithGemini(aiService: AIService, topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
   const fallbackQuestion = (n: number): GeneratedQuizQuestion => ({
     id: `q${n}`,
     question: `Placeholder question ${n} about ${topicTitle}?`,
@@ -440,7 +358,8 @@ async function generateQuizWithGemini(topicTitle: string, topicSources: string[]
   for (let i = 0; i < 5; i++) {
     // Spacer for rate limits
     if (i > 0) await delay(2500);
-    const q = await generateSingleQuestionWithGemini(topicTitle, topicSources, trimmedContext, i, existingQuestions);
+    if (i > 0) await delay(2500);
+    const q = await generateSingleQuestionWithGemini(topicTitle, topicSources, trimmedContext, i, existingQuestions, aiService);
     if (q) {
       questions.push(q);
       existingQuestions.push(q.question);
@@ -577,47 +496,66 @@ app.post('/api/users/signup', async (req, res) => {
 });
 
 // API endpoint to get user information (simplified)
-app.get('/api/user', async (_req, res) => {
-  // Legacy endpoint retained; attempt to resolve current reddit username when available.
+app.get('/api/user', async (req, res) => {
   try {
-    const username = await reddit.getCurrentUsername();
+    let username: string | null = null;
+
+    // 1. Try Devvit Proxy
+    try {
+      username = await reddit.getCurrentUsername() || null;
+    } catch (e) {
+      Logger.warn('[api/user] reddit.getCurrentUsername failed, falling back to headers');
+    }
+
+    // 2. Try Headers Fallback
+    if (!username) {
+      const { userId } = getDevvitUserId(req);
+      username = userId || (req.header('x-devvit-user-name') || null);
+    }
+
     if (username) {
       return res.json({ userId: username, username, displayName: username, isLoggedIn: true });
     }
-    // Return nulls rather than 'anonymous' placeholders so the client can decide display logic.
+
     return res.json({ userId: null, username: null, displayName: null, isLoggedIn: false });
   } catch (e) {
-    // On error, return nulls instead of placeholder string
+    Logger.error('[api/user] error', e);
     return res.status(200).json({ userId: null, username: null, displayName: null, isLoggedIn: false });
   }
 });
 
 // Initialization endpoint: returns postId and username (Devvit context-aware)
 app.get<{ postId: string }, InitResponse | { status: string; message: string }>('/api/init',
-  async (_req, res): Promise<void> => {
-    const { postId } = context as { postId?: string };
+  async (req, res): Promise<void> => {
+    let postId = (context as any)?.postId || (req.header('x-devvit-post-id'));
 
     if (!postId) {
-      console.error('API Init Error: postId not found in devvit context');
-      res.status(400).json({ status: 'error', message: 'postId is required but missing from context' });
-      return;
+      // Very last resort: if we're in playtest, we might have a hardcoded fallback or env
+      postId = process.env.DEVVIT_POST_ID || 'local_post';
     }
 
     try {
-      const username = await reddit.getCurrentUsername();
+      let username: string | null = null;
+
+      try {
+        username = await reddit.getCurrentUsername() || null;
+      } catch (e) {
+        // Fallback to headers
+        username = (req.header('x-devvit-user-name') || req.header('x-devvit-user-id') || null);
+      }
 
       res.json({
         type: 'init',
         postId: postId,
-        username: username ?? null,
+        username: username,
       });
     } catch (error) {
-      console.error(`API Init Error for post ${postId}:`, error);
-      let errorMessage = 'Unknown error during initialization';
-      if (error instanceof Error) {
-        errorMessage = `Initialization failed: ${error.message}`;
-      }
-      res.status(400).json({ status: 'error', message: errorMessage });
+      Logger.error(`API Init Error:`, error);
+      res.json({
+        type: 'init',
+        postId: postId,
+        username: null,
+      });
     }
   }
 );
@@ -714,50 +652,70 @@ const ROBOT_SYSTEM_PROMPT = `Role-play as a medieval guardsman who treats this a
 Write 5 new standalone lines suitable for a landing page mascot. Keep them varied: greetings for new players, snark when hovered too long, and a final push to enter the app.
 Return STRICT JSON: { "lines": ["...","...","...","...","..."] } and NOTHING else.`;
 
+let robotGenCooldown = 0;
+const ROBOT_BACKOFF_MS = 5 * 60 * 1000; // 5 minute cooldown if AI fails
+
 app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const robotFallback = [
+    'Halt. State your business. Quickly.',
+    'New face? Don’t dawdle.',
+    'Eyes front. Spine straight. In or out?',
+    'Still here? Hmph. Training yard awaits.',
+    'Enough loitering. Inside. Now.'
+  ];
+
   try {
     const fs = new FirestoreRestService();
-    const today = new Date().toISOString().slice(0, 10);
     const existing = await fs.getRobotDialogues(today);
-    if (existing && existing.length >= 5) return res.json({ ok: true, date: today, lines: existing.slice(0, 20) });
-    // Generate 5 new lines if none today (or not enough)
-    const model = CONFIG.GEMINI.LITE_MODEL; // Cheaper model for simple text
-    if (!GEMINI_API_KEY) return res.status(200).json({
-      ok: true, date: today, lines: [
-        'Halt. State your business. Quickly.',
-        'New face? Don’t dawdle.',
-        'Eyes front. Spine straight. In or out?',
-        'Still here? Hmph. Training yard awaits.',
-        'Enough loitering. Inside. Now.'
-      ]
+    if (existing && existing.length >= 5) {
+      return res.json({ ok: true, date: today, lines: existing.slice(0, 20) });
+    }
+
+    // Check cooldown to prevent AI quota "leak"
+    if (Date.now() < robotGenCooldown) {
+      Logger.info('[RobotDialogues] Skipping AI generation (cooldown active). Using fallback.');
+      return res.json({ ok: true, date: today, lines: robotFallback });
+    }
+
+    if (!GEMINI_API_KEY) {
+      return res.json({ ok: true, date: today, lines: robotFallback });
+    }
+
+    const ai = new AIService(GEMINI_API_KEY, OPENAI_API_KEY);
+    const model = CONFIG.GEMINI.LITE_MODEL;
+
+    const aiResp = await ai.callAI(ROBOT_SYSTEM_PROMPT, 'Generate 5 lines for today.', model, {
+      temperature: 0.6,
+      maxTokens: 256,
+      responseMimeType: 'application/json'
     });
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: ROBOT_SYSTEM_PROMPT }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 256 } }),
-      }
-    );
-    if (!resp.ok) return res.status(200).json({
-      ok: true, date: today, lines: [
-        'Move along. Or move in.', 'This gate won’t stare back.', 'You. Inside. Chop-chop.', 'Still hovering? Tsk.', 'Enough. Enter the app.'
-      ]
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = await resp.json();
-    const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const parsed = extractJSONCandidate(String(text));
+
+    const parsed = extractJSONCandidate(aiResp.text);
     type RobotJson = { lines?: unknown };
     const linesArr = parsed && typeof parsed === 'object' && Array.isArray((parsed as RobotJson).lines as unknown[])
       ? ((parsed as RobotJson).lines as unknown[]).map((s) => String(s).trim()).filter(Boolean)
       : [];
+
     const clean = sanitizeLines(linesArr).slice(0, 5);
-    const fsOk = await new FirestoreRestService().saveRobotDialogues(today, clean);
-    res.json({ ok: true, date: today, lines: (fsOk ? clean : sanitizeLines(linesArr)).slice(0, 20) });
-  } catch (e) {
-    Logger.error('[RobotDialogues] error', e);
-    res.status(500).json({ ok: false, error: 'ROBOT_DIALOGUES_FAILED' });
+    if (clean.length >= 3) {
+      await fs.saveRobotDialogues(today, clean);
+      return res.json({ ok: true, date: today, lines: clean });
+    }
+
+    throw new Error('MALFORMED_AI_RESPONSE');
+
+  } catch (e: any) {
+    // Detect QuotaError and set cooldown
+    if (e instanceof AIQuotaError || (e as Error).name === 'QuotaError') {
+      robotGenCooldown = Date.now() + ROBOT_BACKOFF_MS;
+      Logger.error(`[RobotDialogues] AI/Firestore rate-limited. Setting ${ROBOT_BACKOFF_MS / 1000}s cooldown.`);
+    } else {
+      Logger.error('[RobotDialogues] Error:', e.message);
+    }
+
+    // Always return success with fallback to keep frontend smooth
+    res.json({ ok: true, date: today, lines: robotFallback });
   }
 });
 
@@ -1255,6 +1213,10 @@ app.get('/api/landing/summary', async (_req, res) => {
 
     res.json({ ok: true, ...summary });
   } catch (e) {
+    if ((e as Error).name === 'QuotaError' || e instanceof AIQuotaError) {
+      Logger.error('[LandingSummary] RATE LIMIT HIT!', e);
+      return res.status(429).json({ ok: false, error: 'QUOTA_EXCEEDED', message: (e as Error).message });
+    }
     Logger.error('[LandingSummary] error', e);
     res.status(500).json({ ok: false, error: 'SUMMARY_FAILED' });
   }
@@ -1380,7 +1342,10 @@ app.post('/api/ai/test', async (req, res) => {
 // Start the server
 const server = createServer(app);
 server.listen(getServerPort(), () => {
-  Logger.info('Topic-based quiz bot server started');
+  if (!(globalThis as any).hasLoggedStart) {
+    Logger.info('Topic-based quiz bot server started');
+    (globalThis as any).hasLoggedStart = true;
+  }
 });
 
 export default Devvit;

@@ -51,7 +51,7 @@ export const useLandingSummary = (enabled: boolean) => {
         try {
           const cache = { ts: Date.now(), summary };
           localStorage.setItem('streax.landingSummary', JSON.stringify(cache));
-        } catch {/* ignore */}
+        } catch {/* ignore */ }
       }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setError((e as Error).message);
@@ -71,12 +71,16 @@ export const useLandingSummary = (enabled: boolean) => {
           setData(parsed.summary);
         }
       }
-    } catch {/* ignore */}
+    } catch {/* ignore */ }
     void fetchSummary();
-    const iv = setInterval(() => {
+
+    // Poll once more after 15s to update stale data, then stop.
+    // This meets the requirement of "once or twice" and "long apart starting with 15s".
+    const timer = setTimeout(() => {
       void fetchSummary();
-    }, 1500);
-    return () => { abortRef.current?.abort(); clearInterval(iv); };
+    }, 15000);
+
+    return () => { abortRef.current?.abort(); clearTimeout(timer); };
   }, [enabled, fetchSummary]);
 
   return { data, loading, error, refresh: fetchSummary };
