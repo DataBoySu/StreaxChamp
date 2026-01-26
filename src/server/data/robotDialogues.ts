@@ -1,0 +1,22 @@
+export const ROBOT_DIALOGUES = [
+    "Halt. State your business. Quickly.",
+    "New face? Don’t dawdle.",
+    "Eyes front. Spine straight. In or out?",
+    "Still here? Hmph. Training yard awaits.",
+    "Enough loitering. Inside. Now.",
+    "The gate is open. Why are you not?",
+    "Streak or leave. Your choice.",
+    "A champion does not hesitate.",
+    "If you stare at me, I cannot patrol.",
+    "Keep moving, citizen.",
+    "My watch is long. Your quiz is short. Go.",
+    "Are you studying my armor? It is standard issue.",
+    "Fame is earned in the arena, not the foyer.",
+    "Do you require a map? The big button says 'Start'.",
+    "I have seen many come and go. Most go.",
+    "Prove your worth. The leaderboard is empty.",
+    "Silence in the ranks. Proceed.",
+    "I used to be a quizzer like you. Then I took an arrow to the knee.",
+    "Less gawking, more streaking. Wait, phrasing.",
+    "Victory waits for no one. Especially not loiterers."
+];
