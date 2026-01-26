@@ -347,29 +347,37 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 // Gemini quiz generation (hard informative variant) – returns 5 challenging, explanation-rich questions
 // Helper for sequential generation
-async function generateSingleQuestionWithGemini(
-    topicTitle: string,
-    topicSources: string[],
-    contextText: string,
-    index: number,
-    existingQuestions: string[] = []
-): Promise<GeneratedQuizQuestion | null> {
-    const model = CONFIG.GEMINI.CONTENT_MODEL;
-    const systemPrompt = CONFIG.GEMINI.PROMPTS.QUIZ_GENERATOR;
+// Gemini quiz generation (Batch Mode: 5 questions at once)
+// Replaces sequential single-question generation to avoid rate limits and improve consistency
+async function generateQuizWithGemini_OLD(topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
+    await validateGeminiKey();
+    if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');
+
+    const model = CONFIG.GEMINI.CONTENT_MODEL || 'gemini-1.5-flash'; // Ensure fallback model
+    const trimmedContext = contextText ? contextText.slice(0, 25000) : '';
+
+    Logger.ai(`[BatchGen] Starting batch generation for topic="${topicTitle}"`, { model });
+
+    const systemPrompt = `You are a Quiz Master for a competitive trivia game.
+Generate exactly 5 diverse, interesting, and challenging multiple-choice questions about the topic.
+- Questions must be unique and cover different aspects of the topic.
+- Avoid repetitive phrasing (e.g., don't start every question with "What is...").
+- Options must be 4 distinct choices.
+- Correct answer index must be 0, 1, 2, or 3.
+- Difficulty should describe the complexity (easy/medium/hard).
+- Return a JSON object with a "questions" array.`;
+
     const userPrompt = `Topic: ${topicTitle}
 Sources:
 ${topicSources.slice(0, 4).join('\n')}
-${contextText ? `\nCONTEXT:\n${contextText}` : ''}
-${existingQuestions.length > 0 ? `\nDO NOT repeat these questions: ${existingQuestions.join(', ')}` : ''}
-Generate unique question #${index + 1}.`;
+${trimmedContext ? `\nCONTEXT:\n${trimmedContext}` : ''}
+
+Generate 5 unique questions now.`;
 
     let attempts = 0;
     const maxAttempts = 2;
 
     while (attempts < maxAttempts) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000); // increased timeout to 15s
-
         try {
             const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
                 method: 'POST',
@@ -379,127 +387,246 @@ Generate unique question #${index + 1}.`;
                     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
                     generationConfig: {
                         temperature: 0.7,
-                        maxOutputTokens: 2048,
+                        maxOutputTokens: 4096, // Increased limit for batch of 5 questions
                         response_mime_type: "application/json",
                         response_schema: {
                             type: "object",
                             properties: {
-                                id: { type: "string" },
-                                question: { type: "string" },
-                                options: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 4 },
-                                correctAnswer: { type: "number" },
-                                difficulty: { type: "string" },
-                                category: { type: "string" },
-                                explanation: { type: "string" }
-                            },
-                            required: ["id", "question", "options", "correctAnswer", "difficulty", "category", "explanation"]
+                                questions: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            id: { type: "string" },
+                                            question: { type: "string" },
+                                            options: { type: "array", items: { type: "string" } },
+                                            correctAnswer: { type: "number" },
+                                            difficulty: { type: "string" },
+                                            category: { type: "string" },
+                                            explanation: { type: "string" }
+                                        },
+                                        required: ["question", "options", "correctAnswer", "difficulty", "category"]
+                                    }
+                                }
+                            }
                         }
-                    },
-                }),
-                signal: controller.signal,
+                    }
+                })
             });
-            clearTimeout(timeout);
 
-            if (resp.status === 429) {
+            if (!resp.ok) {
+                const txt = await resp.text();
+                Logger.error(`[BatchGen] API Error ${resp.status}`, { body: txt.slice(0, 200) });
+                throw new Error(`Gemini API Error: ${resp.status}`);
+            }
+
+            const data: any = await resp.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+            // Parse JSON
+            let parsed: any;
+            try {
+                parsed = JSON.parse(text);
+            } catch (e) {
+                // If parse fails, it might be markdown fenced
+                const clean = text.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+                parsed = JSON.parse(clean);
+            }
+
+            const rawQuestions = Array.isArray(parsed?.questions) ? parsed.questions : [];
+            if (rawQuestions.length < 5) {
+                Logger.warn(`[BatchGen] Insufficient questions generated: ${rawQuestions.length}/5`);
                 attempts++;
-                const wait = attempts * 5000;
-                Logger.warn(`[SingleGenRateLimit] 429 received. Waiting ${wait}ms... (Attempt ${attempts}/${maxAttempts})`);
-                await delay(wait);
                 continue;
             }
 
-            if (!resp.ok) return null;
+            // Norm & Validate
+            const questions: GeneratedQuizQuestion[] = rawQuestions.map((q: any, idx: number) => ({
+                id: `q${Date.now()}-${idx}`,
+                question: String(q.question),
+                options: Array.isArray(q.options) ? q.options.slice(0, 4).map(String) : [],
+                correctAnswer: Number(q.correctAnswer) || 0,
+                difficulty: String(q.difficulty || 'medium'),
+                category: String(q.category || topicTitle),
+                explanation: q.explanation,
+                createdAt: new Date().toISOString()
+            })).filter(q => q.options.length === 4);
 
-            const data: any = await resp.json();
-            const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-            let q: any;
-            try {
-                let cleanText = text.trim();
-                if (cleanText.startsWith('```')) {
-                    cleanText = cleanText.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
-                }
-                q = JSON.parse(cleanText);
-            } catch (e) {
-                Logger.error(`[SingleGenJSON] failed to parse: ${text}`, e);
-                return null;
+            if (questions.length < 5) {
+                Logger.warn(`[BatchGen] Validation pruned questions. Valid: ${questions.length}/5`);
+                attempts++;
+                continue;
             }
 
-            if (!q || typeof q.question !== 'string') return null;
-
-            const opts = Array.isArray(q.options) ? (q.options as unknown[]).slice(0, 4) : [];
-            const normOpts = opts.length >= 4 ? opts.map((o) => String(o)).slice(0, 4) : ['A', 'B', 'C', 'D'];
-
+            Logger.ai(`[BatchGen] Success! Generated ${questions.length} questions.`, { model });
             return {
-                id: String(q.id ?? `q${Date.now()}-${index}`),
-                question: String(q.question),
-                options: normOpts,
-                correctAnswer: Number.isInteger(q.correctAnswer) ? (q.correctAnswer as number) : 0,
-                difficulty: typeof q.difficulty === 'string' && /^(easy|medium|hard)$/i.test(q.difficulty) ? String(q.difficulty).toLowerCase() : 'hard',
-                category: String(q.category ?? topicTitle),
-                explanation: typeof q.explanation === 'string' ? q.explanation : undefined,
-                createdAt: new Date().toISOString(),
+                questions: questions.slice(0, 5),
+                metadata: {
+                    generatedAt: new Date().toISOString(),
+                    sourceWikis: topicSources.slice(0, 2),
+                    version: 'v3-batch',
+                    model: model,
+                    generator: 'gemini'
+                }
             };
+
         } catch (e) {
-            clearTimeout(timeout);
-            Logger.error(`[SingleGenFail] idx=${index} attempt=${attempts}`, e);
+            Logger.error(`[BatchGen] Attempt ${attempts + 1} failed`, e);
             attempts++;
-            if (attempts < maxAttempts) await delay(2000);
+            await delay(2000);
         }
     }
-    return null;
+
+    throw AppError.aiFailure('BATCH_GEN_FAILED');
 }
 
-// [REMOVED] Legacy helper. Use callGemini() instead.
-
-// Gemini quiz generation (hard informative variant)
+// Gemini quiz generation (Smart Batch Mode: Accumulate & Retry)
+// Generates 5 questions. If some fail, keeps valid ones and requests remainder.
 async function generateQuizWithGemini(topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
     await validateGeminiKey();
+    if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');
 
-    if (!GEMINI_API_KEY) {
-        throw AppError.aiFailure('NO_API_KEY');
-    }
-
-    const questions: GeneratedQuizQuestion[] = [];
-    const existingQuestions: string[] = [];
+    const model = CONFIG.GEMINI.CONTENT_MODEL || 'gemini-1.5-flash';
     const trimmedContext = contextText ? contextText.slice(0, 25000) : '';
 
-    Logger.info(`[SequentialGen] Starting generation for topic="${topicTitle}"`);
+    // Accumulator for valid questions
+    const validQuestions: GeneratedQuizQuestion[] = [];
+    const targetCount = 5;
+    let attempts = 0;
+    const maxAttempts = 3; // Retry entire batches up to 3 times (total api calls)
 
-    // Generate 5 questions sequentially
-    for (let i = 0; i < 5; i++) {
-        // Spacer for rate limits
-        if (i > 0) await delay(2500);
+    Logger.ai(`[SmartGen] Starting generation for topic="${topicTitle}" Target=${targetCount}`, { model });
+
+    // Loop until we have enough questions or exhaust attempts
+    while (validQuestions.length < targetCount && attempts < maxAttempts) {
+        attempts++;
+        const needed = targetCount - validQuestions.length;
+
+        // Contextualize prompt to avoid duplicates
+        const existingTxt = validQuestions.map(q => q.question).join(" | ");
+        const avoidPrompt = validQuestions.length > 0 ? `\nDO NOT repeat these questions: ${existingTxt}` : '';
+
+        const systemPrompt = `You are a Quiz Master. Generate exactly ${needed} diverse, interesting multiple-choice questions about the topic.
+- Questions must be unique.
+- Options must be 4 distinct choices.
+- Correct answer index: 0-3.
+- Return a JSON object with a "questions" array containing ${needed} items.`;
+
+        const userPrompt = `Topic: ${topicTitle}
+Sources:
+${topicSources.slice(0, 4).join('\n')}
+${trimmedContext ? `\nCONTEXT:\n${trimmedContext}` : ''}
+${avoidPrompt}
+
+Generate ${needed} unique questions now.`;
 
         try {
-            const q = await generateSingleQuestionWithGemini(topicTitle, topicSources, trimmedContext, i, existingQuestions);
-            if (q) {
-                questions.push(q);
-                existingQuestions.push(q.question);
-            } else {
-                Logger.warn(`[SequentialGen] Failed to generate question ${i + 1}`);
+            Logger.ai(`[SmartGen] Batch Attempt ${attempts}/${maxAttempts}: Requesting ${needed} questions...`);
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: systemPrompt }] },
+                    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+                    generationConfig: {
+                        temperature: 0.7,
+                        maxOutputTokens: 16384, // High limit for smart batching (User requested 4x 4096)
+                        response_mime_type: "application/json",
+                        response_schema: {
+                            type: "object",
+                            properties: {
+                                questions: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            id: { type: "string" },
+                                            question: { type: "string" },
+                                            options: { type: "array", items: { type: "string" } },
+                                            correctAnswer: { type: "number" },
+                                            difficulty: { type: "string" },
+                                            category: { type: "string" },
+                                            explanation: { type: "string" }
+                                        },
+                                        required: ["question", "options", "correctAnswer", "difficulty", "category"]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })
+            });
+
+            if (!resp.ok) {
+                Logger.warn(`[SmartGen] API Fail ${resp.status}`);
+                await delay(1000); // Backoff briefly
+                continue;
             }
+
+            const data: any = await resp.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            let parsed: any;
+            try { parsed = JSON.parse(text); }
+            catch { parsed = JSON.parse(text.replace(/^```json\s*/, '').replace(/\s*```$/, '')); }
+
+            const rawList = Array.isArray(parsed?.questions) ? parsed.questions : [];
+
+            // Validate and Accumulate
+            let addedThisRound = 0;
+            for (const q of rawList) {
+                if (validQuestions.length >= targetCount) break; // Don't overfill
+
+                // Strict validation
+                if (!q.question || !Array.isArray(q.options) || q.options.length !== 4) continue;
+
+                // Check duplicate against current batch (and previous)
+                if (validQuestions.some(vq => vq.question === q.question)) continue;
+
+                validQuestions.push({
+                    id: `q${Date.now()}-${validQuestions.length}`,
+                    question: String(q.question),
+                    options: q.options.map(String),
+                    correctAnswer: Number(q.correctAnswer) || 0,
+                    difficulty: String(q.difficulty || 'medium'),
+                    category: String(q.category || topicTitle),
+                    explanation: q.explanation,
+                    createdAt: new Date().toISOString()
+                });
+                addedThisRound++;
+            }
+
+            Logger.info(`[SmartGen] Attempt ${attempts}: Added ${addedThisRound} valid questions. Total: ${validQuestions.length}/${targetCount}`);
+
+            // If we added nothing despite success, maybe the model is stuck?
+            if (addedThisRound === 0) await delay(1000);
+
         } catch (e) {
-            Logger.error(`[SequentialGen] Error generating question ${i + 1}`, e);
+            Logger.error(`[SmartGen] Error on attempt ${attempts}`, e);
+            await delay(1500);
         }
     }
 
-    // STRICT VALIDATION: Must have 5 questions
-    if (questions.length < 5) {
-        Logger.error(`[QuizGenFail] Only generated ${questions.length}/5 valid questions. Aborting.`);
-        throw AppError.aiFailure(`INSUFFICIENT_QUESTIONS: ${questions.length}/5`);
+    // PARTIAL SAVE LOGIC: failing softly if we have at least 1 question
+    if (validQuestions.length > 0) {
+        if (validQuestions.length < targetCount) {
+            Logger.warn(`[SmartGen] Partial Success: ONLY ${validQuestions.length}/${targetCount} generated. Saving what we have.`);
+        } else {
+            Logger.ai(`[SmartGen] Full Success! Generated ${validQuestions.length} questions.`);
+        }
+
+        return {
+            questions: validQuestions,
+            metadata: {
+                generatedAt: new Date().toISOString(),
+                sourceWikis: topicSources.slice(0, 2),
+                version: 'v4-smart-batch',
+                model: model,
+                generator: 'gemini'
+            }
+        };
     }
 
-    return {
-        questions,
-        metadata: {
-            generatedAt: new Date().toISOString(),
-            sourceWikis: topicSources.slice(0, 2),
-            version: 'v2-strict',
-            model: CONFIG.GEMINI.CONTENT_MODEL,
-            generator: 'gemini',
-        },
-    };
+    throw AppError.aiFailure('SMART_GEN_FAILED_TOTAL');
 }
 
 // Configure Devvit for HTTP access and media

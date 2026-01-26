@@ -4,6 +4,7 @@ import './animations.css';
 import FirebaseTopics, { TopicDoc } from '../../services/FirebaseTopics';
 import { firebaseQuizService } from '../../services/FirebaseQuizService';
 import { useBackoffPolling } from '../../hooks/useBackoffPolling';
+import { QuizGenerationLoader } from '../ui/QuizGenerationLoader';
 
 // Utility function to slugify a title (kept local)
 const slugify = (s: string) =>
@@ -411,11 +412,7 @@ export const TopicSelector: React.FC<{
                               onClick={() => requestQuiz(topic)}
                               className={`${isHighlighted ? 'animate-shake' : ''} ${vibeClass} ${generatingSlug === (slug) ? 'opacity-60 pointer-events-none' : ''}`}
                             />
-                            {generatingSlug === (topic.slug || slugify(topic.name)) && (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="px-3 py-1 text-xs rounded bg-black/70 border border-orange-500 text-orange-300 animate-pulse">Generating…</div>
-                              </div>
-                            )}
+                            {/* Loader handled globally */}
                           </div>
                         </div>
                       );
@@ -433,11 +430,7 @@ export const TopicSelector: React.FC<{
                             onClick={() => requestQuiz(topic)}
                             className={`${isHighlighted ? 'animate-shake' : ''} ${vibeClass} ${generatingSlug === (slug) ? 'opacity-60 pointer-events-none' : ''}`}
                           />
-                          {generatingSlug === (topic.slug || slugify(topic.name)) && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="px-3 py-1 text-xs rounded bg-black/70 border border-orange-500 text-orange-300 animate-pulse">Generating…</div>
-                            </div>
-                          )}
+                          {/* Loader handled globally */}
                         </div>
                       </div>
                     );
@@ -480,6 +473,10 @@ export const TopicSelector: React.FC<{
         )}
       </div>
 
+      <QuizGenerationLoader
+        isVisible={!!generatingSlug}
+        topicName={generatingSlug ? toTitleCase(topics.find(t => (t.slug === generatingSlug || slugify(t.name) === generatingSlug))?.name || generatingSlug) : undefined}
+      />
     </div>
   );
 };
