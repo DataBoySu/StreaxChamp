@@ -1,26 +1,20 @@
 import { useEffect, useState } from 'react';
 import { firebaseQuizService } from '../services/FirebaseQuizService';
 
-import { CONFIG } from '../../shared/constants';
-
 export function useTopics() {
-  const [topics, setTopics] = useState<Array<any>>(() => {
-    // 1. Try local cache
-    try {
-      const raw = localStorage.getItem('streax:topics');
-      if (raw) return JSON.parse(raw);
-    } catch { }
-
-    // 2. Fallback to constant defaults
-    return CONFIG.GAME.PREDEFINED_TOPICS.map(t => ({
-      title: t,
-      slug: t.toLowerCase().replace(/\s+/g, '-')
-    }));
-  });
-  const [loading, setLoading] = useState(false); // Assume loaded since we have defaults
+  const [topics, setTopics] = useState<Array<any>>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Background refresh
+    // load cached topics from localStorage first
+    const raw = localStorage.getItem('streax:topics');
+    if (raw) {
+      try {
+        setTopics(JSON.parse(raw));
+        setLoading(false);
+      } catch { }
+    }
+    // then refresh from Firestore
     refresh();
   }, []);
 

@@ -37,9 +37,9 @@ export const CONFIG = {
     },
     GEMINI: {
         /** Cheapest model for simple tasks like normalization & categorization */
-        LITE_MODEL: 'gemini-2.5-flash-lite',
+        LITE_MODEL: 'xiaomi/mimo-v2-flash:free',
         /** Capable model for complex reasoning and creative generation */
-        CONTENT_MODEL: 'gemini-2.5-flash',
+        CONTENT_MODEL: 'google/gemini-2.5-flash',
         PROMPTS: {
             TOPIC_NORMALIZER: `You are a precise topic normalizer for a quiz generator.\nGiven a user input topic string, 
                                 return STRICT JSON with keys: title (canonical properly capitalized topic name), 
@@ -54,15 +54,6 @@ STRICT RULES:
  - explanation must be ONE concise sentence starting with a direct fact.
  - Output MUST NOT be truncated. Keep your response concise to stay within token limits.
  - Return ONLY the JSON object.`
-        },
-        /** Configurable endpoint for OpenAI-compliant providers (OpenRouter, Groq, etc.) */
-        OPENAI_ENDPOINT: 'https://api.groq.com/openai/v1/chat/completions',
-        /** Helper to determine if we should use Google native vs OpenAI-compatible API */
-        getProvider: (model: string): 'google' | 'openai_compatible' => {
-            if (!model) return 'google';
-            // OpenAI-compatible providers require "provider/model_name" format (contains a slash)
-            // Google Gemini-native models use the direct model name (no slash)
-            return model.includes('/') ? 'openai_compatible' : 'google';
         }
     },
 };

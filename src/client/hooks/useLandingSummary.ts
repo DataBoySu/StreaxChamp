@@ -73,14 +73,10 @@ export const useLandingSummary = (enabled: boolean) => {
       }
     } catch {/* ignore */ }
     void fetchSummary();
-
-    // Poll once more after 15s to update stale data, then stop.
-    // This meets the requirement of "once or twice" and "long apart starting with 15s".
-    const timer = setTimeout(() => {
+    const iv = setInterval(() => {
       void fetchSummary();
-    }, 15000);
-
-    return () => { abortRef.current?.abort(); clearTimeout(timer); };
+    }, 1500);
+    return () => { abortRef.current?.abort(); clearInterval(iv); };
   }, [enabled, fetchSummary]);
 
   return { data, loading, error, refresh: fetchSummary };

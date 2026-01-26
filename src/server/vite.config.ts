@@ -24,16 +24,6 @@ export default defineConfig({
         entryFileNames: 'index.cjs',
         inlineDynamicImports: true,
       },
-      onwarn(warning, warn) {
-        if (
-          warning.code === 'EVAL' &&
-          warning.id &&
-          warning.id.includes('@protobufjs/inquire')
-        ) {
-          return;
-        }
-        warn(warning);
-      },
     },
   },
   define: {
