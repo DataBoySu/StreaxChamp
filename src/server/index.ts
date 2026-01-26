@@ -12,8 +12,9 @@ import { reddit } from '@devvit/web/server';
 import { context } from '@devvit/web/server';
 import { createPost } from './core/post';
 import type { InitResponse } from '../shared/types/api';
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { CONFIG } from '../shared/constants';
+import { AppError } from './utils/AppError';
 
 // App-level secret for Gemini key; configured via Devvit settings
 Devvit.addSettings({
@@ -660,16 +661,26 @@ Return STRICT JSON: { "lines": ["...","...","...","...","..."] } and NOTHING els
 
 app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
     try {
-        const fs = new FirestoreRestService();
         const today = new Date().toISOString().slice(0, 10);
+
+        // Check RAM cache first (zero DB/AI calls if cached)
+        if (ROBOT_DIALOGUE_CACHE && ROBOT_DIALOGUE_CACHE.date === today) {
+            return res.json({ ok: true, date: today, lines: ROBOT_DIALOGUE_CACHE.lines, cached: true });
+        }
+
+        const fs = new FirestoreRestService();
         const existing = await fs.getRobotDialogues(today);
-        if (existing && existing.length >= 5) return res.json({ ok: true, date: today, lines: existing.slice(0, 20) });
+        if (existing && existing.length >= 5) {
+            // Cache in RAM for subsequent requests
+            ROBOT_DIALOGUE_CACHE = { date: today, lines: existing.slice(0, 20) };
+            return res.json({ ok: true, date: today, lines: existing.slice(0, 20) });
+        }
         // Generate 5 new lines if none today (or not enough)
         const model = CONFIG.GEMINI.LITE_MODEL; // Cheaper model for simple text
         if (!GEMINI_API_KEY) return res.status(200).json({
             ok: true, date: today, lines: [
                 'Halt. State your business. Quickly.',
-                'New face? Don’t dawdle.',
+                'New face? Do not dawdle.',
                 'Eyes front. Spine straight. In or out?',
                 'Still here? Hmph. Training yard awaits.',
                 'Enough loitering. Inside. Now.'
@@ -685,7 +696,7 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
         );
         if (!resp.ok) return res.status(200).json({
             ok: true, date: today, lines: [
-                'Move along. Or move in.', 'This gate won’t stare back.', 'You. Inside. Chop-chop.', 'Still hovering? Tsk.', 'Enough. Enter the app.'
+                'Move along. Or move in.', 'This gate will not stare back.', 'You. Inside. Chop-chop.', 'Still hovering? Tsk.', 'Enough. Enter the app.'
             ]
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -698,7 +709,12 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
             : [];
         const clean = sanitizeLines(linesArr).slice(0, 5);
         const fsOk = await new FirestoreRestService().saveRobotDialogues(today, clean);
-        res.json({ ok: true, date: today, lines: (fsOk ? clean : sanitizeLines(linesArr)).slice(0, 20) });
+        const finalLines = (fsOk ? clean : sanitizeLines(linesArr)).slice(0, 20);
+
+        // Cache in RAM for subsequent requests
+        ROBOT_DIALOGUE_CACHE = { date: today, lines: finalLines };
+
+        res.json({ ok: true, date: today, lines: finalLines });
     } catch (e) {
         Logger.error('[RobotDialogues] error', e);
         res.status(500).json({ ok: false, error: 'ROBOT_DIALOGUES_FAILED' });
@@ -1414,6 +1430,25 @@ app.post('/api/ai/test', async (req, res) => {
     }
 });
 
+// In-memory cache for robot dialogues (prevents redundant AI/DB calls)
+let ROBOT_DIALOGUE_CACHE: { date: string; lines: string[] } | null = null;
+
+// Global error handling middleware (MUST be last)
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    if (err instanceof AppError) {
+        Logger.error(`[AppError] ${err.code}: ${err.message}`, { statusCode: err.statusCode, path: req.path });
+        return res.status(err.statusCode).json(err.toJSON());
+    }
+
+    // Programming error - log but don't expose details
+    Logger.error('[UnhandledError]', err);
+    return res.status(500).json({
+        error: 'INTERNAL_ERROR',
+        message: 'An unexpected error occurred',
+        statusCode: 500,
+    });
+});
+
 // Start the server
 const server = createServer(app);
 server.listen(getServerPort(), () => {
@@ -1421,3 +1456,4 @@ server.listen(getServerPort(), () => {
 });
 
 export default Devvit;
+
