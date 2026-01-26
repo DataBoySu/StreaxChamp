@@ -3,7 +3,6 @@ import TopicButtonNew from './TopicButton';
 import './animations.css';
 import FirebaseTopics, { TopicDoc } from '../../services/FirebaseTopics';
 import { firebaseQuizService } from '../../services/FirebaseQuizService';
-import { fetchTopicsFallback } from '../../services/TopicsFallback';
 import { useBackoffPolling } from '../../hooks/useBackoffPolling';
 
 // Utility function to slugify a title (kept local)
@@ -78,37 +77,14 @@ export const TopicSelector: React.FC<{
           setLoading(false);
         },
         async (err) => {
-          console.error('Realtime topics listener failed (likely CSP). Falling back.', err);
-          // Fallback fetch
-          const fallback = await fetchTopicsFallback();
-          const mapped: TopicDoc[] = fallback.map(t => ({
-            id: t.slug,
-            name: t.title,
-            createdAt: Date.now(),
-            slug: t.slug,
-            urls: {},
-            hasQuiz: false,
-            status: 'ready'
-          }));
-          setTopics(mapped);
+          console.error('Realtime topics listener failed:', err);
+          // No fallback - show error state
           setLoading(false);
         }
       );
     } catch (e) {
-      void (async () => {
-        const fallback = await fetchTopicsFallback();
-        const mapped: TopicDoc[] = fallback.map(t => ({
-          id: t.slug,
-          name: t.title,
-          createdAt: Date.now(),
-          slug: t.slug,
-          urls: {},
-          hasQuiz: false,
-          status: 'ready'
-        }));
-        setTopics(mapped);
-        setLoading(false);
-      })();
+      console.error('Topics subscription error:', e);
+      setLoading(false);
     }
     return () => { if (unsub) unsub(); };
   }, []);

@@ -18,7 +18,6 @@ export const CONFIG = {
         DEFAULT_QUESTIONS_COUNT: 5,
         TIMER_DURATION: 15, // seconds
         BONUS_TIMER_DURATION: 15,
-        PREDEFINED_TOPICS: ['Elden Ring', 'Dark Souls', 'Cyberpunk 2077', 'Minecraft'],
     },
     SERVER: {
         DEFAULT_SUBREDDIT: 'streax_champ_dev',
