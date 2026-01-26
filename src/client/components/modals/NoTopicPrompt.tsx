@@ -1,0 +1,57 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+
+interface NoTopicPromptProps {
+    onClose: () => void;
+    onChooseTopic: () => void;
+    onPlayRandom: () => void;
+}
+
+export const NoTopicPrompt: React.FC<NoTopicPromptProps> = ({
+    onClose,
+    onChooseTopic,
+    onPlayRandom,
+}) => {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                className="modern-card relative w-full max-w-md mx-auto p-6 pt-8 border-2 border-accent/40"
+                style={{
+                    boxShadow: '0 0 25px rgba(255,69,0,0.35), 0 0 8px rgba(255,255,255,0.15)',
+                }}
+            >
+                <button
+                    onClick={onClose}
+                    className="absolute top-2 right-2 text-secondary hover:text-primary transition-colors"
+                    aria-label="Close"
+                >
+                    ✕
+                </button>
+                <h3 className="text-2xl font-extrabold mb-3 text-gradient">Select a Topic</h3>
+                <p className="text-secondary mb-6 leading-relaxed">
+                    You have not selected a topic. Would you like to pick one now or play a random daily quiz?
+                </p>
+                <div className="flex flex-col gap-3">
+                    <button
+                        onClick={onChooseTopic}
+                        className="modern-button modern-button-primary w-full py-3 font-bold"
+                    >
+                        Choose Topic
+                    </button>
+                    <button
+                        onClick={onPlayRandom}
+                        className="modern-button modern-button-secondary w-full py-3 font-bold"
+                    >
+                        Play Random Quiz
+                    </button>
+                </div>
+                <div className="mt-4 text-xs text-center text-secondary">
+                    Random quiz will use the daily curated questions.
+                </div>
+            </motion.div>
+        </div>
+    );
+};

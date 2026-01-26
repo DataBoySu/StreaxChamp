@@ -8,7 +8,7 @@ StreaxChamp is a high-performance, immersive quiz application built on the [Redd
 
 ## (ฅ•ω•ฅ) Key Features
 
-- **Infinite AI Quizzes** 🧠: Powered by `gemini` for rapid, diverse trivia generation.
+- **Infinite AI Quizzes** 🧠: Powered by `Gemini` for rapid, diverse trivia generation.
 - **Dynamic Mascot** 🤖: An interactive robot companion with AI-driven banter and state-aware animations.
 - **Topic Marketplace** 🛒: Browse "Hot Topics" or generate your own custom trivia field in seconds.
 - **Leaderboards** 🏆: Competitive ranking system persisted via Firestore REST.
@@ -42,49 +42,77 @@ StreaxChamp is a high-performance, immersive quiz application built on the [Redd
 
 </details>
 
-### (˶˃ ᵕ ˂˶) Project Structure
-```text
 StreaxChamp/
-├── .env                          # Configuration for environment variables (API keys, project IDs)
-├── AGENTS.md                     # Documentation for AI agent interactions and roles
-├── README.md                     # Project overview, setup instructions, and documentation
-├── dataconnect/                  # Firebase Data Connect configuration and schema definitions
-│   ├── dataconnect.yaml          # Main configuration file for Firebase Data Connect
-│   └── schema/                   # GraphQL schema definitions for the database
-├── scripts/                      # Utility scripts for maintenance, seeding, and testing
-│   ├── seedTopics.ts             # Script to populate initial topics in the database
-│   ├── testGemini.ts             # Integration test for Gemini AI service
-│   └── serve-and-run-server.js   # Script to start both the dev server and backend services
-├── src/                          # Main source code directory
-│   ├── client/                   # Frontend React application code
-│   │   ├── App.tsx               # Main application component and routing logic
-│   │   ├── index.css             # Global styles and Tailwind CSS imports
-│   │   ├── main.tsx              # React entry point, renders the App component
-│   │   ├── components/           # Reusable UI components
-│   │   │   ├── AnimatedWelcomeBox.tsx  # Interactive welcome panel on landing
-│   │   │   ├── InteractiveRobot.tsx    # Robot avatar with dynamic animations and states
-│   │   │   ├── HotTopics.tsx           # Dashboard view for trending quiz topics
-│   │   │   └── QuizAdminPanel.tsx      # Internal tool for managing and force-generating quizzes
-│   │   ├── hooks/                # Custom React hooks for business logic
-│   │   │   ├── useQuizData.ts    # Manages quiz state, timers, and answer submission
-│   │   │   ├── useLeaderboard.ts # Fetches and updates competitive ranking data
-│   │   │   └── useTheme.ts       # Handles dark/light mode toggles and persistent styling
-│   │   └── services/             # Client-side API and Firebase client wrappers
-│   ├── server/                   # Backend services (Node.js/Vite environment)
-│   │   ├── index.ts              # Server entry point handling core initialization
-│   │   ├── controllers/          # Request handlers for various application domains
-│   │   │   ├── QuizController.ts # Logic for quiz generation and validation
-│   │   │   └── TopicController.ts# Manages topic scraping and curation flow
-│   │   └── services/             # Core backend business logic and integrations
-│   │       ├── GeminiService.ts  # Interface for Google Gemini AI (quiz/topic generation)
-│   │       └── BrowserlessService.ts # Manages headless browser instances for web scraping
-│   ├── shared/                   # Shared code used by both client and server
-│   │   ├── constants.ts          # Unified configuration constants and magic numbers
-│   │   └── types/                # TypeScript interfaces and types for data consistency
-│   └── dataconnect-generated/    # Auto-generated SDK for Firebase Data Connect
-├── tailwind.config.js            # Configuration for Tailwind CSS utility framework
-├── tsconfig.json                 # Project-wide TypeScript compiler configuration
-└── vite.config.ts                # Build tool configuration for the frontend and server
+├── AGENTS.md                               # Documentation for AI agent logic and personas.
+├── README.md                               # Main project documentation and overview.
+├── package.json                            # Project dependencies and script definitions.
+├── tsconfig.json                           # TypeScript compiler configuration.
+├── vite.config.ts                          # Root Vite configuration for the monorepo build.
+├── dataconnect/                            # Firebase Data Connect configuration and schemas.
+│   ├── dataconnect.yaml                    # Main Data Connect configuration file.
+│   ├── schema/
+│   │   └── schema.gql                      # GraphQL database schema definition.
+│   └── example/                            # Example GraphQL operations for reference.
+├── scripts/                                # Utility scripts for maintenance and testing.
+│   ├── seedTopics.ts                       # Script to populate initial topics in Firestore.
+│   ├── testGemini.ts                       # Test script for Gemini AI trivia generation.
+│   ├── checkTopics.ts                      # Utility to verify topic integrity in the DB.
+│   └── serve-and-run-server.js             # Automation for starting the dev environment.
+├── src/                                    # Main source code directory.
+│   ├── client/                             # Frontend React application for Devvit WebView.
+│   │   ├── App.tsx                         # Root component: UI orchestration and game state.
+│   │   ├── main.tsx                        # React entry point and DOM mounting.
+│   │   ├── index.css                       # Global styles, layout, and design system tokens.
+│   │   ├── components/                     # UI Component library.
+│   │   │   ├── dashboard/                  # Dashboard-related UI components.
+│   │   │   │   ├── GameSidebar.tsx         # Player history and topic-specific leaderboards.
+│   │   │   │   └── GlobalDashboard.tsx     # Global ranking and hot topic lists.
+│   │   │   ├── landing/                    # Initial views shown before the quiz starts.
+│   │   │   │   └── LandingHero.tsx         # Hero section with mascot and start controls.
+│   │   │   ├── modals/                     # Interface overlays for user input.
+│   │   │   │   ├── AuthModal.tsx           # Reddit username and nickname capture.
+│   │   │   │   └── NoTopicPrompt.tsx       # Fallback prompt for starting a quiz.
+│   │   │   ├── quiz/                       # Game loop and active gameplay views.
+│   │   │   │   ├── QuizActiveView.tsx      # Display for active questions and options.
+│   │   │   │   ├── QuizResult.tsx          # Post-game score summary and celebration.
+│   │   │   │   ├── GapView.tsx             # Loading state and streak feedback between questions.
+│   │   │   │   └── BonusQuestionView.tsx   # Special UI for the score-doubling bonus question.
+│   │   │   ├── topic/                      # Topic discovery and selection interface.
+│   │   │   │   ├── TopicSelector.tsx       # Full-screen grid for browsing and searching topics.
+│   │   │   │   └── TopicButton.tsx         # Stylized card for individual quiz topics.
+│   │   │   ├── ui/                         # Lower-level shared UI elements.
+│   │   │   │   ├── MessageDisplay.tsx      # Toast-like feedback for correct/incorrect answers.
+│   │   │   │   ├── LoadingDots.tsx         # Minimalist animated loading indicator.
+│   │   │   │   └── index.tsx               # Export barrel for basic UI components.
+│   │   │   └── InteractiveRobot.tsx        # SVG Mascot with eye-tracking and speech state.
+│   │   ├── hooks/                          # Custom React hooks for business logic.
+│   │   │   ├── useQuizData.ts              # Logic for question management and scoring.
+│   │   │   ├── useLeaderboard.ts           # Real-time polling and submission of high scores.
+│   │   │   ├── useTopics.ts                # Fetching and filtering the topic marketplace.
+│   │   │   └── useTheme.ts                 # Global theme switching and persistence.
+│   │   ├── services/                       # Client-side API and Firebase logic.
+│   │   │   ├── FirebaseQuizService.ts      # REST bridge for Firestore quiz data.
+│   │   │   └── TopicApi.ts                 # Backend communication for topic generation.
+│   │   └── utils/                          # Frontend helper functions.
+│   │       └── getMultiplierText.ts        # Logic for mapping streaks to descriptive labels.
+│   ├── server/                             # Backend services (Devvit Server Context).
+│   │   ├── index.ts                        # Main entry point for the Devvit backend.
+│   │   ├── controllers/                    # Request handlers for various API domains.
+│   │   │   ├── QuizController.ts           # Handling quiz fetching and validation.
+│   │   │   ├── TopicController.ts          # Management of topic generation requests.
+│   │   │   └── UserController.ts           # User session and profile resolution.
+│   │   ├── services/                       # Core backend business logic.
+│   │   │   ├── GeminiService.ts            # Integration with Google Gemini for AI content.
+│   │   │   ├── BrowserlessService.ts       # Web scraping layer for real-world topic research.
+│   │   │   └── FirestoreRestService.ts     # Low-level gRPC-to-REST bridge for Firestore.
+│   │   └── routes/                         # API route definitions.
+│   │       └── api.ts                      # Express-like routing for WebView API calls.
+│   └── shared/                             # Common code shared between client and server.
+│       ├── constants.ts                    # Global configuration and magic numbers.
+│       ├── index.ts                        # Central export point for shared logic.
+│       └── types/
+│           └── index.ts                    # Unified TS interfaces for quiz and user data.
+└── tailwind.config.js                      # Design token and utility class configuration.
 ```
 
 ---
