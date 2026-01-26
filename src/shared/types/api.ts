@@ -17,6 +17,61 @@ export interface DailyQuiz {
   description?: string;
 }
 
+// Topic types - used for topic generation and quiz management
+export interface Topic {
+  slug: string;
+  title: string;
+  sources: string[];
+  createdAt?: string;
+  status?: 'ready' | 'generating' | 'stale' | 'error';
+  hasQuiz?: boolean;
+  lastQuizDate?: string;
+  lastGenerated?: string;
+  playCount?: number;
+  contextSnippet?: string;
+  model?: string;
+}
+
+export interface TopicGenerateRequest {
+  topic: string;
+  userKey?: string;
+}
+
+export interface TopicGenerateResponse {
+  title: string;
+  slug: string;
+  sources: string[];
+  saved: boolean;
+  provider: 'gemini' | 'fallback';
+  fallbackReason?: string;
+  model?: string;
+  latencyMs?: number;
+}
+
+export interface TopicQuizRequest {
+  force?: boolean;
+}
+
+export interface TopicQuizResponse {
+  fromCache: boolean;
+  saved?: boolean;
+  quiz: {
+    questions: Question[];
+    metadata: {
+      generatedAt: string;
+      sourceWikis: string[];
+      version: string;
+      generator: 'gemini' | 'fallback';
+    };
+  };
+  bonus?: {
+    question: string;
+    options: string[];
+    correctIndex: number;
+  } | null;
+  reason?: string;
+}
+
 export interface UserScore {
   userId: string;
   username: string;
