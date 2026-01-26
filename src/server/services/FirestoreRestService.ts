@@ -1,6 +1,7 @@
 /**
- * Firestore REST API service for Devvit server-side operations
- * Uses HTTP fetch instead of Firebase SDK to work within Devvit's constraints
+ * Firestore REST API service for Devvit server-side operations.
+ * Uses HTTP fetch to interact with the Firestore REST endpoint, ensuring
+ * compatibility with Devvit's non-standard Node environment.
  */
 import { CONFIG } from '../../shared/constants';
 
@@ -20,13 +21,12 @@ export interface QuizData {
 }
 
 export class FirestoreRestService {
-  // @ts-expect-error - projectId is used in baseUrl construction
   private readonly projectId: string;
   private readonly baseUrl: string;
 
   constructor(projectId: string = (process.env.FIRESTORE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || CONFIG.FIREBASE.PROJECT_ID)) {
     this.projectId = projectId;
-    this.baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+    this.baseUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents`;
   }
 
   // --- Circuit Breaker State (Global) ---
@@ -43,7 +43,6 @@ export class FirestoreRestService {
       const fs = new FirestoreRestService();
       const url = `${fs.getBaseUrl()}/health-check-dummy/test`;
       const resp = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-      // 404 is OK (doc doesn't exist), 200 is OK, 401/403 means auth issues (still "reachable")
       return resp.status === 404 || resp.status === 200 || resp.status === 401 || resp.status === 403;
     } catch {
       return false;
@@ -73,7 +72,6 @@ export class FirestoreRestService {
 
   /**
    * Safe accessor for the constructed base URL.
-   * Use this instead of reaching into the instance via casts.
    */
   getBaseUrl(): string {
     return this.baseUrl;
@@ -90,35 +88,18 @@ export class FirestoreRestService {
 
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (!response.ok) {
-        if (response.status === 404) {
-          // No quiz found for today
-          return null;
-        }
-        if (response.status === 401 || response.status === 403) {
-          // Authentication required for Firestore REST API
-          return null;
-        }
+        if (response.status === 404) return null;
+        if (response.status === 401 || response.status === 403) return null;
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-
-      // Parse Firestore document format
       return this.parseFirestoreDocument(data);
     } catch (error) {
-      // Error fetching quiz
-
-      // Be more specific about why the connection failed
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        // Network error - domain might not be allowlisted
-      }
-
       return null;
     }
   }
@@ -188,8 +169,6 @@ export class FirestoreRestService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private parseFirestoreDocument(doc: any): QuizData {
     const fields = doc.fields;
-
-    // Parse questions array - handling the actual format from our quiz generator
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const questions = fields.questions.arrayValue.values.map((questionDoc: any) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -202,17 +181,16 @@ export class FirestoreRestService {
       return {
         question: String(qFields.question.stringValue),
         answers: options,
-        correctAnswer: options[correctAnswerIndex], // Convert index to actual answer
-      } as QuizData['questions'][0];
+        correctAnswer: options[correctAnswerIndex],
+      };
     });
 
-    // Parse metadata - handling the actual format from our quiz generator
     const metadataFields = fields.metadata.mapValue.fields;
     const metadata = {
       generatedAt: metadataFields.generatedAt.stringValue,
-      topic: 'Gaming', // Default topic
-      difficulty: 'mixed', // Since we have multiple difficulties
-      source: metadataFields.sourceWikis?.arrayValue?.values?.[0]?.stringValue || 'Gaming Wiki',
+      topic: 'General Knowledge',
+      difficulty: 'mixed',
+      source: metadataFields.sourceWikis?.arrayValue?.values?.[0]?.stringValue || 'Wiki',
     };
 
     return {
@@ -230,43 +208,22 @@ export class FirestoreRestService {
       const documentPath = `subreddit_configs/${subredditName}`;
       const url = `${this.baseUrl}/${documentPath}`;
 
-      // Saving config for subreddit
-
       const body = {
         fields: {
-          wikiUrl: {
-            stringValue: wikiUrl,
-          },
-          configuredAt: {
-            stringValue: new Date().toISOString(),
-          },
-          subredditName: {
-            stringValue: subredditName,
-          },
+          wikiUrl: { stringValue: wikiUrl },
+          configuredAt: { stringValue: new Date().toISOString() },
+          subredditName: { stringValue: subredditName },
         },
       };
 
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
 
-      // Config save response received
-
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          // Authentication required for config save
-          return false;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      // Successfully saved config
-      return true;
+      return response.ok;
     } catch (error) {
-      // Error saving subreddit config
       return false;
     }
   }
@@ -276,52 +233,18 @@ export class FirestoreRestService {
    */
   async testConnection(): Promise<{ success: boolean; error?: string }> {
     try {
-      // Testing connection to Firestore
-
-      // Try a simple list operation to test connectivity
       const response = await fetch(`${this.baseUrl}/test-connection`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
-      // Test response received
-
       if (response.status === 401 || response.status === 403) {
-        return {
-          success: false,
-          error: 'Authentication required - Firestore project requires authentication',
-        };
+        return { success: false, error: 'Authentication required' };
       }
 
-      if (response.status === 404) {
-        // 404 is expected for non-existent documents, means connection is working
-        return { success: true };
-      }
-
-      if (response.ok) {
-        return { success: true };
-      } else {
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-        };
-      }
+      return { success: response.status === 404 || response.ok };
     } catch (error) {
-      // Connection test error
-
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        return {
-          success: false,
-          error: 'Network error - domain might not be allowlisted or network unavailable',
-        };
-      }
-
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
@@ -345,7 +268,7 @@ export class FirestoreRestService {
           createdAt: { stringValue: new Date().toISOString() },
           hasQuiz: { booleanValue: false },
           ...(topic.model ? { model: { stringValue: topic.model } } : {}),
-          ...(typeof topic.genLatencyMs === 'number' ? { genLatencyMs: { integerValue: String(Math.round(topic.genLatencyMs)) } } : {}),
+          ...(topic.genLatencyMs ? { genLatencyMs: { integerValue: String(Math.round(topic.genLatencyMs)) } } : {}),
         },
       };
 
@@ -355,28 +278,20 @@ export class FirestoreRestService {
         body: JSON.stringify(body),
       });
 
-      if (!response.ok) {
-        return false;
-      }
-
-      return true;
+      return response.ok;
     } catch (error) {
       return false;
     }
   }
 
   /**
-   * List topics under topics/ by doing a naive list (REST API may require structured query)
-   * For v1 we attempt to read the topics collection using documents:list
+   * List topics under topics/
    */
   async listTopics(): Promise<Array<{ title: string; slug: string; sources?: string[] }>> {
     try {
-      // Firestore REST API does not have a straightforward collection list via documents path in all cases,
-      // but we attempt a list using the collection's documents endpoint.
       const url = `${this.baseUrl}/topics`;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
       if (!data.documents) return [];
       return data.documents.map((d: any) => {
@@ -399,26 +314,19 @@ export class FirestoreRestService {
       const url = `${this.baseUrl}/topics/${slug}`;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
       const f = data.fields || {};
-      // Recover title/slug if earlier patch calls erased them
       let title = f.title?.stringValue || f.id?.stringValue || '';
       const sources = f.sources?.arrayValue?.values?.map((v: any) => v.stringValue) || [];
       const status = f.status?.stringValue || null;
       const lastGenerated = f.lastGenerated?.stringValue || null;
       const generationPhase = f.generationPhase?.stringValue || null;
-      // If title is missing, reconstruct from slug (capitalize words)
       if (!title) {
-        title = slug
-          .split('-')
-          .map((w) => (w[0] ? w[0].toUpperCase() + w.slice(1) : ''))
-          .join(' ');
+        title = slug.split('-').map((w) => (w[0] ? w[0].toUpperCase() + w.slice(1) : '')).join(' ');
       }
       const recoveredSlug = f.slug?.stringValue || slug;
-      // parse questions if present
       let questions: any[] = [];
-      if (f.questions && f.questions.arrayValue && f.questions.arrayValue.values) {
+      if (f.questions?.arrayValue?.values) {
         questions = f.questions.arrayValue.values.map((q: any) => {
           const qf = q.mapValue.fields || {};
           const options = qf.options?.arrayValue?.values?.map((o: any) => o.stringValue) || [];
@@ -445,10 +353,8 @@ export class FirestoreRestService {
       const url = `${this.baseUrl}/topics/${slug}/quizzes/${date}`;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
       const f = data.fields || {};
-      // parse questions
       const questions = (f.questions?.arrayValue?.values || []).map((q: any, idx: number) => {
         const qf = q.mapValue.fields || {};
         const options = (qf.options?.arrayValue?.values || []).map((o: any) => o.stringValue || '');
@@ -517,17 +423,8 @@ export class FirestoreRestService {
                 generatedAt: { stringValue: quiz.metadata.generatedAt || nowIso },
                 sourceWikis: { arrayValue: { values: (quiz.metadata.sourceWikis || []).map((s: string) => ({ stringValue: s })) } },
                 version: { stringValue: quiz.metadata.version || 'v1' },
-                ...(quiz.metadata.model ? { model: { stringValue: quiz.metadata.model } } : {}),
-                ...(quiz.metadata.generator ? { generator: { stringValue: quiz.metadata.generator } } : {}),
-                topicSlug: { stringValue: slug },
-              },
-            },
-          },
-          uploadedAt: { stringValue: nowIso },
-          integrity: {
-            mapValue: {
-              fields: {
-                questionCount: { integerValue: String(quiz.questions.length) },
+                model: { stringValue: quiz.metadata.model || 'gemini' },
+                generator: { stringValue: quiz.metadata.generator || 'system' },
               },
             },
           },
@@ -541,45 +438,22 @@ export class FirestoreRestService {
   }
 
   /**
-   * Patch topic fields (for updating status, hasQuiz, etc.)
+   * Patch topic fields
    */
   async patchTopic(slug: string, patch: Record<string, any>): Promise<boolean> {
     try {
       const url = `${this.baseUrl}/topics/${slug}`;
       const fields: Record<string, any> = {};
       const updateMask: string[] = [];
-      // Fetch existing to preserve baseline if doc missing some core fields
-      let existing: any = null;
-      try {
-        const existingRes = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-        if (existingRes.ok) existing = await existingRes.json();
-      } catch { }
-      const existingFields = existing?.fields || {};
-      const ensure = (key: string, val: any) => {
-        if (!existingFields[key] && !(key in fields)) {
-          if (typeof val === 'string') fields[key] = { stringValue: val }, updateMask.push(key);
-          else if (typeof val === 'boolean') fields[key] = { booleanValue: val }, updateMask.push(key);
-        }
-      };
       Object.entries(patch).forEach(([k, v]) => {
         if (typeof v === 'string') { fields[k] = { stringValue: v }; updateMask.push(k); }
         else if (typeof v === 'number') { fields[k] = { integerValue: String(v) }; updateMask.push(k); }
         else if (typeof v === 'boolean') { fields[k] = { booleanValue: v }; updateMask.push(k); }
       });
-      // Baseline invariants
-      ensure('id', slug);
-      // Reconstruct title/name if absent
-      const readable = slug.split('-').map(w => w[0] ? w[0].toUpperCase() + w.slice(1) : '').join(' ');
-      ensure('title', readable);
-      ensure('name', readable);
-      ensure('slug', slug);
-      // Always update updatedAt
       fields.updatedAt = { stringValue: new Date().toISOString() };
       updateMask.push('updatedAt');
       const maskParams = updateMask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
-      const patchUrl = `${url}?${maskParams}`;
-      const body = { fields };
-      const res = await fetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(`${url}?${maskParams}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
       return res.ok;
     } catch {
       return false;
@@ -587,52 +461,38 @@ export class FirestoreRestService {
   }
 
   /**
-   * Increment a topic's playCount field (creating it if absent) without altering other fields.
-   * Firestore REST API lacks atomic increment here without auth; we perform a read-modify-write.
-   * Best-effort; race conditions are acceptable for lightweight leaderboard highlighting.
+   * Increment a topic's playCount field
    */
   async incrementTopicPlayCount(slug: string): Promise<void> {
     try {
       const url = `${this.baseUrl}/topics/${slug}`;
       const getRes = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-      if (!getRes.ok) return; // Topic missing; do nothing.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!getRes.ok) return;
       const data: any = await getRes.json();
-      const f = data.fields || {};
-      const current = parseInt(f.playCount?.integerValue || '0', 10) || 0;
-      const newVal = current + 1;
-      // Build minimal patch
-      const patchUrl = `${url}?updateMask.fieldPaths=playCount&updateMask.fieldPaths=updatedAt`;
-      const body = {
-        fields: {
-          playCount: { integerValue: String(newVal) },
-          updatedAt: { stringValue: new Date().toISOString() },
-        },
-      };
-      await fetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    } catch {
-      // Silent failure acceptable for non-critical metric
-    }
+      const current = parseInt(data.fields?.playCount?.integerValue || '0', 10) || 0;
+      const body = { fields: { playCount: { integerValue: String(current + 1) }, updatedAt: { stringValue: new Date().toISOString() } } };
+      await fetch(`${url}?updateMask.fieldPaths=playCount&updateMask.fieldPaths=updatedAt`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } catch { }
   }
 
   /**
-   * Get the globally stored daily bonus question (one ultra-hard off-topic question) for a given date.
-   * Path: dailyBonus/{date}
+   * Get the globally stored daily bonus question
    */
-  async getDailyBonusQuestion(date: string): Promise<{ id: string; question: string; options: string[]; correctAnswer: number; difficulty: string; generatedAt: string } | null> {
+  async getDailyBonusQuestion(date: string): Promise<any | null> {
     try {
       const url = `${this.baseUrl}/dailyBonus/${date}`;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
       const f = data.fields || {};
-      const question = f.question?.stringValue || '';
-      const options = (f.options?.arrayValue?.values || []).map((v: { stringValue?: string }) => v.stringValue || '').slice(0, 4);
-      const correctAnswer = Number(f.correctAnswer?.integerValue ?? 0);
-      const difficulty = f.difficulty?.stringValue || 'hard';
-      const generatedAt = f.generatedAt?.stringValue || new Date().toISOString();
-      return { id: date, question, options, correctAnswer, difficulty, generatedAt };
+      return {
+        id: date,
+        question: f.question?.stringValue || '',
+        options: (f.options?.arrayValue?.values || []).map((v: any) => v.stringValue || '').slice(0, 4),
+        correctAnswer: Number(f.correctAnswer?.integerValue ?? 0),
+        difficulty: f.difficulty?.stringValue || 'hard',
+        generatedAt: f.generatedAt?.stringValue || new Date().toISOString(),
+      };
     } catch {
       return null;
     }
@@ -644,7 +504,6 @@ export class FirestoreRestService {
   async saveDailyBonusQuestion(date: string, payload: { question: string; options: string[]; correctAnswer: number; difficulty?: string }): Promise<boolean> {
     try {
       const url = `${this.baseUrl}/dailyBonus/${date}`;
-      const nowIso = new Date().toISOString();
       const body = {
         fields: {
           id: { stringValue: date },
@@ -652,7 +511,7 @@ export class FirestoreRestService {
           options: { arrayValue: { values: payload.options.slice(0, 4).map(o => ({ stringValue: o })) } },
           correctAnswer: { integerValue: String(payload.correctAnswer ?? 0) },
           difficulty: { stringValue: payload.difficulty || 'extreme' },
-          generatedAt: { stringValue: nowIso },
+          generatedAt: { stringValue: new Date().toISOString() },
         },
       };
       const res = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -663,17 +522,15 @@ export class FirestoreRestService {
   }
 
   /**
-   * Get daily robot dialogues from Firestore. Path: robotDialogues/{date}
+   * Get daily robot dialogues
    */
   async getRobotDialogues(date: string): Promise<string[] | null> {
     try {
       const url = `${this.baseUrl}/robotDialogues/${date}`;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
-      const f = data.fields || {};
-      const lines = (f.lines?.arrayValue?.values || []).map((v: { stringValue?: string }) => v.stringValue || '').filter((s: string) => s && s.trim());
+      const lines = (data.fields?.lines?.arrayValue?.values || []).map((v: any) => v.stringValue || '').filter((s: string) => s && s.trim());
       return lines.length ? lines.slice(0, 50) : null;
     } catch {
       return null;
@@ -681,17 +538,16 @@ export class FirestoreRestService {
   }
 
   /**
-   * Save daily robot dialogues (array of short strings) at robotDialogues/{date}
+   * Save daily robot dialogues
    */
   async saveRobotDialogues(date: string, lines: string[]): Promise<boolean> {
     try {
       const url = `${this.baseUrl}/robotDialogues/${date}`;
-      const nowIso = new Date().toISOString();
       const body = {
         fields: {
           id: { stringValue: date },
           lines: { arrayValue: { values: lines.slice(0, 50).map((s) => ({ stringValue: String(s) })) } },
-          generatedAt: { stringValue: nowIso },
+          generatedAt: { stringValue: new Date().toISOString() },
           count: { integerValue: String(Math.min(lines.length, 50)) },
         },
       };

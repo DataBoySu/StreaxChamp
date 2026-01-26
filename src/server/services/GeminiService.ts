@@ -1,12 +1,15 @@
-import { Devvit, SettingScope } from '@devvit/public-api';
+import { Devvit } from '@devvit/public-api';
 import { Logger } from '../Logger';
 import { CONFIG } from '../../shared/constants';
 import { AppError } from '../utils/AppError';
 
-// --- Circuit Breaker State ---
+/**
+ * Current state of the AI circuit breaker.
+ */
 export let aiCircuitOpen = false;
 export let aiLastFailureTime = 0;
-export const aiCooldownMs = 120000; // 2 minute cooldown
+export const aiCooldownMs = 120000; // 2 minute cooldown period
+
 let geminiKeyValidated = false;
 let geminiKeyWorks = false;
 let GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
@@ -14,7 +17,10 @@ let aiRequestsSinceTrip = 0;
 let aiHealingAttempted = false;
 const CIRCUIT_RETRY_THRESHOLD = 5;
 
-// --- Healing Logic ---
+/**
+ * Attempts to "heal" the AI circuit breaker by checking Gemini health 
+ * after a cooldown or request threshold is met.
+ */
 export async function attemptHealing(): Promise<{ healed: boolean; final: boolean }> {
     // Only attempt if circuit is open
     if (!aiCircuitOpen) return { healed: true, final: false };
@@ -82,6 +88,10 @@ export function hydrateGeminiKeyFromSettings(): void {
     } catch { }
 }
 
+/**
+ * Validates the Gemini API key. 
+ * Performs a lazy validation (assumes valid if string exists) to save quota.
+ */
 export async function validateGeminiKey(): Promise<boolean> {
     if (geminiKeyValidated) return geminiKeyWorks;
     if (!GEMINI_API_KEY) {
@@ -133,6 +143,10 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 // --- Generators ---
 
+/**
+ * Atomic pipeline to generate both topic metadata and a quiz in a single LLM pass.
+ * Uses strict JSON response schema and atomic persistence.
+ */
 export async function generateUnifiedContent(rawTopic: string): Promise<{ topic: any, quiz: any, model: string, latencyMs: number }> {
     await validateGeminiKey();
     if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');

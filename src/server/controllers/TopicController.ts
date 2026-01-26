@@ -5,8 +5,14 @@ import { generateUnifiedContent, GeneratedQuizPayload, GeneratedQuizQuestion } f
 import { slugify, toTitleCase } from '../utils/textUtils';
 import { AppError } from '../utils/AppError';
 
+/**
+ * Controller for managing topics, including listing, status checks, and AI-driven generation.
+ */
 export class TopicController {
-    static async listTopics(req: Request, res: Response) {
+    /**
+     * Lists all available topics from Firestore.
+     */
+    static async listTopics(_req: Request, res: Response) {
         try {
             const fs = new FirestoreRestService();
             const list = await fs.listTopics();
@@ -17,12 +23,17 @@ export class TopicController {
         }
     }
 
+    /**
+     * Retrieves metadata for a specific topic by its slug.
+     */
     static async getTopic(req: Request, res: Response) {
         try {
-            const { slug } = req.params;
+            const slug = String(req.params.slug || '');
             if (!slug) return res.status(400).json({ error: 'Slug required' });
+
             const fs = new FirestoreRestService();
             const topic = await fs.getTopic(slug);
+
             if (!topic) return res.status(404).json({ error: 'NOT_FOUND' });
             res.json(topic);
         } catch (e) {
@@ -30,10 +41,14 @@ export class TopicController {
         }
     }
 
+    /**
+     * Gets the current status of a topic, including whether a daily quiz is ready.
+     */
     static async getTopicStatus(req: Request, res: Response) {
         try {
-            const { slug } = req.params;
+            const slug = String(req.params.slug || '');
             if (!slug) return res.status(400).json({ error: 'Slug required' });
+
             const fs = new FirestoreRestService();
             const topic = await fs.getTopic(slug);
 
@@ -41,7 +56,6 @@ export class TopicController {
                 return res.json({ exists: false, hasQuiz: false });
             }
 
-            // Check if quiz exists
             const today = new Date().toISOString().slice(0, 10);
             const quiz = await fs.getTopicQuiz(slug, today);
 
@@ -61,22 +75,27 @@ export class TopicController {
         }
     }
 
+    /**
+     * Triggers the Unified Generation Pipeline to create a new topic and its first quiz.
+     */
     static async generateTopic(req: Request, res: Response) {
         try {
             const { topic, userKey } = req.body || {};
-            if (!topic || typeof topic !== 'string') return res.status(400).json({ error: 'Topic is required' });
+            if (!topic || typeof topic !== 'string') {
+                return res.status(400).json({ error: 'Topic is required' });
+            }
 
             const fs = new FirestoreRestService();
-
-            // 1. Call Unified Generator
             Logger.info('[Generate] starting atomic pipeline', { input: topic });
+
+            // 1. Generate Content via Gemini
             const { topic: topicData, quiz: quizData, model, latencyMs } = await generateUnifiedContent(topic);
 
-            const title = toTitleCase(topicData.title); // Ensure case consistency
+            const title = toTitleCase(topicData.title);
             const slug = topicData.slug || slugify(title);
             const sources = topicData.sources;
 
-            // 2. Save Topic (Atomic)
+            // 2. Persist Topic Metadata
             const topicPayload: any = {
                 title,
                 slug,
@@ -84,7 +103,7 @@ export class TopicController {
                 model,
                 genLatencyMs: latencyMs,
                 requestedBy: userKey,
-                hasQuiz: true, // Pre-generated!
+                hasQuiz: true,
                 status: 'ready',
                 lastQuizDate: new Date().toISOString().slice(0, 10),
                 generationPhase: 'unified_complete'
@@ -93,7 +112,7 @@ export class TopicController {
             const savedTopic = await fs.saveTopic(topicPayload);
             Logger.db(`[Generate] Saved Topic: "${title}"`, { saved: !!savedTopic });
 
-            // 3. Save Quiz (Atomic - immediately after topic)
+            // 3. Persist Initial Quiz
             const today = new Date().toISOString().slice(0, 10);
             const questions: GeneratedQuizQuestion[] = quizData.questions.map((q: any, idx: number) => {
                 const answerMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
