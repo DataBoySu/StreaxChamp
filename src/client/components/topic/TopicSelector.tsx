@@ -4,6 +4,7 @@ import './animations.css';
 import FirebaseTopics, { TopicDoc } from '../../services/FirebaseTopics';
 import { firebaseQuizService } from '../../services/FirebaseQuizService';
 import { fetchTopicsFallback } from '../../services/TopicsFallback';
+import { useBackoffPolling } from '../../hooks/useBackoffPolling';
 
 // Utility function to slugify a title (kept local)
 const slugify = (s: string) =>
@@ -112,46 +113,46 @@ export const TopicSelector: React.FC<{
     return () => { if (unsub) unsub(); };
   }, []);
 
-  // Poll /api/topics every 10 seconds to pick up topics created via REST endpoints
-  useEffect(() => {
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const r = await fetch('/api/topics');
-        if (!r.ok) return;
-        const list = await r.json();
-        if (cancelled) return;
-        // Merge new topics (preserve optimistic ones)
-        setTopics(prev => {
-          const map: Record<string, TopicDoc> = {};
-          prev.forEach(p => { if (p.slug) map[p.slug] = p; });
-          const isValidStatus = (s: unknown): s is NonNullable<TopicDoc['status']> => (
-            s === 'ready' || s === 'generating' || s === 'stale' || s === 'error'
-          );
-          (list || []).forEach((t: unknown) => {
-            if (t && typeof t === 'object') {
-              const obj = t as { slug?: unknown; title?: unknown; name?: unknown; hasQuiz?: unknown; status?: unknown };
-              const slug = typeof obj.slug === 'string' ? obj.slug : '';
-              if (slug && !map[slug]) {
-                const title = typeof obj.title === 'string' ? obj.title : (typeof obj.name === 'string' ? obj.name : slug);
-                const hasQuiz = typeof obj.hasQuiz === 'boolean' ? obj.hasQuiz : false;
-                const rawStatus = typeof obj.status === 'string' ? obj.status : 'ready';
-                const status: TopicDoc['status'] = isValidStatus(rawStatus) ? rawStatus : 'ready';
-                map[slug] = { id: slug, name: title, createdAt: Date.now(), slug, urls: {}, hasQuiz, status };
-              }
+  // Poll /api/topics with exponential backoff to pick up topics created via REST endpoints
+  const pollTopics = async () => {
+    try {
+      const r = await fetch('/api/topics');
+      if (!r.ok) return;
+      const list = await r.json();
+      // Merge new topics (preserve optimistic ones)
+      setTopics(prev => {
+        const map: Record<string, TopicDoc> = {};
+        prev.forEach(p => { if (p.slug) map[p.slug] = p; });
+        const isValidStatus = (s: unknown): s is NonNullable<TopicDoc['status']> => (
+          s === 'ready' || s === 'generating' || s === 'stale' || s === 'error'
+        );
+        (list || []).forEach((t: unknown) => {
+          if (t && typeof t === 'object') {
+            const obj = t as { slug?: unknown; title?: unknown; name?: unknown; hasQuiz?: unknown; status?: unknown };
+            const slug = typeof obj.slug === 'string' ? obj.slug : '';
+            if (slug && !map[slug]) {
+              const title = typeof obj.title === 'string' ? obj.title : (typeof obj.name === 'string' ? obj.name : slug);
+              const hasQuiz = typeof obj.hasQuiz === 'boolean' ? obj.hasQuiz : false;
+              const rawStatus = typeof obj.status === 'string' ? obj.status : 'ready';
+              const status: TopicDoc['status'] = isValidStatus(rawStatus) ? rawStatus : 'ready';
+              map[slug] = { id: slug, name: title, createdAt: Date.now(), slug, urls: {}, hasQuiz, status };
             }
-          });
-          return Object.values(map).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          }
         });
-      } catch (err) {
-        // ignore polling errors
-      }
-    };
-    // initial poll + interval
-    void poll();
-    const iv = setInterval(poll, 1500);
-    return () => { cancelled = true; clearInterval(iv); };
-  }, []);
+        return Object.values(map).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      });
+    } catch (err) {
+      // ignore polling errors
+    }
+  };
+
+  // Use exponential backoff polling (starts at 3s, backs off to 30s)
+  const { reset: resetTopicPolling } = useBackoffPolling(pollTopics, {
+    enabled: true,
+    initialInterval: 3000,
+    maxInterval: 30000,
+    backoffMultiplier: 1.5,
+  });
 
   // Search suggestions effect
   useEffect(() => {
@@ -311,6 +312,8 @@ export const TopicSelector: React.FC<{
         });
       }
       setQuery('');
+      // Trigger immediate poll to refresh list
+      resetTopicPolling();
     } catch (err) {
       console.error('Error adding topic:', err);
     } finally {
