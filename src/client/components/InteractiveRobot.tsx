@@ -162,14 +162,13 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
           {isHovered && (
             <motion.div
               ref={bubbleRef}
-              initial={{ opacity: 0, scale: 0.8, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: 10 }}
+              initial={{ opacity: 0, scale: 0.8, y: 10, x: '-50%' }}
+              animate={{ opacity: 1, scale: 1, y: 0, x: '-50%' }}
+              exit={{ opacity: 0, scale: 0.8, y: 10, x: '-50%' }}
               style={{
                 position: 'absolute',
-                top: -40, // Adjusted for better centering
+                top: -40,
                 left: '50%',
-                transform: `translateX(-50%)`, // Pure center, no manual offset needed
                 backgroundColor: '#7c3aed',
                 color: 'white',
                 padding: '8px 12px',
@@ -181,7 +180,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
                 maxWidth: 'unset',
                 boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
                 textAlign: 'center',
-                overflow: 'hidden', // For progress bar
+                overflow: 'hidden',
               }}
             >
               {/* Translucent progress bar */}

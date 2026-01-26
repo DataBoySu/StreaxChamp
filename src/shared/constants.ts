@@ -64,7 +64,7 @@ export const CONFIG = {
     },
     GEMINI: {
         /** Cheapest model for simple tasks like normalization & categorization */
-        LITE_MODEL: 'gemini-2.0-flash',
+        LITE_MODEL: 'gemini-2.5-flash-lite',
         /** Capable model for complex reasoning and creative generation */
         CONTENT_MODEL: 'gemini-2.5-flash',
         PROMPTS: {
