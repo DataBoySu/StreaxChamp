@@ -293,7 +293,7 @@ async function generateUnifiedContent(rawTopic: string): Promise<{ topic: any, q
                                                 properties: {
                                                     question: { type: "string" },
                                                     options: { type: "array", items: { type: "string" } },
-                                                    correctAnswer: { type: "number" },
+                                                    correctAnswer: { type: "string" },
                                                     difficulty: { type: "string" },
                                                     category: { type: "string" },
                                                     explanation: { type: "string" }
@@ -1145,16 +1145,23 @@ app.post('/api/topics/generate', async (req, res) => {
 
         // 3. Save Quiz (Atomic - immediately after topic)
         const today = new Date().toISOString().slice(0, 10);
-        const questions: GeneratedQuizQuestion[] = quizData.questions.map((q: any, idx: number) => ({
-            id: `q${Date.now()}-${idx}`,
-            question: q.question,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
-            difficulty: q.difficulty,
-            category: q.category,
-            explanation: q.explanation,
-            createdAt: new Date().toISOString()
-        }));
+        const questions: GeneratedQuizQuestion[] = quizData.questions.map((q: any, idx: number) => {
+            const answerMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+            const correctIdx = typeof q.correctAnswer === 'string'
+                ? (answerMap[q.correctAnswer.toUpperCase()] ?? 0)
+                : (Number(q.correctAnswer) || 0);
+
+            return {
+                id: `q${Date.now()}-${idx}`,
+                question: String(q.question),
+                options: q.options ? q.options.map(String) : [],
+                correctAnswer: correctIdx,
+                difficulty: String(q.difficulty || 'medium'),
+                category: String(q.category || title),
+                explanation: String(q.explanation || ''),
+                createdAt: new Date().toISOString()
+            };
+        });
 
         const quizPayload: GeneratedQuizPayload = {
             questions: questions.slice(0, 5),
