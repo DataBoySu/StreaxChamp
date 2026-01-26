@@ -13,6 +13,8 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
   const [exhausted, setExhausted] = useState(false);
   const [globalMousePosition, setGlobalMousePosition] = useState({ x: 0, y: 0 });
   const [progress, setProgress] = useState(0); // Progress bar (0-100)
+  const [systemStatus, setSystemStatus] = useState<{ ai: boolean; db: boolean }>({ ai: true, db: true });
+  const [healingActive, setHealingActive] = useState(false);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
 
@@ -24,7 +26,11 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
         const r = await fetch('/api/robot/dialogues/today');
         const data = await r.json();
         const fetched: string[] = Array.isArray(data?.lines) ? data.lines.slice(0, 20) : [];
-        if (!cancelled) setLines(fetched);
+        if (!cancelled) {
+          setLines(fetched);
+          if (data.systemStatus) setSystemStatus(data.systemStatus);
+          setHealingActive(!!data.healingInProgress);
+        }
       } catch {
         // noop; keep default fallback below
       }
@@ -33,6 +39,18 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
   }, []);
 
   const messages = useMemo(() => {
+    const statusLines: string[] = [];
+    if (healingActive) {
+      statusLines.push('STAND BY. REPAIRING DATA-STREAM...');
+    } else if (!systemStatus.ai) {
+      statusLines.push('Critical Anomaly: Gemini connection severed.');
+      statusLines.push('I am currently out of juice. Try again in 2... if I heal.');
+      statusLines.push('Quota Exhausted. The Great Eye is resting.');
+    }
+    if (!systemStatus.db) {
+      statusLines.push('Firestore core offline. Memories... fading.');
+    }
+
     const fallback = [
       `Halt, ${username}. Enjoy your experience.`,
       'New comer? Keep moving, we have a lot to show.',
@@ -41,8 +59,8 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
       'Enough gawking. Inside.'
     ];
     const base = lines.length ? lines : fallback;
-    return base.slice(0, 20);
-  }, [lines, username]);
+    return [...statusLines, ...base.slice(0, 20)];
+  }, [lines, username, systemStatus]);
 
   // Track global mouse position for robot following
   useEffect(() => {
@@ -462,6 +480,20 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
             backgroundColor: '#60a5fa',
             borderRadius: '2px',
             boxShadow: '0 0 4px currentColor',
+          }}
+        />
+        {/* New System Status LED */}
+        <motion.div
+          animate={{
+            backgroundColor: (!systemStatus.ai || !systemStatus.db) ? '#ef4444' : '#00ff88',
+            opacity: [0.6, 1, 0.6],
+          }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            boxShadow: (!systemStatus.ai || !systemStatus.db) ? '0 0 8px #ef4444' : '0 0 8px #00ff88',
           }}
         />
       </motion.div>

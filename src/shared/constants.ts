@@ -64,23 +64,28 @@ export const CONFIG = {
     },
     GEMINI: {
         /** Cheapest model for simple tasks like normalization & categorization */
-        LITE_MODEL: 'gemini-2.5-flash-lite',
+        LITE_MODEL: 'gemini-2.5-flash',
         /** Capable model for complex reasoning and creative generation */
-        CONTENT_MODEL: 'gemini-2.5-flash',
+        CONTENT_MODEL: 'gemini-3-flash',
         PROMPTS: {
-            TOPIC_NORMALIZER: `You are a precise topic normalizer for a quiz generator.\nGiven a user input topic string, 
-                                return STRICT JSON with keys: title (canonical properly capitalized topic name), 
-                                sources (array of 2-5 high-quality authoritative URLs—Wikipedia second if exists, 
-                                then fandom.com, official site, IGN, etc. Only real pages).\nNO commentary. JSON only.`,
+            TOPIC_NORMALIZER: `SYSTEM ROLE: You are a headless DATA PROCESSING UNIT. Your ONLY function is to normalize strings into JSON.
+                                CONSTRAINTS:
+                                - OUTPUT MUST BE RAW JSON ONLY.
+                                - NO PREAMBLE (Do not say "Here is the JSON").
+                                - NO CODE BLOCKS (Do not use \`\`\`json).
+                                - NO MARKDOWN.
+                                - NO EXPLANATIONS.
+                                - START WITH { AND END WITH }.
+                                SCHEMA: {"title": "Canonical Topic Name", "sources": ["URL1", "URL2", ...]}`,
 
-            QUIZ_GENERATOR: `You are an expert quiz generator. Your MISSION is to produce high-density, challenging questions for a gaming-focused quiz.
-                            Output MUST be a SINGLE minified-style JSON object. DO NOT include markdown code blocks, backticks, or any conversational text.
-                            Fields: id, question, options (4 specific strings), correctAnswer (0-3), difficulty, category, explanation.
-                            STRICT RULES:
-                            - Questions must be challenging and factually accurate.
-                            - explanation must be ONE concise sentence starting with a direct fact.
-                            - Output MUST NOT be truncated. Keep your response concise to stay within token limits.
-                            - Return ONLY the JSON object.`
+            QUIZ_GENERATOR: `SYSTEM ROLE: You are a headless QUIZ GENERATOR. Your ONLY function is to output question data in JSON.
+                            CONSTRAINTS:
+                            - OUTPUT MUST BE RAW JSON ONLY.
+                            - NO PREAMBLE. NO CODE BLOCKS. NO MARKDOWN.
+                            - NO EXPLANATIONS OUTSIDE THE "explanation" FIELD.
+                            - START WITH { AND END WITH }.
+                            SCHEMA: {"questions": [{"id": "uuid", "question": "...", "options": ["...", "...", "...", "..."], "correctAnswer": 0_3, "difficulty": "...", "category": "...", "explanation": "..."}]}
+                            GOAL: 5 challenging, unique, and medically/factually accurate questions.`
         }
     },
 };

@@ -337,7 +337,7 @@ export const TopicSelector: React.FC<{
           {/* Close button */}
           <button
             onClick={handleClose}
-            className="ml-2 px-3 py-2 rounded-md text-sm border border-white/15 hover:bg-white/10"
+            className="ml-2 mr-4 px-4 py-2 rounded-md text-sm border border-white/15 hover:bg-white/10"
             aria-label="Close"
           >
             ✕

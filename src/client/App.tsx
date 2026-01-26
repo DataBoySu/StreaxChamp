@@ -1332,7 +1332,7 @@ export const App = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-success/5 pointer-events-none" />
 
               {/* Close/Quit Button */}
-              {(quizStarted || selectedTopic || usingRandomFallback) && (
+              {(quizStarted) && (
                 <button
                   onClick={() => {
                     setQuizStarted(false);

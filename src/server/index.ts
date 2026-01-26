@@ -41,55 +41,27 @@ function hydrateGeminiKeyFromSettings(): void {
             .catch(() => {/* ignore */ });
     } catch {/* ignore */ }
 }
-// --- Gemini API Key Validation (Chunk 3.7) ---
-// Validate Gemini API key at server startup to catch invalid keys early
+// --- Gemini API Key Validation (REFINED: Zero-Ping Mode) ---
+// We assume the key works until a real generation fails to conserve precious free-tier quota.
 let geminiKeyValidated = false;
 let geminiKeyWorks = false;
 
 async function validateGeminiKey(): Promise<boolean> {
-    // Only validate once per server session to prevent rate limiting
     if (geminiKeyValidated) return geminiKeyWorks;
-    geminiKeyValidated = true;
 
     if (!GEMINI_API_KEY) {
-        Logger.error('[AI] ❌ No Gemini API key configured');
+        Logger.error('[AI] ❌ No Gemini API key configured in .env or settings');
         geminiKeyWorks = false;
-        aiCircuitOpen = true; // Pre-trip circuit breaker
+        geminiKeyValidated = true;
+        aiCircuitOpen = true;
         return false;
     }
 
-    try {
-        Logger.info('[AI] Validating Gemini API key...');
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI.LITE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: 'test' }] }],
-                    generationConfig: { maxOutputTokens: 5 }
-                }),
-                signal: AbortSignal.timeout(5000) // 5s timeout for startup validation
-            }
-        );
-
-        if (resp.ok) {
-            Logger.info('[AI] ✅ Gemini API key validated successfully');
-            geminiKeyWorks = true;
-            return true;
-        } else {
-            const status = resp.status;
-            Logger.error(`[AI] ❌ Gemini API key invalid: HTTP ${status}`);
-            geminiKeyWorks = false;
-            aiCircuitOpen = true; // Pre-trip circuit breaker
-            return false;
-        }
-    } catch (e) {
-        Logger.error('[AI] ❌ Gemini API key validation failed:', e);
-        geminiKeyWorks = false;
-        aiCircuitOpen = true; // Pre-trip circuit breaker
-        return false;
-    }
+    // Assume it works as per user instruction to save 20-call quota
+    geminiKeyWorks = true;
+    geminiKeyValidated = true;
+    Logger.info('[AI] 🛡️ Gemini Status: ASSUME_VALID (Network check deferred to first real call)');
+    return true;
 }
 
 // Run validation lazily on first request
@@ -98,22 +70,24 @@ async function validateGeminiKey(): Promise<boolean> {
 // Safety settings removed per request (solo testing environment)
 
 // --- Circuit Breakers ---
-// If any critical service fails once, we switch to "Banter Mode" and stop trying.
-// After N requests, we attempt a health check to see if services are back.
+// If any critical service fails, we switch to "Banter Mode" and stop trying.
 let aiCircuitOpen = false;
 let dbCircuitOpen = false;
+let aiLastFailureTime = 0;
+let aiCooldownMs = 120000; // 2 minute cooldown for 429 errors
 let aiRequestsSinceTrip = 0;
 let dbRequestsSinceTrip = 0;
-let aiHealingAttempted = false; // Track if we already tried to heal AI
-let dbHealingAttempted = false; // Track if we already tried to heal DB
+let aiHealingAttempted = false;
+let dbHealingAttempted = false;
 const CIRCUIT_RETRY_THRESHOLD = 5; // After 5 user interactions, attempt healing
 
 // Health check: Send minimal request to Gemini to verify availability
 async function checkGeminiHealth(): Promise<boolean> {
     if (!GEMINI_API_KEY) return false;
+    Logger.warn('[CircuitBreaker] 🩹 System attempting AI self-repair (Health Check)...');
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3000); // 3s timeout for health check
+        const timeout = setTimeout(() => controller.abort(), 3000);
         const resp = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI.LITE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
             {
@@ -127,7 +101,11 @@ async function checkGeminiHealth(): Promise<boolean> {
             }
         );
         clearTimeout(timeout);
-        return resp.ok;
+        if (resp.ok) {
+            Logger.info('[CircuitBreaker] ✅ AI Connection Restored');
+            return true;
+        }
+        return false;
     } catch {
         return false;
     }
@@ -294,7 +272,7 @@ async function callGemini(rawTopic: string): Promise<GeminiResult> {
                     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
                     generationConfig: {
                         temperature: 0.1,
-                        maxOutputTokens: 256,
+                        maxOutputTokens: 512, // Increased from 256 to prevent truncation
                         response_mime_type: "application/json",
                         response_schema: {
                             type: "object",
@@ -317,7 +295,8 @@ async function callGemini(rawTopic: string): Promise<GeminiResult> {
         // In native JSON mode, we extract values from the response payload
         const data: any = await resp.json();
         const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const parsed = JSON.parse(text);
+        const parsed = extractJSONCandidate(text);
+
         // validate parsed shape
         const p = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
         if (!p || typeof p.title !== 'string') {
@@ -334,11 +313,22 @@ async function callGemini(rawTopic: string): Promise<GeminiResult> {
             : [
                 `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`,
             ];
+
+        Logger.ai(`[TopicNorm] Gemini matched: "${title}" (Sources: ${sources.length})`, { model, latencyMs });
         return { title, slug: finalSlug, sources, provider: 'gemini', model, latencyMs };
     } catch (err) {
+        const status = (err as any)?.status;
+        const msg = (err as any)?.message || 'UNKNOWN_GEMINI_ERROR';
+
+        if (status === 429 || status === 500) {
+            Logger.warn(`[AI] Critical Failure (${status}): Tripping circuit for 120s cooldown.`);
+            aiLastFailureTime = Date.now();
+            aiCircuitOpen = true;
+        } else {
+            aiCircuitOpen = true; // Generic trip
+        }
+
         Logger.error('Gemini call failed, strict error mode enabled:', err);
-        aiCircuitOpen = true; // Trip the breaker
-        const msg = (err as Error)?.message || 'UNKNOWN_GEMINI_ERROR';
         throw AppError.aiFailure(msg);
     }
 }
@@ -349,136 +339,7 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 // Helper for sequential generation
 // Gemini quiz generation (Batch Mode: 5 questions at once)
 // Replaces sequential single-question generation to avoid rate limits and improve consistency
-async function generateQuizWithGemini_OLD(topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
-    await validateGeminiKey();
-    if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');
-
-    const model = CONFIG.GEMINI.CONTENT_MODEL || 'gemini-1.5-flash'; // Ensure fallback model
-    const trimmedContext = contextText ? contextText.slice(0, 25000) : '';
-
-    Logger.ai(`[BatchGen] Starting batch generation for topic="${topicTitle}"`, { model });
-
-    const systemPrompt = `You are a Quiz Master for a competitive trivia game.
-Generate exactly 5 diverse, interesting, and challenging multiple-choice questions about the topic.
-- Questions must be unique and cover different aspects of the topic.
-- Avoid repetitive phrasing (e.g., don't start every question with "What is...").
-- Options must be 4 distinct choices.
-- Correct answer index must be 0, 1, 2, or 3.
-- Difficulty should describe the complexity (easy/medium/hard).
-- Return a JSON object with a "questions" array.`;
-
-    const userPrompt = `Topic: ${topicTitle}
-Sources:
-${topicSources.slice(0, 4).join('\n')}
-${trimmedContext ? `\nCONTEXT:\n${trimmedContext}` : ''}
-
-Generate 5 unique questions now.`;
-
-    let attempts = 0;
-    const maxAttempts = 2;
-
-    while (attempts < maxAttempts) {
-        try {
-            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    system_instruction: { parts: [{ text: systemPrompt }] },
-                    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 4096, // Increased limit for batch of 5 questions
-                        response_mime_type: "application/json",
-                        response_schema: {
-                            type: "object",
-                            properties: {
-                                questions: {
-                                    type: "array",
-                                    items: {
-                                        type: "object",
-                                        properties: {
-                                            id: { type: "string" },
-                                            question: { type: "string" },
-                                            options: { type: "array", items: { type: "string" } },
-                                            correctAnswer: { type: "number" },
-                                            difficulty: { type: "string" },
-                                            category: { type: "string" },
-                                            explanation: { type: "string" }
-                                        },
-                                        required: ["question", "options", "correctAnswer", "difficulty", "category"]
-                                    }
-                                }
-                            }
-                        }
-                    }
-                })
-            });
-
-            if (!resp.ok) {
-                const txt = await resp.text();
-                Logger.error(`[BatchGen] API Error ${resp.status}`, { body: txt.slice(0, 200) });
-                throw new Error(`Gemini API Error: ${resp.status}`);
-            }
-
-            const data: any = await resp.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-            // Parse JSON
-            let parsed: any;
-            try {
-                parsed = JSON.parse(text);
-            } catch (e) {
-                // If parse fails, it might be markdown fenced
-                const clean = text.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-                parsed = JSON.parse(clean);
-            }
-
-            const rawQuestions = Array.isArray(parsed?.questions) ? parsed.questions : [];
-            if (rawQuestions.length < 5) {
-                Logger.warn(`[BatchGen] Insufficient questions generated: ${rawQuestions.length}/5`);
-                attempts++;
-                continue;
-            }
-
-            // Norm & Validate
-            const questions: GeneratedQuizQuestion[] = rawQuestions.map((q: any, idx: number) => ({
-                id: `q${Date.now()}-${idx}`,
-                question: String(q.question),
-                options: Array.isArray(q.options) ? q.options.slice(0, 4).map(String) : [],
-                correctAnswer: Number(q.correctAnswer) || 0,
-                difficulty: String(q.difficulty || 'medium'),
-                category: String(q.category || topicTitle),
-                explanation: q.explanation,
-                createdAt: new Date().toISOString()
-            })).filter(q => q.options.length === 4);
-
-            if (questions.length < 5) {
-                Logger.warn(`[BatchGen] Validation pruned questions. Valid: ${questions.length}/5`);
-                attempts++;
-                continue;
-            }
-
-            Logger.ai(`[BatchGen] Success! Generated ${questions.length} questions.`, { model });
-            return {
-                questions: questions.slice(0, 5),
-                metadata: {
-                    generatedAt: new Date().toISOString(),
-                    sourceWikis: topicSources.slice(0, 2),
-                    version: 'v3-batch',
-                    model: model,
-                    generator: 'gemini'
-                }
-            };
-
-        } catch (e) {
-            Logger.error(`[BatchGen] Attempt ${attempts + 1} failed`, e);
-            attempts++;
-            await delay(2000);
-        }
-    }
-
-    throw AppError.aiFailure('BATCH_GEN_FAILED');
-}
+// [CLEANUP] generateQuizWithGemini_OLD removed.
 
 // Gemini quiz generation (Smart Batch Mode: Accumulate & Retry)
 // Generates 5 questions. If some fail, keeps valid ones and requests remainder.
@@ -506,11 +367,10 @@ async function generateQuizWithGemini(topicTitle: string, topicSources: string[]
         const existingTxt = validQuestions.map(q => q.question).join(" | ");
         const avoidPrompt = validQuestions.length > 0 ? `\nDO NOT repeat these questions: ${existingTxt}` : '';
 
-        const systemPrompt = `You are a Quiz Master. Generate exactly ${needed} diverse, interesting multiple-choice questions about the topic.
-- Questions must be unique.
-- Options must be 4 distinct choices.
-- Correct answer index: 0-3.
-- Return a JSON object with a "questions" array containing ${needed} items.`;
+        // Use centralized prompt and inject count
+        const systemPrompt = CONFIG.GEMINI.PROMPTS.QUIZ_GENERATOR
+            .replace('exactly 5', `exactly ${needed}`)
+            .replace('containing 5 items', `containing ${needed} items`);
 
         const userPrompt = `Topic: ${topicTitle}
 Sources:
@@ -565,9 +425,7 @@ Generate ${needed} unique questions now.`;
 
             const data: any = await resp.json();
             const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            let parsed: any;
-            try { parsed = JSON.parse(text); }
-            catch { parsed = JSON.parse(text.replace(/^```json\s*/, '').replace(/\s*```$/, '')); }
+            const parsed = extractJSONCandidate(text) as any;
 
             const rawList = Array.isArray(parsed?.questions) ? parsed.questions : [];
 
@@ -601,6 +459,13 @@ Generate ${needed} unique questions now.`;
             if (addedThisRound === 0) await delay(1000);
 
         } catch (e) {
+            const status = (e as any)?.status;
+            if (status === 429 || status === 500) {
+                Logger.warn(`[SmartGen] Critical Failure (${status}): Tripping circuit for 120s cooldown.`);
+                aiLastFailureTime = Date.now();
+                aiCircuitOpen = true;
+                break; // Stop batch loop immediately on quota/internal fail
+            }
             Logger.error(`[SmartGen] Error on attempt ${attempts}`, e);
             await delay(1500);
         }
@@ -784,7 +649,6 @@ app.get<{ postId: string }, InitResponse | { status: string; message: string }>(
 );
 
 // API endpoint to get quiz data
-// API endpoint to get quiz data
 app.get('/api/quiz', async (_req, res) => {
     try {
         await validateGeminiKey();
@@ -927,34 +791,59 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
         }
 
         // AI Circuit: Check if we should attempt healing
-        if (aiCircuitOpen) {
-            aiRequestsSinceTrip++;
-            if (aiRequestsSinceTrip >= CIRCUIT_RETRY_THRESHOLD) {
-                Logger.info(`[CircuitBreaker] AI healing attempt (${aiRequestsSinceTrip} requests since trip)`);
-                const aiHealthy = await checkGeminiHealth();
-                if (aiHealthy) {
-                    Logger.info('[CircuitBreaker] AI is back! Closing circuit.');
-                    aiCircuitOpen = false;
-                    aiRequestsSinceTrip = 0;
-                    // Fall through to normal flow
-                } else {
-                    Logger.warn('[CircuitBreaker] AI still down after healing attempt - giving up');
-                    aiHealingAttempted = true; // Mark that we tried and failed
-                    return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.PERMANENTLY_DOWN });
-                }
+        const cooldownElapsed = Date.now() - aiLastFailureTime > aiCooldownMs;
+        const thresholdReached = aiRequestsSinceTrip >= CIRCUIT_RETRY_THRESHOLD;
+
+        if (aiCircuitOpen && (cooldownElapsed || thresholdReached)) {
+            aiRequestsSinceTrip++; // continue counting but also try healing
+            Logger.info(`[CircuitBreaker] AI healing attempt (${aiRequestsSinceTrip} requests since trip / cooldown: ${cooldownElapsed})`);
+            const aiHealthy = await checkGeminiHealth();
+            if (aiHealthy) {
+                Logger.info('[CircuitBreaker] AI is back! Closing circuit.');
+                aiCircuitOpen = false;
+                aiRequestsSinceTrip = 0;
+                aiHealingAttempted = false; // Reset failure flag
+                // Fall through to normal flow
             } else {
-                // If we already tried healing and it failed, show final message
-                if (aiHealingAttempted) {
-                    return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.PERMANENTLY_DOWN });
-                }
-                return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
+                Logger.warn('[CircuitBreaker] AI still down after healing attempt - resetting cooldown');
+                aiLastFailureTime = Date.now(); // reset timer for next attempt
+                aiHealingAttempted = true;
+                return res.json({
+                    ok: true,
+                    date: today,
+                    lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE,
+                    systemStatus: { ai: false, db: !dbCircuitOpen },
+                    healingInProgress: true
+                });
             }
+        } else if (aiCircuitOpen) {
+            aiRequestsSinceTrip++;
+            if (aiHealingAttempted) {
+                return res.json({
+                    ok: true,
+                    date: today,
+                    lines: CONFIG.ROBOT.FALLBACK_BANTER.PERMANENTLY_DOWN,
+                    systemStatus: { ai: false, db: !dbCircuitOpen }
+                });
+            }
+            return res.json({
+                ok: true,
+                date: today,
+                lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE,
+                systemStatus: { ai: false, db: !dbCircuitOpen }
+            });
         }
 
         // Check RAM cache first (zero DB/AI calls if cached)
         if (ROBOT_DIALOGUE_CACHE && ROBOT_DIALOGUE_CACHE.date === today) {
             Logger.cache('[Robot] RAM Cache Hit', { date: today });
-            return res.json({ ok: true, date: today, lines: ROBOT_DIALOGUE_CACHE.lines, cached: true });
+            return res.json({
+                ok: true,
+                date: today,
+                lines: ROBOT_DIALOGUE_CACHE.lines,
+                cached: true,
+                systemStatus: { ai: !aiCircuitOpen, db: !dbCircuitOpen }
+            });
         }
 
         const fs = new FirestoreRestService();
@@ -970,7 +859,12 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
         if (existing && existing.length >= 5) {
             // Cache in RAM for subsequent requests
             ROBOT_DIALOGUE_CACHE = { date: today, lines: existing.slice(0, 20) };
-            return res.json({ ok: true, date: today, lines: existing.slice(0, 20) });
+            return res.json({
+                ok: true,
+                date: today,
+                lines: existing.slice(0, 20),
+                systemStatus: { ai: !aiCircuitOpen, db: !dbCircuitOpen }
+            });
         }
         // Generate 5 new lines if none today (or not enough)
         const model = CONFIG.GEMINI.LITE_MODEL; // Cheaper model for simple text
@@ -988,7 +882,22 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: ROBOT_SYSTEM_PROMPT }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 256 } }),
+                    body: JSON.stringify({
+                        system_instruction: { parts: [{ text: ROBOT_SYSTEM_PROMPT }] },
+                        contents: [{ role: 'user', parts: [{ text: 'Generate 5 robot lines now.' }] }],
+                        generationConfig: {
+                            temperature: 0.6,
+                            maxOutputTokens: 512,
+                            response_mime_type: "application/json",
+                            response_schema: {
+                                type: "object",
+                                properties: {
+                                    lines: { type: "array", items: { type: "string" } }
+                                },
+                                required: ["lines"]
+                            }
+                        }
+                    }),
                 }
             );
         } catch (e) {
@@ -998,9 +907,21 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
         }
 
         if (!resp.ok) {
-            Logger.warn(`[Robot] AI Status Fail ${resp.status} -> Trip Breaker`);
-            aiCircuitOpen = true;
-            return res.json({ ok: true, date: today, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
+            const status = resp.status;
+            if (status === 429 || status === 500) {
+                Logger.warn(`[Robot] AI Critical Fail (${status}) -> Trip 120s cooldown`);
+                aiLastFailureTime = Date.now();
+                aiCircuitOpen = true;
+            } else {
+                Logger.warn(`[Robot] AI Status Fail ${status} -> Trip Breaker`);
+                aiCircuitOpen = true;
+            }
+            return res.json({
+                ok: true,
+                date: today,
+                lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE,
+                systemStatus: { ai: false, db: !dbCircuitOpen }
+            });
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = await resp.json();
@@ -1011,6 +932,7 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
             ? ((parsed as RobotJson).lines as unknown[]).map((s) => String(s).trim()).filter(Boolean)
             : [];
         const clean = sanitizeLines(linesArr).slice(0, 5);
+        Logger.ai(`[Robot] Gemini returned ${clean.length} valid dialogue lines`, { model });
 
         // VALIDATION: Only save to Firestore if we have 5 valid lines
         if (clean.length < 5) {
@@ -1039,7 +961,12 @@ app.get('/api/robot/dialogues/today', async (_req: Request, res: Response) => {
         // Cache in RAM for subsequent requests
         ROBOT_DIALOGUE_CACHE = { date: today, lines: validLines };
 
-        res.json({ ok: true, date: today, lines: validLines });
+        res.json({
+            ok: true,
+            date: today,
+            lines: validLines,
+            systemStatus: { ai: !aiCircuitOpen, db: !dbCircuitOpen }
+        });
     } catch (e) {
         Logger.error('[RobotDialogues] error', e);
         // Determine if it was AI or DB error to set specific flags if needed
@@ -1160,10 +1087,10 @@ app.get('/api/topics/:slug/status', async (req, res) => {
     try {
         const { slug } = req.params;
         const firestoreService = new FirestoreRestService();
-        const topic = await firestoreService.getTopic(slug);
+        const topic = await firestoreService.getTopic(slug || '');
         if (!topic) return res.status(404).json({ error: 'Topic not found' });
         const today = new Date().toISOString().split('T')[0];
-        const quiz = await firestoreService.getTopicQuiz?.(slug as string, today as string);
+        const quiz = await firestoreService.getTopicQuiz?.(slug || '', today || '');
         res.json({
             slug,
             status: topic.status || 'unknown',
@@ -1208,6 +1135,7 @@ app.post('/api/topics/generate', async (req, res) => {
 
         // Only save if we strictly trust the output
         const saved = await firestoreService.saveTopic(topicPayload);
+        Logger.db(`[GenerateTopic] Topic stored in Firestore: "${title}" (Slug: ${slug})`, { saved: !!saved });
         res.status(200).json({ title, slug, sources, saved, provider, model, latencyMs });
     } catch (error) {
         Logger.error('Error in /api/topics/generate:', error);
@@ -1224,7 +1152,7 @@ app.post('/api/topics/:slug/quiz', async (req, res) => {
         const date: string = new Date().toISOString().slice(0, 10);
         const firestoreService = new FirestoreRestService();
         // Try existing quiz
-        const existing = await firestoreService.getTopicQuiz(slug, date);
+        const existing = await firestoreService.getTopicQuiz(slug || '', date || '');
         const force = Boolean(req.body?.force);
         if (existing && existing.questions && existing.questions.length >= 5 && !force) {
             Logger.cache('[TopicQuiz] Serving from Firestore Cache', { slug, date });
@@ -1735,7 +1663,7 @@ app.post('/api/ai/test', async (req, res) => {
         const start = Date.now();
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
-        const probeModel = ALLOWED_GEMINI_MODELS[0] || 'gemini-2.0-flash';
+        const probeModel = 'gemini-1.5-flash'; // Fixed diagnostics model
         const resp = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${probeModel}:generateContent?key=` + GEMINI_API_KEY,
             {
@@ -1771,7 +1699,7 @@ app.post('/api/ai/test', async (req, res) => {
 let ROBOT_DIALOGUE_CACHE: { date: string; lines: string[] } | null = null;
 
 // Global error handling middleware (MUST be last)
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof AppError) {
         Logger.error(`[AppError] ${err.code}: ${err.message}`, { statusCode: err.statusCode, path: req.path });
         return res.status(err.statusCode).json(err.toJSON());
