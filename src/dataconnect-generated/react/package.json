@@ -13,5 +13,7 @@
   "browser": "esm/index.esm.js",
   "peerDependencies": {
     "@tanstack-query-firebase/react": "^2.0.0"
-  }
+  },
+  "dependencies": {},
+  "devDependencies": {}
 }
