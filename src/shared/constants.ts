@@ -68,15 +68,6 @@ export const CONFIG = {
         /** Capable model for complex reasoning and creative generation */
         CONTENT_MODEL: 'gemini-2.5-flash',
         PROMPTS: {
-            TOPIC_NORMALIZER: `SYSTEM ROLE: You are a headless DATA PROCESSING UNIT. Your ONLY function is to normalize strings into JSON.
-                                CONSTRAINTS:
-                                - OUTPUT MUST BE RAW JSON ONLY.
-                                - NO PREAMBLE (Do not say "Here is the JSON").
-                                - NO CODE BLOCKS (Do not use \`\`\`json).
-                                - NO MARKDOWN.
-                                - NO EXPLANATIONS.
-                                - START WITH { AND END WITH }.
-                                SCHEMA: {"title": "Canonical Topic Name", "sources": ["URL1", "URL2", ...]}`,
 
             QUIZ_GENERATOR: `SYSTEM ROLE: You are a headless QUIZ GENERATOR. Your ONLY function is to output question data in JSON.
                             CONSTRAINTS:
