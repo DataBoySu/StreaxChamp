@@ -6,6 +6,10 @@ export default {
     extend: {
       colors: {
         'rgb': 'rgb',
+        // Kawaii-Cyberpunk custom palette
+        'brand-red': '#FF4500',
+        'soft-dark': '#1A1A1B',
+        'card-bg': '#272729',
         primary: {
           50: 'rgb(var(--color-bg-primary) / 0.05)',
           100: 'rgb(var(--color-bg-primary) / 0.1)',
@@ -59,11 +63,14 @@ export default {
       },
       boxShadow: {
         'glass': '0 8px 32px rgba(0, 0, 0, 0.1)',
-        'glow': '0 0 20px rgba(var(--color-accent), 0.3)',
+        'glow': '0 0 20px rgba(255, 69, 0, 0.5)', // brand-red glow
         'glow-strong': '0 0 30px rgba(var(--color-accent), 0.6)',
       },
       borderRadius: {
         '4xl': '2rem',
+        // Kawaii-Cyberpunk custom border radius
+        'kawaii': '24px',
+        'pill': '9999px',
       },
       gradientColorStops: {
         'gradient-primary-start': 'rgb(99, 102, 241)',
