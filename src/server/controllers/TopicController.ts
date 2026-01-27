@@ -16,7 +16,7 @@ export class TopicController {
     static async listTopics(_req: Request, res: Response) {
         try {
             const cache = CacheService.getInstance();
-            const cached = cache.get('topics_list');
+            const cached = await cache.get('topics_list');
             if (cached) {
                 return res.json(cached);
             }
@@ -25,7 +25,7 @@ export class TopicController {
             const list = await fs.listTopics();
 
             // Cache for 10 minutes (topics don't change THAT often)
-            cache.set('topics_list', list, 600);
+            await cache.set('topics_list', list, 600);
 
             res.json(list);
         } catch (e) {

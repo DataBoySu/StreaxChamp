@@ -97,7 +97,7 @@ export class QuizController {
             if (!quizData) {
                 // Standard Daily Flow - Check Cache First
                 const cacheKey = `daily_quiz_${todayStr}`;
-                const cached = cache.get(cacheKey);
+                const cached = await cache.get(cacheKey);
 
                 if (cached) {
                     quizData = cached;
@@ -106,7 +106,7 @@ export class QuizController {
                     const existing = await fs.getTodaysQuiz();
                     if (existing) {
                         quizData = existing;
-                        cache.set(cacheKey, existing, 1800); // 30 mins
+                        await cache.set(cacheKey, existing, 1800); // 30 mins
                         void fs.incrementTopicPlayCount?.('daily-quizzes');
                     } else {
                         // Generation (same as before)
@@ -139,7 +139,7 @@ export class QuizController {
 
                         await fs.saveTodaysQuiz(payload);
                         quizData = { id: todayStr, ...payload };
-                        cache.set(cacheKey, quizData, 1800);
+                        await cache.set(cacheKey, quizData, 1800);
                         Logger.ai('[DailyQuiz] AI Generation Successful');
                     }
                 }

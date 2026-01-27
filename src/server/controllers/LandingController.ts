@@ -14,7 +14,7 @@ export class LandingController {
     static async getSummary(_req: Request, res: Response) {
         try {
             const cache = CacheService.getInstance();
-            const cached = cache.get('landing_summary');
+            const cached = await cache.get('landing_summary');
             if (cached) return res.json({ ok: true, ...cached });
 
             const lb = new LeaderboardService();
@@ -42,7 +42,7 @@ export class LandingController {
             };
 
             // Cache for 5 minutes
-            cache.set('landing_summary', summary, 300);
+            await cache.set('landing_summary', summary, 300);
 
             res.json({ ok: true, ...summary });
         } catch (e) {

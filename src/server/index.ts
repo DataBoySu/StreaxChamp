@@ -2,9 +2,9 @@ import 'dotenv/config';
 import { Devvit, SettingScope } from '@devvit/public-api';
 import express from 'express';
 import { createServer, getServerPort } from '@devvit/server';
-import { createPost } from './core/post';
 import { requestLogger } from './middleware/requestLogger';
 import { apiRouter } from './routes/api';
+import { internalRouter } from './routes/internal';
 import { hydrateGeminiKeyFromSettings } from './services/GeminiService';
 
 // App-level secret for Gemini key; configured via Devvit settings
@@ -16,31 +16,8 @@ Devvit.addSettings({
     isSecret: true,
 });
 
-// Configure Devvit for HTTP access and media
-Devvit.configure({
-    http: true,
-    redditAPI: true,
-    redis: false,
-    media: true,
-});
-
-// Programmatic moderator menu: Create Daily Quiz Post
-Devvit.addMenuItem({
-    label: 'Create Daily Quiz Post',
-    location: 'subreddit',
-    forUserType: 'moderator',
-    onPress: async (_event, context) => {
-        try {
-            const subreddit = await context.reddit.getCurrentSubreddit();
-            const post = await createPost(context.reddit, subreddit.name);
-            context.ui.showToast(`Post created: ${post.id}`);
-            console.info('[MenuCreate] post created', post.id);
-        } catch (err) {
-            context.ui.showToast('Failed to create post');
-            console.error('[MenuCreate] createPost failed', err);
-        }
-    }
-});
+// Note: Menu items & Post configurations are handled via devvit.json
+// pointing to /internal/ routes mounted below.
 
 // Try to load secrets from Devvit settings at startup (non-blocking)
 hydrateGeminiKeyFromSettings();
@@ -54,6 +31,9 @@ app.use(requestLogger);
 
 // Mount API Routes
 app.use('/api', apiRouter);
+
+// Mount Internal Routes (Menu Actions, Triggers)
+app.use('/internal', internalRouter);
 
 // 404 Handler
 app.use((_req, res) => {

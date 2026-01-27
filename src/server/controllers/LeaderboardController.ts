@@ -14,13 +14,13 @@ export class LeaderboardController {
     static async listGlobal(_req: Request, res: Response) {
         try {
             const cache = CacheService.getInstance();
-            const cached = cache.get('lb_global');
+            const cached = await cache.get('lb_global');
             if (cached) return res.json(cached);
 
             const svc = new LeaderboardService();
             const list = await svc.listGlobalTotals(50);
 
-            cache.set('lb_global', list, 300); // Cache for 5 mins
+            await cache.set('lb_global', list, 300); // Cache for 5 mins
             res.json(list);
         } catch (e) {
             Logger.error('[Leaderboard] List global error', e);
@@ -78,14 +78,14 @@ export class LeaderboardController {
 
             const cacheKey = `lb_${slug}_${date}`;
             const cache = CacheService.getInstance();
-            const cached = cache.get(cacheKey);
+            const cached = await cache.get(cacheKey);
             if (cached) return res.json(cached);
 
             const svc = new LeaderboardService();
             const dateParam = typeof req.params.date === 'string' ? req.params.date : undefined;
             const list = await svc.list(slug, dateParam); // Pass original undefined if missing
 
-            cache.set(cacheKey, list, 180); // Cache for 3 mins
+            await cache.set(cacheKey, list, 180); // Cache for 3 mins
             res.json(list);
         } catch (e) {
             Logger.error('[Leaderboard] List topic error', e);
