@@ -18,7 +18,9 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
 
-  // Fetch daily robot dialogues (up to 20) from server
+  // Robot dialogues are now hardcoded - no need to fetch from API
+  // Disabled API polling to reduce unnecessary requests
+  /*
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -37,6 +39,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
     })();
     return () => { cancelled = true; };
   }, []);
+  */
 
   const messages = useMemo(() => {
     const statusLines: string[] = [];

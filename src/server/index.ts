@@ -83,6 +83,5 @@ app.use((_req, res) => {
 const server = createServer(app);
 const port = getServerPort();
 server.listen(port, () => {
-    console.log(`Server started on port: ${port}`);
-    console.log('Environment:', CONFIG.INTERNAL.BUILD_ENV);
+    // Server started - no logging needed in Devvit context
 });

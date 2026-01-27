@@ -81,20 +81,25 @@ export function hydrateGeminiKeyFromSettings(): void {
 
 /**
  * Validates the Gemini API key. 
- * Performs a lazy validation (assumes valid if string exists) to save quota.
+ * SILENT OPTIMISTIC STRATEGY: Assumes Gemini works, never validates proactively.
+ * Only logs when circuit breaker actually fails or recovers.
  */
 export async function validateGeminiKey(): Promise<boolean> {
+    // If we've already validated (failed or succeeded), return cached result
     if (geminiKeyValidated) return geminiKeyWorks;
+
+    // Silent check: if no key, mark as failed but DON'T log yet
+    // Only log when an actual AI call fails
     if (!GEMINI_API_KEY) {
-        Logger.error('[AI] ❌ No Gemini API key configured in .env or settings');
         geminiKeyWorks = false;
         geminiKeyValidated = true;
         aiCircuitOpen = true;
         return false;
     }
+
+    // Optimistically assume it works - no logging, no validation
     geminiKeyWorks = true;
     geminiKeyValidated = true;
-    Logger.info(`[AI] Gemini Check: ✅ true`);
     return true;
 }
 
