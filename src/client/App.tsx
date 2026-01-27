@@ -7,6 +7,7 @@ import { useQuizData } from './hooks/useQuizData';
 import { useUsername } from './hooks/useUsername';
 import { useLeaderboard } from './hooks/useLeaderboard';
 import { useLandingSummary } from './hooks/useLandingSummary';
+import { useHistory } from './hooks/useHistory';
 import { CONFIG } from '../shared/constants';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { LandingHero } from './components/landing/LandingHero';
@@ -54,8 +55,6 @@ export const App = () => {
   const [showGap, setShowGap] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
   const [bonusAnswered, setBonusAnswered] = useState(false);
-  const [history, setHistory] = useState<{ id: string; slug: string; title: string; score: number; ts: number }[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
   // User session state (deprecated)
   const [userInfo, setUserInfo] = useState<{ userId: string | null; username: string | null; displayName: string | null } | null>(null);
   const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
@@ -105,21 +104,21 @@ export const App = () => {
 
   // No manual sign-in logic needed
 
-  // Fetch history from server when authenticated
-  const refreshHistory = useCallback(async () => {
-    if (!authUser?.redditUsername) return;
-    setHistoryLoading(true);
-    try {
-      const resp = await fetch(`/api/history/${encodeURIComponent(authUser.redditUsername)}`);
-      const json = await resp.json();
-      if (resp.ok && json.ok) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const list = (json.attempts || []).map((a: any) => ({ id: a.createdAt + ':' + a.slug, slug: a.slug, title: a.slug, score: a.score, ts: Date.parse(a.createdAt || '') || Date.now() }));
-        setHistory(list);
-      }
-    } catch {/* ignore */ } finally { setHistoryLoading(false); }
-  }, [authUser?.redditUsername]);
-  useEffect(() => { if (authUser?.redditUsername) void refreshHistory(); }, [authUser?.redditUsername, refreshHistory]);
+  // Use new global play history hook
+  const { history: globalHistory, loading: globalHistoryLoading, savePlay, hasPlayed } = useHistory(!quizStarted);
+
+  // Transform global history to match UI expectations
+  const history = useMemo(() => {
+    return globalHistory.map(h => ({
+      id: `${h.username}-${h.topicSlug}-${h.timestamp}`,
+      slug: h.topicSlug,
+      title: h.topicTitle,
+      ts: h.timestamp,
+      nickname: h.nickname
+    }));
+  }, [globalHistory]);
+
+  const historyLoading = globalHistoryLoading;
 
   // Derive active questions: prefer topic quiz if present
   interface TopicQuizQuestionRaw { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string; }
@@ -544,31 +543,40 @@ export const App = () => {
     } catch {/* ignore */ }
     const quizId = (selectedTopic ? selectedTopicQuiz?.id : dailyQuiz?.id);
     const submissionPayload = { userKey: key, nickname, score, timeTakenMs: totalMs, ...(quizId ? { quizId } : {}) };
-    void submitLeaderboardScore(slug, submissionPayload).then((ok) => {
-      if (!ok) console.error('[Leaderboard] submit failed');
-      // Force refresh to get proper ordering/ranks
-      setTimeout(() => { try { void refreshTopicLeaderboard?.(); } catch {/* ignore */ } }, 300);
-    });
+
+    // Check if replay (deferred implementation - check hasPlayed)
+    const isReplay = hasPlayed(slug);
+
+    if (isReplay) {
+      // Replay mode: Notification only, no submission, no history update
+      setMessage({
+        type: 'info',
+        text: '🔁 Replay mode - score not submitted',
+        timesUp: false
+      });
+      // We still mark as submitted to prevent loop
+    } else {
+      // New play: Submit score AND save to history
+      void submitLeaderboardScore(slug, submissionPayload).then(async (ok) => {
+        if (!ok) console.error('[Leaderboard] submit failed');
+        else {
+          // Successfully submitted, now save to history
+          await savePlay(
+            key, // username
+            nickname, // nickname
+            slug, // topicSlug
+            selectedTopic?.title || 'Daily Quiz' // topicTitle
+          );
+        }
+        // Force refresh to get proper ordering/ranks
+        setTimeout(() => { try { void refreshTopicLeaderboard?.(); } catch {/* ignore */ } }, 300);
+      });
+    }
   }, [showScore, selectedTopic?.slug, authUser?.nickname, authUser?.redditUsername, hookUsername, score, totalTime, submitLeaderboardScore, topicLeaderboard, refreshTopicLeaderboard]);
 
   useEffect(() => { if (!showScore) submittedRef.current = false; }, [showScore]);
 
-  // Record history once after score submission processed
-  useEffect(() => {
-    if (!showScore) return;
-    if (!selectedTopic && !usingRandomFallback) return; // require a quiz context
-    // create an entry when submittedRef is set (meaning we pushed to leaderboard)
-    if (submittedRef.current) {
-      const topic = selectedTopic?.slug ? { slug: selectedTopic.slug, title: selectedTopic.title } : { slug: 'daily-quizzes', title: 'Daily Quiz' };
-      setHistory(prev => {
-        // Avoid duplicate consecutive entries (same slug + score within 2s)
-        const now = Date.now();
-        if (prev[0] && prev[0].slug === topic.slug && prev[0].score === score && (now - prev[0].ts) < 2000) return prev;
-        const next = [{ id: now + ':' + Math.random().toString(36).slice(2, 7), slug: topic.slug, title: topic.title, score, ts: now }, ...prev].slice(0, 50);
-        return next;
-      });
-    }
-  }, [showScore, selectedTopic, usingRandomFallback, score]);
+  // History is now managed by useHistory hook and saved after quiz completion
 
   if (showTopicMenu) {
     return (
@@ -818,12 +826,7 @@ export const App = () => {
               topicLbLoading={topicLbLoading}
               topicLeaderboard={topicLeaderboard as any[]} // explicit cast for simplicity
               historyLoading={historyLoading}
-              authUser={authUser}
               history={history}
-              onSelectHistoryTopic={(slug, title) => {
-                setSelectedTopic({ slug, title });
-                localStorage.setItem('streax:selectedTopic', JSON.stringify({ slug, title }));
-              }}
             />
           )}
         </div>

@@ -622,7 +622,7 @@ export class FirestoreRestService {
    */
   async saveRobotDialogues(date: string, lines: string[]): Promise<boolean> {
     try {
-      const url = `${this.baseUrl} /robotDialogues/${date} `;
+      const url = `${this.baseUrl}/robotDialogues/${date}`;
       const body = {
         fields: {
           id: { stringValue: date },
@@ -635,6 +635,79 @@ export class FirestoreRestService {
       return res.ok;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Save a play history entry
+   */
+  async savePlayHistory(entry: {
+    username: string;
+    nickname: string;
+    topicSlug: string;
+    topicTitle: string;
+    timestamp: number;
+    quizDate: string;
+  }): Promise<boolean> {
+    try {
+      const url = `${this.baseUrl}/play_history`;
+      const body = {
+        fields: {
+          username: { stringValue: entry.username },
+          nickname: { stringValue: entry.nickname },
+          topicSlug: { stringValue: entry.topicSlug },
+          topicTitle: { stringValue: entry.topicTitle },
+          timestamp: { integerValue: String(entry.timestamp) },
+          quizDate: { stringValue: entry.quizDate },
+        },
+      };
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      return res.ok;
+    } catch (e) {
+      Logger.error('[FirestoreRest.savePlayHistory] error', e);
+      return false;
+    }
+  }
+
+  /**
+   * Get global play history (latest N)
+   */
+  async getGlobalPlayHistory(limit = 15): Promise<Array<{
+    username: string;
+    nickname: string;
+    topicSlug: string;
+    topicTitle: string;
+    timestamp: number;
+  }>> {
+    try {
+      // Fetch all documents, sort client-side by timestamp
+      const url = `${this.baseUrl}/play_history`;
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (!res.ok) return [];
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json();
+      const docs = data?.documents || [];
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const entries = docs.map((d: any) => {
+        const f = d.fields || {};
+        return {
+          username: f.username?.stringValue || '',
+          nickname: f.nickname?.stringValue || '',
+          topicSlug: f.topicSlug?.stringValue || '',
+          topicTitle: f.topicTitle?.stringValue || 'Unknown Topic',
+          timestamp: f.timestamp?.integerValue ? parseInt(f.timestamp.integerValue, 10) : 0,
+        };
+      });
+
+      // Sort by timestamp descending (newest first)
+      entries.sort((a: { timestamp: number }, b: { timestamp: number }) => b.timestamp - a.timestamp);
+
+      return entries.slice(0, limit);
+    } catch (e) {
+      Logger.error('[FirestoreRest.getGlobalPlayHistory] error', e);
+      return [];
     }
   }
 }

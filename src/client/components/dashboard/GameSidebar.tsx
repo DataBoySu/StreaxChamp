@@ -12,8 +12,9 @@ interface HistoryEntry {
     id: string;
     slug: string;
     title: string;
-    score: number;
+    score?: number;
     ts: number;
+    nickname?: string;
 }
 
 interface GameSidebarProps {
@@ -22,10 +23,19 @@ interface GameSidebarProps {
     topicLbLoading: boolean;
     topicLeaderboard: LeaderboardEntry[];
     historyLoading: boolean;
-    authUser: { nickname: string } | null;
     history: HistoryEntry[];
-    onSelectHistoryTopic: (slug: string, title: string) => void;
 }
+
+const getTimeAgo = (timestamp: number): string => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+};
 
 export const GameSidebar: React.FC<GameSidebarProps> = ({
     showScore,
@@ -33,9 +43,7 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
     topicLbLoading,
     topicLeaderboard,
     historyLoading,
-    authUser,
     history,
-    onSelectHistoryTopic,
 }) => {
     return (
         <div className="lg:col-span-1">
@@ -86,39 +94,39 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
                     ) : (
                         <>
                             <div className="flex items-center gap-3 mb-6">
-                                <h2 className="text-2xl font-bold text-gradient">History</h2>
+                                <h2 className="text-2xl font-bold text-gradient">Recent Plays</h2>
                             </div>
-                            <div className="relative min-h-[160px] space-y-3">
+                            <div className="relative min-h-[160px] max-h-[400px] overflow-y-auto space-y-2 pr-1">
                                 {historyLoading && (
                                     <div className="text-center py-4 text-secondary text-xs">
                                         <LoadingDots text="Loading" />
                                     </div>
                                 )}
 
-                                {authUser && !historyLoading && history.length === 0 && (
+                                {!historyLoading && history.length === 0 && (
                                     <div className="text-center py-8 text-secondary text-sm">
                                         No plays yet.
                                     </div>
                                 )}
-                                {history.slice(0, 10).map((h, i) => (
-                                    <div
-                                        key={h.id}
-                                        className="flex items-center gap-3 bg-base-200/40 border border-base-300/40 rounded-lg px-3 py-2"
-                                    >
-                                        <span className="text-accent font-bold w-6 text-right">
-                                            {i + 1}.
-                                        </span>
-                                        <button
-                                            onClick={() => onSelectHistoryTopic(h.slug, h.title)}
-                                            className="text-xs px-3 py-1 rounded-md bg-accent/15 hover:bg-accent/25 border border-accent/30 font-medium truncate max-w-[110px]"
+                                {history.map((h, i) => {
+                                    const timeAgo = getTimeAgo(h.ts || Date.now());
+                                    return (
+                                        <div
+                                            key={h.id || i}
+                                            className="px-3 py-2 bg-base-200/40 border-b border-base-300/40 last:border-0 hover:bg-base-200/60 transition-colors"
                                         >
-                                            {h.title}
-                                        </button>
-                                        <span className="ml-auto text-success font-extrabold text-lg">
-                                            {h.score}
-                                        </span>
-                                    </div>
-                                ))}
+                                            <div className="flex items-center gap-2 text-xs truncate">
+                                                <span className="font-bold text-accent min-w-[1.2rem]">{i + 1}.</span>
+                                                <span className="font-semibold text-primary truncate max-w-[100px]" title={h.nickname}>{h.nickname || 'Player'}</span>
+                                                <span className="opacity-60 text-[10px]">played</span>
+                                                <span className="font-medium text-secondary truncate max-w-[140px]" title={h.title}>
+                                                    {h.title}
+                                                </span>
+                                                <span className="opacity-40 text-[9px] ml-auto whitespace-nowrap">{timeAgo}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </>
                     )}

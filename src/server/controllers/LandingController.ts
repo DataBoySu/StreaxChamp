@@ -21,14 +21,21 @@ export class LandingController {
             const fs = new FirestoreRestService();
 
             // Fetch data in parallel
-            const [globalTop, topics] = await Promise.all([
-                lb.listGlobalTotals(10),
+            const [globalTotalsRaw, topics] = await Promise.all([
+                lb.listGlobalTotals(50),
                 fs.listTopics()
             ]);
 
+            // Map totalScore to score for UI compatibility (no topic info needed)
+            const globalTop = globalTotalsRaw.map(entry => ({
+                userKey: entry.userKey,
+                nickname: entry.nickname,
+                score: entry.totalScore
+            }));
+
             const summary = {
-                globalTop: globalTop.slice(0, 3), // Top 3 for landing
-                globalTotals: globalTop,
+                globalTop: globalTop.slice(0, 10),
+                globalTotals: globalTop.slice(0, 50),
                 hotTopics: topics.slice(0, 6), // Top 6 topics
                 popular: topics.slice(0, 10),
                 top3: globalTop.slice(0, 3)
