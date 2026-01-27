@@ -115,14 +115,18 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
                                             key={h.id || i}
                                             className="px-3 py-2 bg-base-200/40 border-b border-base-300/40 last:border-0 hover:bg-base-200/60 transition-colors"
                                         >
-                                            <div className="flex items-center gap-2 text-xs truncate">
-                                                <span className="font-bold text-accent min-w-[1.2rem]">{i + 1}.</span>
-                                                <span className="font-semibold text-primary truncate max-w-[100px]" title={h.nickname}>{h.nickname || 'Player'}</span>
-                                                <span className="opacity-60 text-[10px]">played</span>
-                                                <span className="font-medium text-secondary truncate max-w-[140px]" title={h.title}>
+                                            <div className="flex items-center gap-3 text-xs w-full">
+                                                <span className="font-bold text-accent shrink-0 min-w-[1.2rem]">{i + 1}.</span>
+                                                <span className="font-semibold text-primary truncate min-w-0 flex-1" title={h.nickname}>
+                                                    {h.nickname || 'Player'}
+                                                </span>
+                                                <span className="opacity-60 text-[10px] whitespace-nowrap shrink-0">played</span>
+                                                <span className="font-medium text-secondary truncate max-w-[130px] shrink-0" title={h.title}>
                                                     {h.title}
                                                 </span>
-                                                <span className="opacity-40 text-[9px] ml-auto whitespace-nowrap">{timeAgo}</span>
+                                                <span className="opacity-40 text-[9px] whitespace-nowrap shrink-0 ml-1 min-w-[35px] text-right">
+                                                    {timeAgo}
+                                                </span>
                                             </div>
                                         </div>
                                     );
