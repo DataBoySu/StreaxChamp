@@ -19,6 +19,7 @@ dist-*/
 .devvit-debug.log*
 
 # Build and IDE
+.agent/
 build/
 coverage/
 .DS_Store
