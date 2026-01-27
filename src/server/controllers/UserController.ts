@@ -13,16 +13,45 @@ export class UserController {
      */
     static async resolveContextUser(req: Request, res: Response) {
         try {
+            // 1. Prioritize SDK for full username resolution
+            try {
+                const sdkUser = await reddit.getCurrentUser();
+                if (sdkUser && sdkUser.id) {
+                    Logger.info('[ContextUser] resolved via SDK', { userId: sdkUser.id });
+                    return res.json({
+                        ok: true,
+                        userId: sdkUser.id,
+                        username: sdkUser.username || 'Player', // Ensure username exists
+                        source: 'sdk'
+                    });
+                }
+            } catch (sdkErr) {
+                // SDK might fail in some contexts (e.g. unauth), continue to fallbacks
+                Logger.info('[ContextUser] SDK lookup skipped/failed', sdkErr);
+            }
+
+            // 2. Fallback to headers (ID only)
             const { userId, source } = getDevvitUserId(req);
             if (userId && /^t2_/.test(userId)) {
-                Logger.info('[ContextUser] resolved', { userId, source });
-                return res.json({ ok: true, userId, source });
+                Logger.info('[ContextUser] resolved ID via headers', { userId });
+                // We have ID but no username, fallback to "Player" for display
+                return res.json({ ok: true, userId, username: 'Player', source });
             }
-            Logger.error('[ContextUser] userId not found');
-            return res.status(404).json({ ok: false, error: 'USER_ID_NOT_AVAILABLE' });
+
+            // 3. Absolute Fallback: Return "Guest/Player" instead of error
+            // User requested robust fallback for "no local dev" scenario
+            Logger.info('[ContextUser] resolution failed, defaulting to Guest');
+            return res.status(200).json({
+                ok: true,
+                userId: 'guest_player',
+                username: 'Player',
+                source: 'fallback'
+            });
+
         } catch (e) {
             Logger.error('[ContextUser] error', e);
-            return res.status(500).json({ ok: false, error: 'CONTEXT_ERROR' });
+            // Critical failure fallback
+            return res.status(200).json({ ok: true, userId: 'guest_error', username: 'Player', source: 'error_fallback' });
         }
     }
 

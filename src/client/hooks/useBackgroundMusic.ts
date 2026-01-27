@@ -16,11 +16,14 @@ const FADE_STEP = 1 / (FADE_DURATION / FADE_INTERVAL); // Volume step per interv
 export const useBackgroundMusic = (): UseBackgroundMusicReturn => {
     const [isMuted, setIsMuted] = useState<boolean>(() => {
         try {
-            return localStorage.getItem('streax:mute') === 'true';
-        } catch { return false; } // Default to unmuted
+            const stored = localStorage.getItem('streax:mute');
+            // User requested default OFF (muted), so only be unmuted if explicitly set to 'false'
+            return stored === null ? true : stored === 'true';
+        } catch { return true; } // Default to muted (Music Off)
     });
 
     const [cursorMode, setCursorMode] = useState<MusicMode>('landing');
+    const [hasInteracted, setHasInteracted] = useState<boolean>(false);
 
     // Audio refs
     const landingRef = useRef<HTMLAudioElement | null>(null);
@@ -33,13 +36,15 @@ export const useBackgroundMusic = (): UseBackgroundMusicReturn => {
     // Initialize audio objects once
     useEffect(() => {
         if (!landingRef.current) {
-            const a = new Audio('/assets/music/landing_bgm.mp3');
+            // User requested fallback to single bgm.mp3
+            const a = new Audio('/assets/bgm.mp3');
             a.loop = true;
             a.volume = 0; // Start muted for fade-in
             landingRef.current = a;
         }
         if (!quizRef.current) {
-            const a = new Audio('/assets/music/quiz_bgm.mp3');
+            // User requested fallback to single bgm.mp3
+            const a = new Audio('/assets/bgm.mp3');
             a.loop = true;
             a.volume = 0;
             quizRef.current = a;
@@ -56,9 +61,8 @@ export const useBackgroundMusic = (): UseBackgroundMusicReturn => {
     const fadeTo = useCallback((audio: HTMLAudioElement, targetVol: number, intervalRef: React.MutableRefObject<NodeJS.Timeout | null>) => {
         if (intervalRef.current) clearInterval(intervalRef.current);
 
-        // If muted globally, target is always 0, but we keep playing to allow unmute fade-in
-        // Actually, better to just set volume 0 instantly if muted, but specialized mute logic handles that.
-        // Here we handle "active track" fading.
+        // Don't start playing if we haven't interacted yet
+        if (targetVol > 0 && !hasInteracted) return;
 
         intervalRef.current = setInterval(() => {
             let current = audio.volume;
@@ -72,13 +76,13 @@ export const useBackgroundMusic = (): UseBackgroundMusicReturn => {
 
             if (current < targetVol) {
                 current = Math.min(1, current + FADE_STEP);
-                if (audio.paused) audio.play().catch(() => { }); // Ensure playing if fading in
+                if (audio.paused && hasInteracted) audio.play().catch(() => { }); // Ensure playing if fading in
             } else {
                 current = Math.max(0, current - FADE_STEP);
             }
             audio.volume = current;
         }, FADE_INTERVAL);
-    }, []);
+    }, [hasInteracted]);
 
     // Effect: Handle Mode Switching
     useEffect(() => {
@@ -86,11 +90,12 @@ export const useBackgroundMusic = (): UseBackgroundMusicReturn => {
         const quiz = quizRef.current;
         if (!landing || !quiz) return;
 
-        // If global mute is ON, we just pause everything or set volume 0
-        // But for smoother experience, we might want to keep "logical" volume up and just set actual volume to 0.
-        // However, standard HTML Audio mute is simpler.
+        // Sync muted state
         landing.muted = isMuted;
         quiz.muted = isMuted;
+
+        // If muted and we haven't started playing, don't do anything
+        if (isMuted && !hasInteracted) return;
 
         if (cursorMode === 'landing') {
             // Fade IN landing, Fade OUT quiz
@@ -106,15 +111,28 @@ export const useBackgroundMusic = (): UseBackgroundMusicReturn => {
             fadeTo(quiz, 0.0, quizFadeRef);
         }
 
-    }, [cursorMode, isMuted, fadeTo]);
+    }, [cursorMode, isMuted, fadeTo, hasInteracted]);
 
     const toggleMute = useCallback(() => {
+        // Mark first interaction to allow playback
+        setHasInteracted(true);
+
         setIsMuted(prev => {
             const next = !prev;
             localStorage.setItem('streax:mute', String(next));
+
+            // If we are Unmuting (next is false), try to play the active track immediately
+            // This satisfies browser interaction requirements
+            if (!next) {
+                const activeAudio = cursorMode === 'quiz' ? quizRef.current : landingRef.current;
+                if (activeAudio) {
+                    activeAudio.muted = false;
+                    activeAudio.play().catch(e => console.warn('Audio play failed:', e));
+                }
+            }
             return next;
         });
-    }, []);
+    }, [cursorMode]);
 
     const playClick = useCallback(() => {
         // Optional: Could add UI click sounds here later

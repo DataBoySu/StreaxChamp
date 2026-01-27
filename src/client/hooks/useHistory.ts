@@ -19,7 +19,7 @@ interface UseHistoryReturn {
 const CACHE_KEY = 'play_history_cache';
 const CACHE_TTL = 30 * 1000; // 30 seconds aggressive cache
 
-export const useHistory = (enabled = true): UseHistoryReturn => {
+export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryReturn => {
     const [history, setHistory] = useState<PlayHistoryEntry[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -71,10 +71,10 @@ export const useHistory = (enabled = true): UseHistoryReturn => {
 
     // Auto-refresh interval (30s)
     useEffect(() => {
-        if (!enabled) return;
+        if (!enabled || !pollingEnabled) return;
         const interval = setInterval(() => void fetchHistory(true), 30000);
         return () => clearInterval(interval);
-    }, [enabled, fetchHistory]);
+    }, [enabled, pollingEnabled, fetchHistory]);
 
     // Window focus revalidation
     useEffect(() => {

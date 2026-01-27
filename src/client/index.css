@@ -23,8 +23,10 @@
   --color-border-hover: 209 213 219;
 
   /* Theme Colors */
-  --color-accent: 255 69 0; /* Reddit orange-red */
-  --color-accent-hover: 220 38 0; /* Darker Reddit red */
+  --color-accent: 255 69 0;
+  /* Reddit orange-red */
+  --color-accent-hover: 220 38 0;
+  /* Darker Reddit red */
   --color-success: 34 197 94;
   --color-error: 239 68 68;
   --color-warning: 245 158 11;
@@ -128,12 +130,15 @@
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(var(--success-rgb), 0.7);
   }
+
   50% {
     transform: scale(1.02);
   }
+
   70% {
     box-shadow: 0 0 0 10px rgba(var(--success-rgb), 0);
   }
+
   100% {
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(var(--success-rgb), 0);
@@ -141,6 +146,7 @@
 }
 
 @keyframes incorrectShake {
+
   0%,
   20%,
   40%,
@@ -148,6 +154,7 @@
   80% {
     transform: translateX(-2px);
   }
+
   10%,
   30%,
   50%,
@@ -155,6 +162,7 @@
   90% {
     transform: translateX(2px);
   }
+
   100% {
     transform: translateX(0);
   }
@@ -165,6 +173,7 @@
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -176,6 +185,7 @@
     opacity: 0;
     transform: translateY(-30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -187,6 +197,7 @@
     opacity: 0;
     transform: scale(0.9);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -194,11 +205,13 @@
 }
 
 @keyframes pulse {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.8;
     transform: scale(1.05);
@@ -206,11 +219,13 @@
 }
 
 @keyframes fastPulse {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.1);
@@ -218,11 +233,13 @@
 }
 
 @keyframes rapidPulse {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.6;
     transform: scale(1.15);
@@ -230,11 +247,13 @@
 }
 
 @keyframes hyperPulse {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1.2);
   }
+
   50% {
     opacity: 0.5;
     transform: scale(1.3);
@@ -242,20 +261,24 @@
 }
 
 @keyframes urgentPulse {
+
   0%,
   100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.1);
   }
 }
 
 @keyframes urgentBlink {
+
   0%,
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -265,16 +288,19 @@
   0% {
     transform: rotate(-90deg);
   }
+
   100% {
     transform: rotate(270deg);
   }
 }
 
 @keyframes glow {
+
   0%,
   100% {
     box-shadow: 0 0 20px rgba(var(--color-accent), 0.3);
   }
+
   50% {
     box-shadow: 0 0 30px rgba(var(--color-accent), 0.6);
   }
@@ -285,18 +311,22 @@
     transform: scale(0) rotate(0deg);
     opacity: 0;
   }
+
   20% {
     transform: scale(1.3) rotate(5deg);
     opacity: 1;
   }
+
   40% {
     transform: scale(1.1) rotate(-2deg);
     opacity: 1;
   }
+
   60% {
     transform: scale(1.2) rotate(1deg);
     opacity: 1;
   }
+
   100% {
     transform: scale(1.5) rotate(0deg);
     opacity: 0;
@@ -304,6 +334,7 @@
 }
 
 @keyframes scoreGlow {
+
   0%,
   100% {
     text-shadow:
@@ -311,6 +342,7 @@
       0 0 20px currentColor,
       0 0 30px currentColor;
   }
+
   50% {
     text-shadow:
       0 0 20px currentColor,
@@ -320,6 +352,7 @@
 }
 
 @keyframes timesUpPulse {
+
   0%,
   100% {
     transform: scale(1);
@@ -329,6 +362,7 @@
       0 0 30px #ef4444,
       0 0 40px #ef4444;
   }
+
   50% {
     transform: scale(1.1);
     text-shadow:
@@ -340,11 +374,13 @@
 }
 
 @keyframes dramaPulse {
+
   0%,
   100% {
     transform: scale(1.2);
     opacity: 1;
   }
+
   50% {
     transform: scale(1.4);
     opacity: 0.8;
@@ -355,6 +391,7 @@
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -364,6 +401,7 @@
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(100%);
   }
@@ -395,6 +433,7 @@
 
 /* ===== COMPONENT STYLES ===== */
 @layer components {
+
   /* Modern Card */
   .modern-card {
     background: rgb(var(--color-bg-card));
@@ -441,12 +480,10 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(
-      45deg,
-      transparent 30%,
-      rgba(255, 255, 255, 0.1) 50%,
-      transparent 70%
-    );
+    background: linear-gradient(45deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.1) 50%,
+        transparent 70%);
     transform: translateX(-100%);
     transition: transform 0.6s;
   }
@@ -495,11 +532,9 @@
     transition: all 0.3s ease;
     font-weight: 700;
     text-align: left;
-    background: linear-gradient(
-      135deg,
-      rgb(var(--color-bg-card)) 0%,
-      rgb(var(--color-bg-card-hover)) 100%
-    );
+    background: linear-gradient(135deg,
+        rgb(var(--color-bg-card)) 0%,
+        rgb(var(--color-bg-card-hover)) 100%);
     transform: translateY(0);
     box-shadow:
       0 6px 20px rgba(var(--color-shadow), 0.15),
@@ -515,11 +550,9 @@
   .quiz-option:hover,
   .quiz-option-big:hover {
     border-color: rgb(var(--color-accent));
-    background: linear-gradient(
-      135deg,
-      rgb(var(--color-bg-card-hover)) 0%,
-      rgba(var(--accent-rgb), 0.1) 100%
-    );
+    background: linear-gradient(135deg,
+        rgb(var(--color-bg-card-hover)) 0%,
+        rgba(var(--accent-rgb), 0.1) 100%);
     transform: translateY(-2px);
     box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.25);
   }
@@ -533,11 +566,9 @@
   .quiz-option.correct,
   .quiz-option-big.correct {
     border-color: rgb(var(--color-success));
-    background: linear-gradient(
-      135deg,
-      rgba(var(--success-rgb), 0.15) 0%,
-      rgba(var(--success-rgb), 0.05) 100%
-    );
+    background: linear-gradient(135deg,
+        rgba(var(--success-rgb), 0.15) 0%,
+        rgba(var(--success-rgb), 0.05) 100%);
     color: rgb(var(--color-success));
     animation: correctPulse 0.6s ease-out;
     box-shadow: 0 8px 24px rgba(var(--success-rgb), 0.3);
@@ -546,11 +577,9 @@
   .quiz-option.incorrect,
   .quiz-option-big.incorrect {
     border-color: rgb(var(--color-error));
-    background: linear-gradient(
-      135deg,
-      rgba(var(--error-rgb), 0.15) 0%,
-      rgba(var(--error-rgb), 0.05) 100%
-    );
+    background: linear-gradient(135deg,
+        rgba(var(--error-rgb), 0.15) 0%,
+        rgba(var(--error-rgb), 0.05) 100%);
     color: rgb(var(--color-error));
     animation: incorrectShake 0.6s ease-out;
     box-shadow: 0 8px 24px rgba(var(--error-rgb), 0.3);
@@ -614,27 +643,35 @@
   .bg-primary {
     background-color: rgb(var(--color-bg-primary));
   }
+
   .bg-secondary {
     background-color: rgb(var(--color-bg-secondary));
   }
+
   .bg-tertiary {
     background-color: rgb(var(--color-bg-tertiary));
   }
+
   .bg-card {
     background-color: rgb(var(--color-bg-card));
   }
+
   .bg-card-hover {
     background-color: rgb(var(--color-bg-card-hover));
   }
+
   .bg-accent {
     background-color: rgb(var(--color-accent));
   }
+
   .bg-success {
     background-color: rgb(var(--color-success));
   }
+
   .bg-error {
     background-color: rgb(var(--color-error));
   }
+
   .bg-warning {
     background-color: rgb(var(--color-warning));
   }
@@ -642,21 +679,27 @@
   .text-primary {
     color: rgb(var(--color-text-primary));
   }
+
   .text-secondary {
     color: rgb(var(--color-text-secondary));
   }
+
   .text-tertiary {
     color: rgb(var(--color-text-tertiary));
   }
+
   .text-accent {
     color: rgb(var(--color-accent));
   }
+
   .text-success {
     color: rgb(var(--color-success));
   }
+
   .text-error {
     color: rgb(var(--color-error));
   }
+
   .text-warning {
     color: rgb(var(--color-warning));
   }
@@ -664,18 +707,23 @@
   .border-primary {
     border-color: rgb(var(--color-border));
   }
+
   .border-secondary {
     border-color: rgb(var(--color-border-hover));
   }
+
   .border-accent {
     border-color: rgb(var(--color-accent));
   }
+
   .border-success {
     border-color: rgb(var(--color-success));
   }
+
   .border-error {
     border-color: rgb(var(--color-error));
   }
+
   .border-warning {
     border-color: rgb(var(--color-warning));
   }
@@ -696,11 +744,13 @@
 
 /* Pulsing animation for timer background */
 @keyframes timer-pulse {
+
   0%,
   100% {
     transform: scale(1);
     opacity: 0.8;
   }
+
   50% {
     transform: scale(1.05);
     opacity: 1;
@@ -709,10 +759,12 @@
 
 /* Shake animation for critical moments */
 @keyframes timer-shake {
+
   0%,
   100% {
     transform: translateX(0);
   }
+
   10%,
   30%,
   50%,
@@ -720,6 +772,7 @@
   90% {
     transform: translateX(-4px);
   }
+
   20%,
   40%,
   60%,
@@ -750,19 +803,23 @@
   0% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.05);
   }
+
   100% {
     transform: scale(1);
   }
 }
 
 @keyframes incorrectShake {
+
   0%,
   100% {
     transform: translateX(0);
   }
+
   10%,
   30%,
   50%,
@@ -770,6 +827,7 @@
   90% {
     transform: translateX(-8px);
   }
+
   20%,
   40%,
   60%,
@@ -783,6 +841,7 @@
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -794,6 +853,7 @@
     opacity: 0;
     transform: translateY(-30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -805,6 +865,7 @@
     opacity: 0;
     transform: scale(0.9);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -812,11 +873,13 @@
 }
 
 @keyframes pulse {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.8;
     transform: scale(1.05);
@@ -824,11 +887,13 @@
 }
 
 @keyframes fastPulse {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.1);
@@ -836,11 +901,13 @@
 }
 
 @keyframes rapidPulse {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.6;
     transform: scale(1.15);
@@ -848,11 +915,13 @@
 }
 
 @keyframes hyperPulse {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1.2);
   }
+
   50% {
     opacity: 0.5;
     transform: scale(1.3);
@@ -860,20 +929,24 @@
 }
 
 @keyframes urgentPulse {
+
   0%,
   100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.1);
   }
 }
 
 @keyframes urgentBlink {
+
   0%,
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -883,16 +956,19 @@
   0% {
     transform: rotate(-90deg);
   }
+
   100% {
     transform: rotate(270deg);
   }
 }
 
 @keyframes glow {
+
   0%,
   100% {
     box-shadow: 0 0 20px rgba(var(--color-accent), 0.3);
   }
+
   50% {
     box-shadow: 0 0 30px rgba(var(--color-accent), 0.6);
   }
@@ -1014,18 +1090,22 @@
     transform: scale(0) rotate(0deg);
     opacity: 0;
   }
+
   20% {
     transform: scale(1.3) rotate(5deg);
     opacity: 1;
   }
+
   40% {
     transform: scale(1.1) rotate(-2deg);
     opacity: 1;
   }
+
   60% {
     transform: scale(1.2) rotate(1deg);
     opacity: 1;
   }
+
   100% {
     transform: scale(1.5) rotate(0deg);
     opacity: 0;
@@ -1054,22 +1134,33 @@
 
 .multiplier-pop-1 {
   color: #ff6b35;
-} /* Reddit orange */
+}
+
+/* Reddit orange */
 .multiplier-pop-2 {
   color: #ff4500;
-} /* Classic Reddit red */
+}
+
+/* Classic Reddit red */
 .multiplier-pop-3 {
   color: #ff0000;
-} /* Bright red */
+}
+
+/* Bright red */
 .multiplier-pop-4 {
   color: #ffd700;
-} /* Gold for high streaks */
+}
+
+/* Gold for high streaks */
 .multiplier-pop-5 {
   color: #ff1493;
-} /* Hot pink for max streak */
+}
+
+/* Hot pink for max streak */
 
 /* Score Glow Effect */
 @keyframes scoreGlow {
+
   0%,
   100% {
     text-shadow:
@@ -1077,6 +1168,7 @@
       0 0 20px currentColor,
       0 0 30px currentColor;
   }
+
   50% {
     text-shadow:
       0 0 20px currentColor,
@@ -1103,6 +1195,7 @@
 }
 
 @keyframes timesUpPulse {
+
   0%,
   100% {
     transform: scale(1);
@@ -1112,6 +1205,7 @@
       0 0 30px #ef4444,
       0 0 40px #ef4444;
   }
+
   50% {
     transform: scale(1.1);
     text-shadow:
@@ -1131,27 +1225,29 @@
 .leaderboard-item:nth-child(1) {
   animation-delay: 0.1s;
 }
+
 .leaderboard-item:nth-child(2) {
   animation-delay: 0.2s;
 }
+
 .leaderboard-item:nth-child(3) {
   animation-delay: 0.3s;
 }
+
 .leaderboard-item:nth-child(4) {
   animation-delay: 0.4s;
 }
+
 .leaderboard-item:nth-child(5) {
   animation-delay: 0.5s;
 }
 
 /* Loading States */
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(var(--color-bg-tertiary), 0.5) 0%,
-    rgba(var(--color-bg-secondary), 0.8) 50%,
-    rgba(var(--color-bg-tertiary), 0.5) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(var(--color-bg-tertiary), 0.5) 0%,
+      rgba(var(--color-bg-secondary), 0.8) 50%,
+      rgba(var(--color-bg-tertiary), 0.5) 100%);
   background-size: 200% 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
 }
@@ -1160,6 +1256,7 @@
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -1179,12 +1276,10 @@
   top: 0;
   left: 0;
   height: 100%;
-  background: linear-gradient(
-    45deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.2) 50%,
-    transparent 70%
-  );
+  background: linear-gradient(45deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.2) 50%,
+      transparent 70%);
   animation: progress-shine 2s ease-in-out infinite;
   width: 100%;
 }
@@ -1193,6 +1288,7 @@
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(100%);
   }
@@ -1232,6 +1328,7 @@
 
 /* Accessibility Improvements */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -1243,6 +1340,7 @@
 
 /* Dark mode text contrast fixes */
 @media (prefers-color-scheme: dark) {
+
   /* Ensure all text is visible in dark mode */
   body,
   .dark {
@@ -1467,6 +1565,7 @@
 }
 
 @keyframes victoryGlow {
+
   0%,
   100% {
     transform: scale(1.2) !important;
@@ -1477,6 +1576,7 @@
       0 0 15px #ffd700,
       0 0 20px #ffd700 !important;
   }
+
   50% {
     transform: scale(1.3) !important;
     opacity: 0.95 !important;
@@ -1489,11 +1589,13 @@
 }
 
 @keyframes dramaPulse {
+
   0%,
   100% {
     transform: scale(1.1) !important;
     opacity: 1 !important;
   }
+
   50% {
     transform: scale(1.2) !important;
     opacity: 0.8 !important;
@@ -1503,11 +1605,13 @@
 /* Mobile adjustments */
 @media (max-width: 767px) {
   @keyframes dramaPulse {
+
     0%,
     100% {
       transform: scale(1.05) !important;
       opacity: 1 !important;
     }
+
     50% {
       transform: scale(1.1) !important;
       opacity: 0.9 !important;
@@ -1534,11 +1638,13 @@
 
 /* Pulse animation for connection dots */
 @keyframes connectionPulse {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.6;
     transform: scale(1.2);
@@ -1561,6 +1667,7 @@
     opacity: 0;
     transform: translateY(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1572,6 +1679,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -1609,11 +1717,13 @@
 }
 
 @keyframes celebrationPulse {
+
   0%,
   100% {
     transform: scale(1);
     opacity: 1;
   }
+
   50% {
     transform: scale(1.05);
     opacity: 0.9;

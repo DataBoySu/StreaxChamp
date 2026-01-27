@@ -24,7 +24,7 @@ export interface LandingSummaryData {
 const CACHE_KEY = 'streax.landingSummary';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-export const useLandingSummary = (enabled: boolean) => {
+export const useLandingSummary = (enabled: boolean, pollingEnabled = true) => {
   const [data, setData] = useState<LandingSummaryData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,9 +92,14 @@ export const useLandingSummary = (enabled: boolean) => {
     } catch {/* ignore */ }
   }, [enabled]);
 
-  // Use exponential backoff polling
+  // Initial fetch (once) if polling is disabled/not starting immediately
+  useEffect(() => {
+    if (enabled) void fetchSummary();
+  }, [enabled, fetchSummary]);
+
+  // Use exponential backoff polling (gated by pollingEnabled)
   const { reset } = useBackoffPolling(fetchSummary, {
-    enabled,
+    enabled: enabled && pollingEnabled,
     initialInterval: 3000,
     maxInterval: 60000,
     backoffMultiplier: 1.5,
