@@ -47,10 +47,23 @@ export const CONFIG = {
                 'My sincere apologies. Come back another time, perhaps?'
             ]
         },
+        HARDCODED_DIALOGUES: [
+            "Halt! State your business at the keep's edge.",
+            "Oh, another one? Fine, fine. Step through the gate, but be quick about it.",
+            "Are you still loitering? This watch does not reward idleness.",
+            "The keep is open to those of high spirit. Are you one of them?",
+            "Stop poking me! I have a post to maintain, you know.",
+            "You look like you've seen a ghost. Or... just too many trivia questions?",
+            "The archives within are quite heavy. Best not to enter if your mind is soft.",
+            "Welcome to the watch. Try not to break anything, especially my patience.",
+            "A moment of your time? No? Good. My time is precious.",
+            "Move along, move along. These gates don't stay open for the sluggish."
+        ],
         PROMPTS: {
             SYSTEM: `Role-play as a medieval guardsman who treats this application as his charge: haughty, easily irritated, and dislikes being disturbed — yet greets newcomers politely at first. Speak as the app's guardsman and refer to the application metaphorically (examples: "the keep", "the gate", "these gates", "this place", "the watch"), but DO NOT use the words "town", "towns", "townsguard" or "village" anywhere in the output. The app is it's figurative town. Short, punchy lines (max 80 chars), witty, a cute puffball of anger with an old man's patience. No profanity. No markdown.
-Write 5 new standalone lines suitable for a landing page mascot. Keep them varied: greetings for new players, snark when hovered too long, and a final push to enter the app.
-Return STRICT JSON: { "lines": ["...","...","...","...","..."] } and NOTHING else.`
+                    Write 5 new standalone lines suitable for a landing page mascot. 
+                    Keep them varied: greetings for new players, snark when hovered too long, and a final push to enter the app.
+                    Return STRICT JSON: { "lines": ["...","...","...","...","..."] } and NOTHING else.`
         }
     },
     BROWSERLESS: {
@@ -66,10 +79,10 @@ Return STRICT JSON: { "lines": ["...","...","...","...","..."] } and NOTHING els
         BUILD_ENV: process.env.NODE_ENV || 'development',
     },
     GEMINI: {
-        /** Cheapest model for simple tasks like normalization & categorization */
-        LITE_MODEL: 'gemini-2.5-flash',
-        /** Capable model for complex reasoning and creative generation */
-        CONTENT_MODEL: 'gemini-2.5-flash',
+        /** Prioritized list for simple tasks like robot banter & health checks */
+        BACKUP_LITE_MODELS: ['gemini-2.5-flash-lite'],
+        /** Prioritized list for complex reasoning and quiz generation */
+        BACKUP_CONTENT_MODELS: ['gemini-2.5-flash', 'gemini-3-flash'],
         PROMPTS: {
 
             QUIZ_GENERATOR: `SYSTEM ROLE: You are a headless QUIZ GENERATOR. Your ONLY function is to output question data in JSON.
@@ -118,4 +131,8 @@ Return STRICT JSON: { "lines": ["...","...","...","...","..."] } and NOTHING els
                                 }`
         }
     },
+    GEMMA: {
+        MODEL_ID: 'gemma-3-12b-it',
+        API_ENDPOINT_TEMPLATE: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
+    }
 };
