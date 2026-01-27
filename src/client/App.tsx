@@ -9,6 +9,7 @@ import { useLeaderboard } from './hooks/useLeaderboard';
 import { useLandingSummary } from './hooks/useLandingSummary';
 import { useHistory } from './hooks/useHistory';
 import { useBackgroundMusic } from './hooks/useBackgroundMusic';
+import { useUserActivity } from './hooks/useUserActivity';
 import { CONFIG } from '../shared/constants';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { LandingHero } from './components/landing/LandingHero';
@@ -78,7 +79,7 @@ export const App = () => {
   });
 
   // Background music system
-  const { isMuted, toggleMute, setMode, playClick } = useBackgroundMusic();
+  const { isMuted, toggleMute, setMode } = useBackgroundMusic();
 
   // Handle music mode switching
   useEffect(() => {
@@ -92,16 +93,20 @@ export const App = () => {
   // Handle volume toggle (replace setMusicOn with toggleMute)
   // ... (UI binding happens in the render block)
 
+  // Activity detection for smart polling (60s timeout)
+  const isUserActive = useUserActivity(60000);
+  const pollingEnabled = !showSplash && isUserActive;
+
   // Leaderboard hook (per selected topic)
   // Enable leaderboard as soon as quiz ends (showScore) or while viewing start screen for previously selected topic
   const { entries: topicLeaderboard, loading: topicLbLoading, submitScore: submitLeaderboardScore, refresh: refreshTopicLeaderboard } = useLeaderboard({ slug: selectedTopic?.slug || null, enabled: !!selectedTopic && (showScore || !quizStarted) });
-  const { data: landingSummary, loading: landingSummaryLoading } = useLandingSummary(!quizStarted && !showScore);
+  const { data: landingSummary, loading: landingSummaryLoading } = useLandingSummary(!quizStarted && !showScore, pollingEnabled);
   const { username: hookUsername } = useUsername();
 
   // No manual sign-in logic needed
 
   // Use new global play history hook
-  const { history: globalHistory, loading: globalHistoryLoading, savePlay, hasPlayed } = useHistory(!quizStarted);
+  const { history: globalHistory, loading: globalHistoryLoading, savePlay, hasPlayed } = useHistory(!quizStarted, pollingEnabled);
 
   // Transform global history to match UI expectations
   const history = useMemo(() => {
@@ -185,17 +190,12 @@ export const App = () => {
       if (userResponse.ok) {
         const userData = await userResponse.json();
         setUserInfo(userData);
-      } else {
         setUserInfo({ userId: null, username: 'Guest', displayName: 'Guest' });
       }
     } catch {
       setUserInfo({ userId: null, username: 'Guest', displayName: 'Guest' });
     }
   };
-
-  // username fetch debug removed
-
-
 
   useEffect(() => {
     void loadUserData();
@@ -633,12 +633,7 @@ export const App = () => {
               {isMuted ? '♪ Music Off' : '♪ Music On'}
             </button>
           </div>
-          {authUser && (
-            <div className="flex items-center gap-2 text-xs text-secondary font-semibold px-2 py-1 rounded bg-base-200">
-              {(() => { const u = authUser ? authUser.redditUsername : ''; const keep = Math.max(1, Math.ceil(u.length * 0.3)); const masked = '*'.repeat(Math.max(0, u.length - keep)) + u.slice(-keep); return <span className="text-accent">{masked}</span>; })()}
-              <span>{authUser.nickname}</span>
-            </div>
-          )}
+
         </div>
 
         {/* AuthModal Removed - Implicit Auth Only */}

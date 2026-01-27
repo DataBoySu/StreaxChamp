@@ -7,11 +7,11 @@ import { Devvit } from '@devvit/public-api';
 
 export async function testSubredditContext(context: any, subredditName: string = 'streax_app_test') {
   console.log(`🧪 Testing context extraction for r/${subredditName}`);
-  
+
   try {
     // Get subreddit information
     const subreddit = await context.reddit.getSubredditByName(subredditName);
-    
+
     const contextData = {
       name: subreddit.name,
       displayName: subreddit.displayName,
@@ -21,15 +21,15 @@ export async function testSubredditContext(context: any, subredditName: string =
       subscribers: subreddit.subscribers,
       created: subreddit.createdAt
     };
-    
+
     console.log('📋 Extracted Context:', JSON.stringify(contextData, null, 2));
-    
+
     // Test source discovery logic
     const sources = discoverSources(contextData);
     console.log('🎯 Discovered Sources:', sources);
-    
+
     return { contextData, sources };
-    
+
   } catch (error) {
     console.error('❌ Error testing context extraction:', error);
     return null;
@@ -39,7 +39,7 @@ export async function testSubredditContext(context: any, subredditName: string =
 function discoverSources(context: any): string[] {
   const { name, description = '', title = '', displayName = '' } = context;
   const allText = `${name} ${description} ${title} ${displayName}`.toLowerCase();
-  
+
   // Gaming patterns
   const gamingPatterns = {
     'darksouls': ['darksouls.wiki.fextralife.com'],
@@ -53,7 +53,7 @@ function discoverSources(context: any): string[] {
     'minecraft': ['minecraft.fandom.com'],
     'pokemon': ['pokemon.fandom.com']
   };
-  
+
   // Category patterns
   const categoryPatterns = {
     gaming: ['game', 'gaming', 'gamer', 'rpg', 'mmo', 'fps', 'strategy', 'indie'],
@@ -62,9 +62,9 @@ function discoverSources(context: any): string[] {
     history: ['history', 'historical', 'ancient', 'medieval', 'war', 'civilization'],
     education: ['education', 'learning', 'study', 'academic', 'university', 'school']
   };
-  
+
   const discoveredSources: string[] = [];
-  
+
   // Check for specific gaming sources
   for (const [keyword, sources] of Object.entries(gamingPatterns)) {
     if (allText.includes(keyword)) {
@@ -72,13 +72,13 @@ function discoverSources(context: any): string[] {
       console.log(`🎮 Found gaming keyword: ${keyword}`);
     }
   }
-  
+
   // Check for general categories
   for (const [category, keywords] of Object.entries(categoryPatterns)) {
     const matches = keywords.filter(keyword => allText.includes(keyword));
     if (matches.length > 0) {
       console.log(`📚 Found category: ${category} (matches: ${matches.join(', ')})`);
-      
+
       switch (category) {
         case 'gaming':
           if (discoveredSources.length === 0) {
@@ -100,13 +100,13 @@ function discoverSources(context: any): string[] {
       }
     }
   }
-  
+
   // Fallback to general Wikipedia if no specific sources found
   if (discoveredSources.length === 0) {
     console.log('📖 No specific sources found, using Wikipedia fallback');
     discoveredSources.push('en.wikipedia.org');
   }
-  
+
   return [...new Set(discoveredSources)]; // Remove duplicates
 }
 
@@ -119,7 +119,7 @@ export const testContextMenuItem = Devvit.addMenuItem({
     try {
       const currentSubreddit = await context.reddit.getCurrentSubreddit();
       const result = await testSubredditContext(context, currentSubreddit.name);
-      
+
       if (result) {
         context.ui.showToast(
           `Context extracted! Found ${result.sources.length} sources. Check logs for details.`
