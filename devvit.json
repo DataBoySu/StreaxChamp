@@ -29,6 +29,16 @@
   "media": {
     "dir": "dist/client/assets"
   },
+  "menu": {
+    "items": [
+      {
+        "label": "Create Daily Quiz Post",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/create-post"
+      }
+    ]
+  },
   "dev": {
     "subreddit": "streax_champ_dev"
   }

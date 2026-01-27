@@ -8,11 +8,17 @@ export const createPost = async (redditClient: any, subredditNameArg?: string) =
     : undefined;
   const subredditName = String(subredditNameArg || ctxSubreddit || process.env.DEVVIT_SUBREDDIT || CONFIG.SERVER.DEFAULT_SUBREDDIT);
 
-  const post = await redditClient.submitCustomPost({
-    subredditName,
-    title: `${CONFIG.GAME.NAME} — Daily Quiz`,
-    entry: 'default'
-  });
-
-  return post;
+  console.log(`[createPost] Submitting custom post to r/${subredditName} with entry 'default'`);
+  try {
+    const post = await redditClient.submitCustomPost({
+      subredditName,
+      title: `${CONFIG.GAME.NAME} — Daily Quiz`,
+      entry: 'default'
+    });
+    console.log(`[createPost] Success! Post ID: ${post.id}`);
+    return post;
+  } catch (e) {
+    console.error('[createPost] Error submitting custom post:', e);
+    throw e;
+  }
 };
