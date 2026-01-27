@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { Logger } from '../Logger';
-import { generateQuizWithGemini } from '../services/GeminiService';
-import { validateGeminiKey } from '../services/GeminiService';
+import { generateUnifiedContent, validateGeminiKey } from '../services/GeminiService';
 
 /**
  * Controller for managing quizzes, including daily bonus questions and full daily/topic quizzes.
@@ -29,24 +28,26 @@ export class QuizController {
             }
 
             // Generate if missing
-            const gen = await generateQuizWithGemini('Ultra Obscure Interdisciplinary Trivia', ['https://en.wikipedia.org/wiki/Knowledge'], undefined);
-            const q = gen.questions && gen.questions.length ? gen.questions[0] : undefined;
+            const gen = await generateUnifiedContent('Ultra Obscure Interdisciplinary Trivia');
+            const q = gen.quiz?.questions?.[0];
 
             if (!q) return res.json(null);
 
             const opts = Array.isArray(q.options) ? q.options.slice(0, 4) : [];
+            const correctIdx = Number(q.correctAnswer) || 0;
+
             if ((q.question || '').trim() && opts.length === 4) {
                 await fs.saveDailyBonusQuestion(date, {
                     question: q.question,
                     options: opts,
-                    correctAnswer: typeof q.correctAnswer === 'number' ? q.correctAnswer : 0,
+                    correctAnswer: correctIdx,
                     difficulty: 'extreme'
                 });
 
                 return res.json({
                     question: q.question,
                     options: opts,
-                    correctIndex: Math.min(Math.max(q.correctAnswer, 0), 3)
+                    correctIndex: Math.min(Math.max(correctIdx, 0), 3)
                 });
             }
             return res.json(null);
@@ -73,12 +74,27 @@ export class QuizController {
 
             // Cache Miss: Generate via AI
             Logger.db('[DailyQuiz] Cache Miss - Initiating AI generation...', { date: new Date().toISOString().slice(0, 10) });
-            const generated = await generateQuizWithGemini('General Knowledge', ['https://en.wikipedia.org/wiki/General_knowledge']);
+            const generated = await generateUnifiedContent('General Knowledge');
+
+            const questions = generated.quiz.questions.map((q: any) => ({
+                id: `q${Date.now()}`,
+                question: q.question,
+                options: q.options,
+                correctAnswer: Number(q.correctAnswer) || 0,
+                difficulty: String(q.difficulty || 'medium'),
+                category: String(q.category || 'General'),
+                explanation: q.explanation,
+                createdAt: new Date().toISOString()
+            }));
 
             const saved = await firestoreService.saveTodaysQuiz({
-                questions: generated.questions,
+                questions: questions,
                 metadata: {
-                    ...generated.metadata,
+                    generatedAt: new Date().toISOString(),
+                    sourceWikis: generated.topic.sources,
+                    version: 'v4-unified',
+                    model: generated.model,
+                    generator: 'gemini',
                     topic: 'General Knowledge',
                     difficulty: 'mixed'
                 }
@@ -93,8 +109,14 @@ export class QuizController {
             const todayResult = new Date().toISOString().slice(0, 10);
             return res.status(200).json({
                 id: todayResult,
-                questions: generated.questions,
-                metadata: generated.metadata
+                questions: questions,
+                metadata: {
+                    generatedAt: new Date().toISOString(),
+                    sourceWikis: generated.topic.sources,
+                    version: 'v4-unified',
+                    model: generated.model,
+                    generator: 'gemini'
+                }
             });
 
         } catch (error) {
@@ -121,15 +143,34 @@ export class QuizController {
             const topicBase = await fs.getTopic(slug);
             if (!topicBase) return res.status(404).json({ error: 'TOPIC_NOT_FOUND' });
 
-            const generatedTopic = await generateQuizWithGemini(
-                String(topicBase.title || 'General Knowledge'),
-                Array.isArray(topicBase.sources) ? topicBase.sources : []
-            );
+            const generated = await generateUnifiedContent(String(topicBase.title || 'General Knowledge'));
 
-            const successStatus = await fs.saveTopicQuiz(slug, today, generatedTopic);
+            const questions = generated.quiz.questions.map((q: any) => ({
+                id: `q${Date.now()}`,
+                question: q.question,
+                options: q.options,
+                correctAnswer: Number(q.correctAnswer) || 0,
+                difficulty: String(q.difficulty || 'medium'),
+                category: String(q.category || topicBase.title || 'General'),
+                explanation: q.explanation,
+                createdAt: new Date().toISOString()
+            }));
+
+            const quizPayload = {
+                questions: questions,
+                metadata: {
+                    generatedAt: new Date().toISOString(),
+                    sourceWikis: generated.topic.sources,
+                    version: 'v4-unified',
+                    model: generated.model,
+                    generator: 'gemini'
+                }
+            };
+
+            const successStatus = await fs.saveTopicQuiz(slug, today, quizPayload);
             if (!successStatus) Logger.error('[QuizSaveFail]', { slug, today });
 
-            res.json({ id: today, date: today, topicSlug: slug, ...generatedTopic });
+            res.json({ id: today, date: today, topicSlug: slug, ...quizPayload });
         } catch (e) {
             Logger.error('[TopicQuizGen] error', e);
             res.status(500).json({ error: 'QUIZ_GEN_FAILED' });

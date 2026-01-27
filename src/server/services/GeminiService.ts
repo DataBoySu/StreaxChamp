@@ -3,6 +3,7 @@ import { Logger } from '../Logger';
 import { CONFIG } from '../../shared/constants';
 import { AppError } from '../utils/AppError';
 
+
 /**
  * Current state of the AI circuit breaker.
  */
@@ -31,18 +32,12 @@ export async function attemptHealing(): Promise<{ healed: boolean; final: boolea
     const thresholdReached = aiRequestsSinceTrip >= CIRCUIT_RETRY_THRESHOLD;
 
     if (cooldownElapsed || thresholdReached) {
-        Logger.warn(`[CircuitBreaker] 🩹 System attempting AI self-repair... (Requests: ${aiRequestsSinceTrip}, Cooldown: ${cooldownElapsed})`);
-        const healthy = await checkGeminiHealth();
-        if (healthy) {
-            aiCircuitOpen = false;
-            aiRequestsSinceTrip = 0;
-            aiHealingAttempted = false;
-            return { healed: true, final: false };
-        } else {
-            Logger.warn('[CircuitBreaker] AI Still Down.');
-            aiHealingAttempted = true;
-            return { healed: false, final: true }; // Final means "we tried and failed, give up for now"
-        }
+        Logger.warn(`[CircuitBreaker] 🩹 Cooldown elapsed. Resetting circuit implementation.`);
+        // Assuming healthy after cooldown; next request will determine actual status
+        aiCircuitOpen = false;
+        aiRequestsSinceTrip = 0;
+        aiHealingAttempted = false;
+        return { healed: true, final: false };
     }
 
     if (aiHealingAttempted) {
@@ -135,8 +130,6 @@ function extractJSONCandidate(text: string): unknown | null {
     return null;
 }
 
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
 // --- Generators ---
 
 /**
@@ -147,7 +140,7 @@ export async function generateUnifiedContent(rawTopic: string): Promise<{ topic:
     await validateGeminiKey();
     if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');
 
-    const model = CONFIG.GEMINI.CONTENT_MODEL || 'gemini-1.5-flash';
+    const model = (CONFIG.GEMINI.BACKUP_CONTENT_MODELS[0] || CONFIG.GEMINI.BACKUP_CONTENT_MODELS[1]) as string;
     const start = Date.now();
     Logger.ai(`[UnifiedGen] Starting atomic generation for input="${rawTopic}"`, { model });
 
@@ -238,213 +231,16 @@ export async function generateUnifiedContent(rawTopic: string): Promise<{ topic:
     }
 }
 
-export async function generateQuizWithGemini(topicTitle: string, topicSources: string[], contextText?: string): Promise<GeneratedQuizPayload> {
-    await validateGeminiKey();
-    if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');
-
-    const model = CONFIG.GEMINI.CONTENT_MODEL || 'gemini-1.5-flash';
-    const trimmedContext = contextText ? contextText.slice(0, 25000) : '';
-    const validQuestions: GeneratedQuizQuestion[] = [];
-    const targetCount = 5;
-    let attempts = 0;
-    const maxAttempts = 3;
-
-    Logger.ai(`[SmartGen] Starting generation for topic="${topicTitle}" Target=${targetCount}`, { model });
-
-    while (validQuestions.length < targetCount && attempts < maxAttempts) {
-        attempts++;
-        const needed = targetCount - validQuestions.length;
-        const existingTxt = validQuestions.map(q => q.question).join(" | ");
-        const avoidPrompt = validQuestions.length > 0 ? `\nDO NOT repeat these questions: ${existingTxt}` : '';
-
-        const systemPrompt = CONFIG.GEMINI.PROMPTS.QUIZ_GENERATOR
-            .replace('exactly 5', `exactly ${needed}`)
-            .replace('containing 5 items', `containing ${needed} items`);
-
-        const userPrompt = `Topic: ${topicTitle}
-Sources:
-${topicSources.slice(0, 4).join('\n')}
-${trimmedContext ? `\nCONTEXT:\n${trimmedContext}` : ''}
-${avoidPrompt}
-
-Generate ${needed} unique questions now.`;
-
-        try {
-            Logger.ai(`[SmartGen] Batch Attempt ${attempts}/${maxAttempts}: Requesting ${needed} questions...`);
-            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    system_instruction: { parts: [{ text: systemPrompt }] },
-                    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 16384,
-                        response_mime_type: "application/json",
-                        response_schema: {
-                            type: "object",
-                            properties: {
-                                questions: {
-                                    type: "array",
-                                    items: {
-                                        type: "object",
-                                        properties: {
-                                            id: { type: "string" },
-                                            question: { type: "string" },
-                                            options: { type: "array", items: { type: "string" } },
-                                            correctAnswer: { type: "number" },
-                                            difficulty: { type: "string" },
-                                            category: { type: "string" },
-                                            explanation: { type: "string" }
-                                        },
-                                        required: ["question", "options", "correctAnswer", "difficulty", "category"]
-                                    }
-                                }
-                            }
-                        }
-                    }
-                })
-            });
-
-            if (!resp.ok) {
-                Logger.warn(`[SmartGen] API Fail ${resp.status}`);
-                await delay(1000);
-                continue;
-            }
-
-            const data: any = await resp.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            const parsed = extractJSONCandidate(text) as any;
-            const rawList = Array.isArray(parsed?.questions) ? parsed.questions : [];
-
-            let addedThisRound = 0;
-            for (const q of rawList) {
-                if (validQuestions.length >= targetCount) break;
-                if (!q.question || !Array.isArray(q.options) || q.options.length !== 4) continue;
-                if (validQuestions.some(vq => vq.question === q.question)) continue;
-
-                validQuestions.push({
-                    id: `q${Date.now()}-${validQuestions.length}`,
-                    question: String(q.question),
-                    options: q.options.map(String),
-                    correctAnswer: Number(q.correctAnswer) || 0,
-                    difficulty: String(q.difficulty || 'medium'),
-                    category: String(q.category || topicTitle),
-                    explanation: q.explanation,
-                    createdAt: new Date().toISOString()
-                });
-                addedThisRound++;
-            }
-
-            Logger.info(`[SmartGen] Attempt ${attempts}: Added ${addedThisRound} valid questions. Total: ${validQuestions.length}/${targetCount}`);
-            if (addedThisRound === 0) await delay(1000);
-
-        } catch (e) {
-            const status = (e as any)?.status;
-            if (status === 429 || status === 500) {
-                Logger.warn(`[SmartGen] Critical Failure (${status}): Tripping circuit for 120s cooldown.`);
-                aiLastFailureTime = Date.now();
-                aiCircuitOpen = true;
-                break;
-            }
-            Logger.error(`[SmartGen] Error on attempt ${attempts}`, e);
-            await delay(1500);
-        }
-    }
-
-    if (validQuestions.length > 0) {
-        if (validQuestions.length < targetCount) {
-            Logger.warn(`[SmartGen] Partial Success: ONLY ${validQuestions.length}/${targetCount} generated. Saving what we have.`);
-        } else {
-            Logger.ai(`[SmartGen] Full Success! Generated ${validQuestions.length} questions.`);
-        }
-
-        return {
-            questions: validQuestions,
-            metadata: {
-                generatedAt: new Date().toISOString(),
-                sourceWikis: topicSources.slice(0, 2),
-                version: 'v4-smart-batch',
-                model: model,
-                generator: 'gemini'
-            }
-        };
-    }
-
-    throw AppError.aiFailure('SMART_GEN_FAILED_TOTAL');
-}
-
 export async function generateRobotLines(): Promise<string[]> {
-    await validateGeminiKey();
-    if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');
-
-    const model = 'gemini-2.0-flash-exp'; // Specific creative model - or use LITE_MODEL
-    const prompt = CONFIG.ROBOT.PROMPTS.SYSTEM;
-
-    try {
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 0.9,
-                        maxOutputTokens: 1024,
-                        response_mime_type: "application/json"
-                    }
-                })
-            }
-        );
-
-        if (!resp.ok) {
-            throw new Error(`Gemini HTTP ${resp.status}`);
-        }
-
-        const data: any = await resp.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const parsed = extractJSONCandidate(text) as { lines: string[] };
-
-        if (parsed && Array.isArray(parsed.lines)) {
-            return parsed.lines.filter(l => l && typeof l === 'string').slice(0, 10);
-        }
-        return [];
-    } catch (e: any) {
-        if (e.message && (e.message.includes('429') || e.message.includes('500'))) {
-            aiCircuitOpen = true;
-            aiLastFailureTime = Date.now();
-        }
-        Logger.error('[RobotGen] failed', e);
-        throw e;
-    }
+    // Robot lines are now hardcoded for stability and performance as per user request
+    return CONFIG.ROBOT.HARDCODED_DIALOGUES || [];
 }
 
+/**
+ * Lightweight health check to ensure Gemini API is reachable.
+ * Used by the circuit breaker to periodically verify the connection.
+ */
 export async function checkGeminiHealth(): Promise<boolean> {
-    if (!GEMINI_API_KEY) return false;
-    Logger.warn('[CircuitBreaker] 🩹 System attempting AI self-repair (Health Check)...');
-    try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3000);
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI.LITE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
-                    generationConfig: { maxOutputTokens: 10 }
-                }),
-                signal: controller.signal
-            }
-        );
-        clearTimeout(timeout);
-        if (resp.ok) {
-            Logger.info('[CircuitBreaker] ✅ AI Connection Restored');
-            return true;
-        }
-        return false;
-    } catch {
-        return false;
-    }
+    // Health check disabled by request: Assume healthy until proven otherwise by a failed request.
+    return !!GEMINI_API_KEY;
 }

@@ -1,13 +1,11 @@
 import React from 'react';
 import LoadingDots from '../LoadingDots';
 import HotTopics from '../HotTopics';
+import { LandingSummaryData } from '../../hooks/useLandingSummary';
 
 interface GlobalDashboardProps {
     landingSummaryLoading: boolean;
-    landingSummary: {
-        globalTop: Array<{ nickname: string; slug: string; title: string; score: number }>;
-        hotTopics: Array<{ slug: string; title: string; description?: string }>;
-    } | null;
+    landingSummary: LandingSummaryData | null;
     refreshLanding: () => void;
     authUser: { nickname: string } | null;
     onSelectTopic: (slug: string, title: string) => void;

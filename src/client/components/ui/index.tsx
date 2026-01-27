@@ -34,25 +34,25 @@ export const ModernButton: React.FC<{
   className = '',
   size = 'md',
 }) => {
-  const sizeClasses = {
-    sm: 'px-4 py-2 text-sm',
-    md: 'px-6 py-3 text-base',
-    lg: 'px-8 py-4 text-lg',
-  };
+    const sizeClasses = {
+      sm: 'px-4 py-2 text-sm',
+      md: 'px-6 py-3 text-base',
+      lg: 'px-8 py-4 text-lg',
+    };
 
-  return (
-    <motion.button
-      className={`modern-button modern-button-${variant} ${sizeClasses[size]} ${className}`}
-      onClick={onClick}
-      disabled={disabled}
-      whileHover={disabled ? {} : { scale: 1.02 }}
-      whileTap={disabled ? {} : { scale: 0.98 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-    >
-      {children}
-    </motion.button>
-  );
-};
+    return (
+      <motion.button
+        className={`modern-button modern-button-${variant} ${sizeClasses[size]} ${className}`}
+        onClick={onClick}
+        disabled={disabled}
+        whileHover={disabled ? {} : { scale: 1.02 }}
+        whileTap={disabled ? {} : { scale: 0.98 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+      >
+        {children}
+      </motion.button>
+    );
+  };
 
 // Quiz Option Component
 export const QuizOption: React.FC<{
@@ -348,13 +348,12 @@ export const QuestionHeader: React.FC<{
         {Array.from({ length: totalQuestions }).map((_, i) => (
           <motion.div
             key={i}
-            className={`w-2 h-2 rounded-full ${
-              i < currentQuestion
-                ? 'bg-success'
-                : i === currentQuestion - 1
-                  ? 'bg-accent'
-                  : 'bg-border'
-            }`}
+            className={`w-2 h-2 rounded-full ${i < currentQuestion
+              ? 'bg-success'
+              : i === currentQuestion - 1
+                ? 'bg-accent'
+                : 'bg-border'
+              }`}
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: i * 0.05 }}
