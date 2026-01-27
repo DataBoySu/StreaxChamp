@@ -1,7 +1,5 @@
 # ✨ StreaxChamp ✨
-<p align ="center">
-<img src="./src/client/public/assets/poster.png" width="40%" alt="StreaxChamp Poster" />
-</p>
+![StreaxChamp Poster](https://raw.githubusercontent.com/DataBoySu/StreaxChamp/main/src/client/public/assets/poster.png)
 
 **(˶ᵔ ᵕ ᵔ˶) Helping your subreddit reach its final form! (˶ᵔ ᵕ ᵔ˶)**
 
