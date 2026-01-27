@@ -41,9 +41,9 @@ export const TopicSelector: React.FC<{
   const [generatingSlug, setGeneratingSlug] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [exclusiveSlug, setExclusiveSlug] = useState<string | null>(null);
-  const [inlineSuggestion, setInlineSuggestion] = useState('');
-  const [highlightedTopic, setHighlightedTopic] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [inlineSuggestion] = useState('');
+  const [highlightedTopic] = useState('');
+  const [loading] = useState(false);
   const [popularSlugs] = useState<string[]>(['science', 'technology', 'history', 'movies', 'sports']);
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const optimisticRef = useRef<Record<string, TopicDoc>>({});
@@ -416,7 +416,9 @@ export const TopicSelector: React.FC<{
 
       <QuizGenerationLoader
         isVisible={!!generatingSlug}
-        topicName={generatingSlug ? toTitleCase(topics.find(t => (t.slug === generatingSlug || slugify(t.name) === generatingSlug))?.name || generatingSlug) : undefined}
+        {...(generatingSlug ? {
+          topicName: toTitleCase(topics.find(t => (t.slug === generatingSlug || slugify(t.name) === generatingSlug))?.name || generatingSlug)
+        } : {})}
       />
     </div>
   );

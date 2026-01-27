@@ -9,12 +9,12 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
-  const [lines, setLines] = useState<string[]>([]);
+  const [lines] = useState<string[]>([]);
   const [exhausted, setExhausted] = useState(false);
   const [globalMousePosition, setGlobalMousePosition] = useState({ x: 0, y: 0 });
   const [progress, setProgress] = useState(0); // Progress bar (0-100)
-  const [systemStatus, setSystemStatus] = useState<{ ai: boolean; db: boolean }>({ ai: true, db: true });
-  const [healingActive, setHealingActive] = useState(false);
+  const [systemStatus] = useState<{ ai: boolean; db: boolean }>({ ai: true, db: true });
+  const [healingActive] = useState(false);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
 
