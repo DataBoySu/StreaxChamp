@@ -1,29 +1,52 @@
 import { useEffect, useState } from 'react';
 import { firebaseQuizService } from '../services/FirebaseQuizService';
 
+const CACHE_KEY = 'streax:topics';
+const CACHE_TTL = 600000; // 10 minutes in ms
+
 export function useTopics() {
   const [topics, setTopics] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // load cached topics from localStorage first
-    const raw = localStorage.getItem('streax:topics');
-    if (raw) {
-      try {
-        setTopics(JSON.parse(raw));
-        setLoading(false);
-      } catch { }
+    const cached = getCachedTopics();
+    if (cached) {
+      // Cache hit - use it immediately
+      setTopics(cached.data);
+      setLoading(false);
+      return; // Don't call API
     }
-    // then refresh from Firestore
+
+    // Cache miss - fetch from API
     refresh();
   }, []);
+
+  function getCachedTopics(): { data: any[]; ts: number } | null {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed.ts || !parsed.data) return null;
+
+      // Check if expired (TTL)
+      if (Date.now() - parsed.ts > CACHE_TTL) {
+        localStorage.removeItem(CACHE_KEY);
+        return null;
+      }
+
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
 
   async function refresh() {
     try {
       const serverTopics = await firebaseQuizService.getTopics?.();
       if (serverTopics && serverTopics.length) {
         setTopics(serverTopics);
-        localStorage.setItem('streax:topics', JSON.stringify(serverTopics));
+        // Cache with timestamp
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: serverTopics }));
       }
     } catch (e) {
       // ignore

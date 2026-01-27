@@ -15,7 +15,6 @@ import { QuizResult } from './components/quiz/QuizResult';
 import { GapView } from './components/quiz/GapView';
 import { BonusQuestionView } from './components/quiz/BonusQuestionView';
 import { firebaseQuizService } from './services/FirebaseQuizService';
-import { AuthModal } from './components/modals/AuthModal';
 import { NoTopicPrompt } from './components/modals/NoTopicPrompt';
 import { GameSidebar } from './components/dashboard/GameSidebar';
 import { GlobalDashboard } from './components/dashboard/GlobalDashboard';
@@ -33,7 +32,7 @@ const NUM_QUESTIONS = CONFIG.GAME.DEFAULT_QUESTIONS_COUNT;
 export const App = () => {
   const theme = useTheme();
   // Daily quiz (fallback) hook
-  const { questions: dailyQuestions, loading } = useQuizData();
+  const { questions: dailyQuestions, quiz: dailyQuiz, loading } = useQuizData();
 
   const [showSplash, setShowSplash] = useState(true);
   const [quizStarted, setQuizStarted] = useState(false);
@@ -62,7 +61,7 @@ export const App = () => {
   const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
   const [showTopicMenu, setShowTopicMenu] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<{ title: string; slug: string } | null>(null);
-  interface SelectedTopicQuiz { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[]; bonus?: { question: string; options: string[]; correctIndex: number } | null }
+  interface SelectedTopicQuiz { id?: string | undefined; questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[]; bonus?: { question: string; options: string[]; correctIndex: number } | null }
   const [selectedTopicQuiz, setSelectedTopicQuiz] = useState<SelectedTopicQuiz | null>(null);
   const [topicQuizStatus, setTopicQuizStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [showNoTopicPrompt, setShowNoTopicPrompt] = useState(false);
@@ -77,11 +76,7 @@ export const App = () => {
     } catch {/* ignore */ }
     return null;
   });
-  const [showNicknameModal, setShowNicknameModal] = useState(false);
-  const [pendingNickname, setPendingNickname] = useState('');
-  const [pendingReddit, setPendingReddit] = useState('');
-  const [lookupState, setLookupState] = useState<'idle' | 'checking' | 'need-nickname'>('idle');
-  const [signupError] = useState<string | null>(null);
+
   // Background music state
   const [musicOn, setMusicOn] = useState<boolean>(() => {
     try { const v = localStorage.getItem(CONFIG.STORAGE_KEYS.MUSIC); return v === 'on'; } catch { return false; }
@@ -108,44 +103,7 @@ export const App = () => {
   const { data: landingSummary, loading: landingSummaryLoading, refresh: refreshLanding } = useLandingSummary(!quizStarted && !showScore);
   const { username: hookUsername } = useUsername();
 
-  const submitLocalAuth = useCallback(async () => {
-    if (!pendingReddit.trim()) return;
-    const uname = pendingReddit.trim().replace(/^u\//i, '').toLowerCase();
-    if (lookupState === 'idle') {
-      setLookupState('checking');
-      try {
-        const resp = await fetch(`/api/users/resolve?userId=${encodeURIComponent(uname)}`);
-        const data = await resp.json();
-        if (resp.ok && data.found && data.user) {
-          const auth = { redditUsername: data.user.userId, nickname: data.user.nickname };
-          setAuthUser(auth);
-          try { localStorage.setItem('streax.auth', JSON.stringify(auth)); localStorage.setItem('streax.nickname', auth.nickname); } catch {/* ignore */ }
-          setShowNicknameModal(false);
-          setLookupState('idle');
-          setPendingNickname('');
-        } else {
-          setLookupState('need-nickname');
-        }
-      } catch { setLookupState('need-nickname'); }
-      return;
-    }
-    if (lookupState === 'need-nickname') {
-      if (!pendingNickname.trim()) return;
-      try {
-        const resp = await fetch('/api/users/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uname, nickname: pendingNickname.trim() }) });
-        const data = await resp.json();
-        if (resp.ok && data.ok) {
-          const auth = { redditUsername: data.user.userId, nickname: data.user.nickname };
-          setAuthUser(auth);
-          try { localStorage.setItem('streax.auth', JSON.stringify(auth)); localStorage.setItem('streax.nickname', auth.nickname); } catch {/* ignore */ }
-          setShowNicknameModal(false);
-          setLookupState('idle');
-          setPendingNickname('');
-        }
-      } catch {/* ignore */ }
-    }
-  }, [pendingReddit, pendingNickname, lookupState]);
-  const handleSignIn = useCallback(() => { setShowNicknameModal(true); }, []);
+  // No manual sign-in logic needed
 
   // Fetch history from server when authenticated
   const refreshHistory = useCallback(async () => {
@@ -212,9 +170,22 @@ export const App = () => {
     }
   }, [theme]);
 
-  // Function to load user data from server
+  // Function to load user data from server (Implicit Auth)
   const loadUserData = async () => {
     try {
+      // 1. Try context resolution first (most reliable in Devvit)
+      const contextRes = await fetch('/api/context/user');
+      if (contextRes.ok) {
+        const cData = await contextRes.json();
+        if (cData.userId) {
+          const auth = { redditUsername: cData.userId, nickname: cData.username || cData.userId };
+          setAuthUser(auth);
+          setUserInfo({ userId: cData.userId, username: cData.userId, displayName: cData.username });
+          return;
+        }
+      }
+
+      // 2. Fallback to session check
       const userResponse = await fetch('/api/user');
       if (userResponse.ok) {
         const userData = await userResponse.json();
@@ -571,7 +542,9 @@ export const App = () => {
         (topicLeaderboard as any)?.unshift?.({ userKey: key, nickname, score, timeTakenMs: totalMs, submittedAt: new Date().toISOString(), rank: 1 });
       }
     } catch {/* ignore */ }
-    void submitLeaderboardScore(slug, { userKey: key, nickname, score, timeTakenMs: totalMs }).then((ok) => {
+    const quizId = (selectedTopic ? selectedTopicQuiz?.id : dailyQuiz?.id);
+    const submissionPayload = { userKey: key, nickname, score, timeTakenMs: totalMs, ...(quizId ? { quizId } : {}) };
+    void submitLeaderboardScore(slug, submissionPayload).then((ok) => {
       if (!ok) console.error('[Leaderboard] submit failed');
       // Force refresh to get proper ordering/ranks
       setTimeout(() => { try { void refreshTopicLeaderboard?.(); } catch {/* ignore */ } }, 300);
@@ -606,7 +579,7 @@ export const App = () => {
           setShowTopicMenu(false);
           // If quiz data comes from the selector (e.g. newly generated), use it directly
           if (topic.quiz && Array.isArray(topic.quiz.questions)) {
-            setSelectedTopicQuiz({ questions: topic.quiz.questions, bonus: topic.bonus || null });
+            setSelectedTopicQuiz({ id: topic.quizId, questions: topic.quiz.questions, bonus: topic.bonus || null });
             setTopicQuizStatus('ready');
             return;
           }
@@ -615,7 +588,7 @@ export const App = () => {
           try {
             const quiz = await firebaseQuizService.getOrGenerateTopicQuiz(topic.slug);
             if (quiz && Array.isArray(quiz.questions)) {
-              setSelectedTopicQuiz({ questions: quiz.questions, bonus: quiz.bonus || null });
+              setSelectedTopicQuiz({ id: quiz.id, questions: quiz.questions, bonus: quiz.bonus || null });
               setTopicQuizStatus('ready');
             } else {
               setTopicQuizStatus('error');
@@ -669,9 +642,7 @@ export const App = () => {
               {musicOn ? '♪ Music On' : '♪ Music Off'}
             </button>
           </div>
-          {!authUser ? (
-            <motion.button onClick={handleSignIn} className="modern-button modern-button-secondary px-4 py-2 text-sm font-bold">Sign In</motion.button>
-          ) : (
+          {authUser && (
             <div className="flex items-center gap-2 text-xs text-secondary font-semibold px-2 py-1 rounded bg-base-200">
               {(() => { const u = authUser ? authUser.redditUsername : ''; const keep = Math.max(1, Math.ceil(u.length * 0.3)); const masked = '*'.repeat(Math.max(0, u.length - keep)) + u.slice(-keep); return <span className="text-accent">{masked}</span>; })()}
               <span>{authUser.nickname}</span>
@@ -681,23 +652,7 @@ export const App = () => {
         {/* Hidden audio element (user provided mp3 placed in public or assets). Fallback to /assets/bgm.mp3 */}
         <audio ref={audioRef} src="/assets/bgm.mp3" loop preload="auto" style={{ display: 'none' }} />
 
-        {showNicknameModal && !authUser && (
-          <AuthModal
-            onClose={() => {
-              setShowNicknameModal(false);
-              setLookupState('idle');
-              setPendingNickname('');
-            }}
-            pendingReddit={pendingReddit}
-            setPendingReddit={setPendingReddit}
-            pendingNickname={pendingNickname}
-            setPendingNickname={setPendingNickname}
-            lookupState={lookupState}
-            setLookupState={setLookupState}
-            signupError={signupError}
-            onSubmit={submitLocalAuth}
-          />
-        )}
+        {/* AuthModal Removed - Implicit Auth Only */}
         <div
           className={`grid grid-cols-1 gap-4 lg:gap-6 ${!quizStarted || showScore ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}
         >

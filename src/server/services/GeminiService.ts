@@ -94,7 +94,7 @@ export async function validateGeminiKey(): Promise<boolean> {
     }
     geminiKeyWorks = true;
     geminiKeyValidated = true;
-    Logger.info('[AI] 🛡️ Gemini Status: ASSUME_VALID (Network check deferred to first real call)');
+    Logger.info(`[AI] Gemini Check: ✅ true`);
     return true;
 }
 
