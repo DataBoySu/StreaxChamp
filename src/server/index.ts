@@ -2,9 +2,7 @@ import 'dotenv/config';
 import { Devvit, SettingScope } from '@devvit/public-api';
 import express from 'express';
 import { createServer, getServerPort } from '@devvit/server';
-import { Logger } from './Logger';
 import { createPost } from './core/post';
-import { CONFIG } from '../shared/constants';
 import { requestLogger } from './middleware/requestLogger';
 import { apiRouter } from './routes/api';
 import { hydrateGeminiKeyFromSettings } from './services/GeminiService';
@@ -27,40 +25,22 @@ Devvit.configure({
 });
 
 // Programmatic moderator menu: Create Daily Quiz Post
-try {
-    Devvit.addMenuItem({
-        label: 'Create Daily Quiz Post',
-        location: 'subreddit',
-        forUserType: 'moderator',
-        onPress: async (_event: unknown, _ctx: unknown) => {
-            try {
-                const ctx = _ctx as unknown;
-                const ctxRec = ctx as Record<string, unknown> | undefined;
-                const subredditName = ctxRec && typeof ctxRec === 'object'
-                    ? String(((ctxRec.subreddit as Record<string, unknown> | undefined)?.name as string) || (ctxRec.subredditName as string) || process.env.DEVVIT_SUBREDDIT || CONFIG.SERVER.DEFAULT_SUBREDDIT)
-                    : (process.env.DEVVIT_SUBREDDIT || CONFIG.SERVER.DEFAULT_SUBREDDIT);
-                const post = await createPost(subredditName);
-                try {
-                    type UIShape = { showToast?: (m: string) => void } | undefined;
-                    const ui = ctxRec && typeof ctxRec === 'object' && typeof ctxRec['ui'] === 'object' ? (ctxRec['ui'] as UIShape) : undefined;
-                    ui?.showToast?.(`Post created: ${post?.id ?? 'unknown'}`);
-                } catch {/* ignore UI errors */ }
-                console.info('[MenuCreate] post created', post?.id);
-            } catch (err) {
-                try {
-                    const c = _ctx as Record<string, unknown> | undefined;
-                    type UIShape = { showToast?: (m: string) => void } | undefined;
-                    const ui = c && typeof c['ui'] === 'object' ? (c['ui'] as UIShape) : undefined;
-                    ui?.showToast?.('Failed to create post');
-                } catch {/* ignore */ }
-                console.error('[MenuCreate] createPost failed', err);
-            }
+Devvit.addMenuItem({
+    label: 'Create Daily Quiz Post',
+    location: 'subreddit',
+    forUserType: 'moderator',
+    onPress: async (_event, context) => {
+        try {
+            const subreddit = await context.reddit.getCurrentSubreddit();
+            const post = await createPost(context.reddit, subreddit.name);
+            context.ui.showToast(`Post created: ${post.id}`);
+            console.info('[MenuCreate] post created', post.id);
+        } catch (err) {
+            context.ui.showToast('Failed to create post');
+            console.error('[MenuCreate] createPost failed', err);
         }
-    });
-} catch (e) {
-    // Non-fatal: addMenuItem may not be available in some runtimes
-    Logger.info('[DevvitMenu] addMenuItem unavailable or failed to register', e);
-}
+    }
+});
 
 // Try to load secrets from Devvit settings at startup (non-blocking)
 hydrateGeminiKeyFromSettings();

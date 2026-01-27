@@ -195,12 +195,7 @@ export const App = () => {
 
   // username fetch debug removed
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowSplash(false);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, []);
+
 
   useEffect(() => {
     void loadUserData();
