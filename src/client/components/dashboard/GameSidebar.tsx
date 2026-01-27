@@ -67,16 +67,16 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
                                 {topicLeaderboard &&
                                     topicLeaderboard.slice(0, 10).map((e, i) => (
                                         <div
-                                            key={e.userKey + i}
-                                            className="flex items-center gap-4 bg-base-200/40 border border-base-300/40 rounded-lg px-4 py-2"
+                                            key={`${e.userKey}-${i}`}
+                                            className="grid grid-cols-[2rem_1fr_3rem] items-center gap-3 bg-base-200/40 border border-base-300/40 rounded-lg px-4 py-2"
                                         >
-                                            <span className="font-bold text-accent w-7 text-right">
+                                            <span className="font-bold text-accent text-right pr-2">
                                                 {i + 1}.
                                             </span>
-                                            <span className="font-semibold truncate max-w-[120px]">
+                                            <span className="font-semibold truncate min-w-0" title={e.nickname}>
                                                 {e.nickname}
                                             </span>
-                                            <span className="ml-auto text-success font-extrabold text-lg">
+                                            <span className="text-success font-extrabold text-lg text-right">
                                                 {e.score}
                                             </span>
                                         </div>
@@ -94,11 +94,7 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
                                         <LoadingDots text="Loading" />
                                     </div>
                                 )}
-                                {!authUser && !historyLoading && (
-                                    <div className="text-center py-8 text-secondary text-sm italic">
-                                        Log in to save history.
-                                    </div>
-                                )}
+
                                 {authUser && !historyLoading && history.length === 0 && (
                                     <div className="text-center py-8 text-secondary text-sm">
                                         No plays yet.

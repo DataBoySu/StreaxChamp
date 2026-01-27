@@ -6,7 +6,6 @@ import { LandingSummaryData } from '../../hooks/useLandingSummary';
 interface GlobalDashboardProps {
     landingSummaryLoading: boolean;
     landingSummary: LandingSummaryData | null;
-    refreshLanding: () => void;
     authUser: { nickname: string } | null;
     onSelectTopic: (slug: string, title: string) => void;
 }
@@ -14,7 +13,6 @@ interface GlobalDashboardProps {
 export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
     landingSummaryLoading,
     landingSummary,
-    refreshLanding,
     authUser,
     onSelectTopic,
 }) => {
@@ -26,46 +24,34 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                 </h2>
                 <div className="modern-card p-4 md:p-6">
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center mb-2 px-1">
                             {landingSummaryLoading ? (
                                 <LoadingDots text="Loading" />
                             ) : (
-                                <span className="text-xs opacity-60">Top scores today</span>
+                                <span className="text-xs font-medium opacity-50 uppercase tracking-widest">Top scores today</span>
                             )}
-                            <button
-                                onClick={refreshLanding}
-                                className="p-1 rounded hover:bg-base-300"
-                                aria-label="Refresh"
-                                title="Refresh"
-                            >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                    className="w-5 h-5"
-                                >
-                                    <path d="M12 6V3L8 7l4 4V8c2.757 0 5 2.243 5 5a5 5 0 0 1-8.594 3.5 1 1 0 1 0-1.414 1.414A7 7 0 0 0 19 13c0-3.86-3.141-7-7-7Z" />
-                                </svg>
-                            </button>
                         </div>
                         {(landingSummary?.globalTop || []).slice(0, 10).map((e, i) => (
                             <div
-                                key={e.slug + e.nickname + i}
-                                className="flex items-center gap-4 bg-base-200/40 border border-base-300/40 rounded-lg px-4 py-3"
+                                key={`${e.slug}-${e.nickname}-${i}`}
+                                className="grid grid-cols-[2.5rem_1.5fr_1fr_4rem] items-center gap-3 bg-base-200/40 border border-base-300/40 rounded-lg px-4 py-3 hover:bg-base-200/60 transition-colors"
                             >
-                                <span className="font-bold text-accent min-w-7 text-right">
+                                <span className="font-bold text-accent text-right pr-2">
                                     {i + 1}.
                                 </span>
-                                <span className="font-semibold truncate max-w-[120px]">
+                                <span className="font-semibold truncate min-w-0" title={e.nickname}>
                                     {e.nickname}
                                 </span>
-                                <button
-                                    onClick={() => onSelectTopic(e.slug, e.title)}
-                                    className="text-xs px-3 py-1 rounded-md bg-accent/15 hover:bg-accent/25 border border-accent/30 font-medium mr-auto"
-                                >
-                                    {e.title}
-                                </button>
-                                <span className="text-success font-extrabold text-xl tracking-wide">
+                                <div className="flex justify-start overflow-hidden">
+                                    <button
+                                        onClick={() => onSelectTopic(e.slug, e.title)}
+                                        className="text-[10px] px-2 py-0.5 rounded bg-accent/15 hover:bg-accent/25 border border-accent/20 font-medium truncate max-w-full"
+                                        title={e.title}
+                                    >
+                                        {e.title}
+                                    </button>
+                                </div>
+                                <span className="text-success font-extrabold text-lg text-right">
                                     {e.score}
                                 </span>
                             </div>

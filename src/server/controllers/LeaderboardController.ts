@@ -33,7 +33,9 @@ export class LeaderboardController {
      */
     static async submitScore(req: Request, res: Response) {
         try {
-            const { userKey, nickname, score, timeTakenMs, slug } = req.body || {};
+            const { userKey, nickname, score, timeTakenMs, slug: bodySlug } = req.body || {};
+            const slug = req.params.slug || bodySlug; // Prioritize URL param
+
             if (!userKey || !nickname || typeof score !== 'number') {
                 return res.status(400).json({ error: 'Invalid submission payload' });
             }

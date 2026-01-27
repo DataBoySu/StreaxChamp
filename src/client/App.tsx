@@ -100,7 +100,7 @@ export const App = () => {
   // Leaderboard hook (per selected topic)
   // Enable leaderboard as soon as quiz ends (showScore) or while viewing start screen for previously selected topic
   const { entries: topicLeaderboard, loading: topicLbLoading, submitScore: submitLeaderboardScore, refresh: refreshTopicLeaderboard } = useLeaderboard({ slug: selectedTopic?.slug || null, enabled: !!selectedTopic && (showScore || !quizStarted) });
-  const { data: landingSummary, loading: landingSummaryLoading, refresh: refreshLanding } = useLandingSummary(!quizStarted && !showScore);
+  const { data: landingSummary, loading: landingSummaryLoading } = useLandingSummary(!quizStarted && !showScore);
   const { username: hookUsername } = useUsername();
 
   // No manual sign-in logic needed
@@ -833,7 +833,6 @@ export const App = () => {
         <GlobalDashboard
           landingSummaryLoading={landingSummaryLoading}
           landingSummary={landingSummary}
-          refreshLanding={refreshLanding}
           authUser={authUser}
           onSelectTopic={(slug, title) => {
             setSelectedTopic({ slug, title });
