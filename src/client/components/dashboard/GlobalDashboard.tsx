@@ -33,8 +33,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                         </div>
                         {(landingSummary?.globalTop || []).slice(0, 10).map((e, i) => (
                             <div
-                                key={`${e.slug}-${e.nickname}-${i}`}
-                                className="grid grid-cols-[2.5rem_1.5fr_1fr_4rem] items-center gap-3 bg-base-200/40 border border-base-300/40 rounded-lg px-4 py-3 hover:bg-base-200/60 transition-colors"
+                                key={`${e.userKey}-${i}`}
+                                className="grid grid-cols-[2.5rem_1fr_4rem] items-center gap-3 bg-base-200/40 border border-base-300/40 rounded-lg px-4 py-3 hover:bg-base-200/60 transition-colors"
                             >
                                 <span className="font-bold text-accent text-right pr-2">
                                     {i + 1}.
@@ -42,15 +42,6 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                                 <span className="font-semibold truncate min-w-0" title={e.nickname}>
                                     {e.nickname}
                                 </span>
-                                <div className="flex justify-start overflow-hidden">
-                                    <button
-                                        onClick={() => onSelectTopic(e.slug, e.title)}
-                                        className="text-[10px] px-2 py-0.5 rounded bg-accent/15 hover:bg-accent/25 border border-accent/20 font-medium truncate max-w-full"
-                                        title={e.title}
-                                    >
-                                        {e.title}
-                                    </button>
-                                </div>
                                 <span className="text-success font-extrabold text-lg text-right">
                                     {e.score}
                                 </span>

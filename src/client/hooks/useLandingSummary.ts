@@ -16,7 +16,7 @@ export interface LandingPopularEntry {
 export interface LandingSummaryData {
   top3: LandingTopEntry[];
   popular: LandingPopularEntry[];
-  globalTop: { slug: string; title: string; nickname: string; score: number; timeTakenMs: number }[];
+  globalTop: { userKey: string; nickname: string; score: number }[];
   hotTopics: { slug: string; title: string }[];
   globalTotals?: { userKey: string; nickname: string; totalScore: number }[];
 }

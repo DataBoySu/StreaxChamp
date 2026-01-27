@@ -15,7 +15,7 @@ interface UseLeaderboardOptions {
   enabled?: boolean;
 }
 
-const CACHE_TTL = 180000; // 3 minutes in ms
+const CACHE_TTL = 60 * 1000; // 60 seconds aggressive cache
 
 export function useLeaderboard({ slug, limit = 25, enabled = true }: UseLeaderboardOptions) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -24,40 +24,30 @@ export function useLeaderboard({ slug, limit = 25, enabled = true }: UseLeaderbo
 
   const getCacheKey = (leaderboardSlug: string) => `streax:leaderboard:${leaderboardSlug}`;
 
-  const getCachedLeaderboard = (leaderboardSlug: string): LeaderboardEntry[] | null => {
-    try {
-      const raw = localStorage.getItem(getCacheKey(leaderboardSlug));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed.ts || !parsed.data) return null;
 
-      // Check if expired
-      if (Date.now() - parsed.ts > CACHE_TTL) {
-        localStorage.removeItem(getCacheKey(leaderboardSlug));
-        return null;
-      }
-
-      return parsed.data;
-    } catch {
-      return null;
-    }
-  };
 
   const fetchLeaderboard = useCallback(async (forceRefresh = false) => {
     if (!slug || !enabled) return;
 
-    // Check cache first unless forcing refresh
+    // Check cache first
     if (!forceRefresh) {
-      const cached = getCachedLeaderboard(slug);
-      if (cached) {
-        setEntries(cached);
-        return;
+      const raw = localStorage.getItem(getCacheKey(slug));
+      if (raw) {
+        try {
+          const { ts, data } = JSON.parse(raw);
+          if (data) {
+            setEntries(data);
+            // If cache is fresh, stop here. If stale (>TTL), continue to fetch in background.
+            if (Date.now() - ts < CACHE_TTL) return;
+          }
+        } catch { /* ignore */ }
       }
     }
 
-    setLoading(true); setError(null);
+    if (entries.length === 0) setLoading(true); // Only set loading if we have no data
+    setError(null);
     try {
-      const res = await fetch(`/api/leaderboard/${encodeURIComponent(slug)}/today?limit=${limit}`);
+      const res = await fetch(`/api/leaderboard/${encodeURIComponent(slug)}?limit=${limit}`);
       const data = await res.json();
       if (res.ok && data.entries) {
         const mapped: LeaderboardEntry[] = data.entries.map((e: any, idx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -80,6 +70,13 @@ export function useLeaderboard({ slug, limit = 25, enabled = true }: UseLeaderbo
   }, [slug, limit, enabled]);
 
   useEffect(() => { void fetchLeaderboard(); }, [fetchLeaderboard]);
+
+  // Window focus revalidation
+  useEffect(() => {
+    const onFocus = () => void fetchLeaderboard();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [fetchLeaderboard]);
 
   const submitScore = useCallback(async (slugParam: string, payload: { userKey: string; nickname: string; score: number; timeTakenMs: number; quizId?: string }) => {
     try {

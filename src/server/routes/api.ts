@@ -5,6 +5,7 @@ import { RobotController } from '../controllers/RobotController';
 import { UserController } from '../controllers/UserController';
 import { LeaderboardController } from '../controllers/LeaderboardController';
 import { LandingController } from '../controllers/LandingController';
+import { HistoryController } from '../controllers/HistoryController'; // Added import
 import { context } from '@devvit/web/server';
 import { reddit } from '@devvit/web/server';
 
@@ -27,6 +28,10 @@ router.get('/leaderboard/global', LeaderboardController.listGlobal);
 router.post('/leaderboard/:slug/submit', LeaderboardController.submitScore);
 router.post('/leaderboard/submit', LeaderboardController.submitScore); // Fallback for any legacy calls
 router.get('/topics/:slug/leaderboard', LeaderboardController.listTopicLeaderboard);
+
+// --- History ---
+router.get('/history/global', HistoryController.getGlobalHistory);
+router.post('/history/save', HistoryController.savePlay);
 
 // --- Robot ---
 router.get('/robot/dialogues/today', RobotController.getDialogues);
