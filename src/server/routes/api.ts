@@ -4,6 +4,7 @@ import { QuizController } from '../controllers/QuizController';
 import { RobotController } from '../controllers/RobotController';
 import { UserController } from '../controllers/UserController';
 import { LeaderboardController } from '../controllers/LeaderboardController';
+import { LandingController } from '../controllers/LandingController';
 import { context } from '@devvit/web/server';
 import { reddit } from '@devvit/web/server';
 
@@ -28,6 +29,9 @@ router.get('/topics/:slug/leaderboard', LeaderboardController.listTopicLeaderboa
 
 // --- Robot ---
 router.get('/robot/dialogues/today', RobotController.getDialogues);
+
+// --- Landing ---
+router.get('/landing/summary', LandingController.getSummary);
 
 // --- Users ---
 router.get('/context/user', UserController.resolveContextUser);

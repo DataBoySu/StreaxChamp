@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { CONFIG } from '../../shared/constants';
 import { Logger } from '../Logger';
 import { FirestoreRestService } from '../services/FirestoreRestService';
+
 import { validateGeminiKey, attemptHealing as attemptAiHealing, generateRobotLines } from '../services/GeminiService';
 
 /**
@@ -38,21 +39,9 @@ export class RobotController {
                 return res.json({ ok: true, date: todaySlug, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
             }
 
-            // 3. Normal Operation: Fetch from DB or Generate Fresh
-            const fsService = new FirestoreRestService();
-            const existingDialogues = await fsService.getRobotDialogues(todaySlug);
-            if (existingDialogues) {
-                return res.json({ ok: true, date: todaySlug, lines: existingDialogues });
-            }
-
-            Logger.ai('[Robot] Generating fresh lines for today...');
-            const freshLines = await generateRobotLines();
-            if (freshLines && freshLines.length > 0) {
-                await fsService.saveRobotDialogues(todaySlug, freshLines);
-                return res.json({ ok: true, date: todaySlug, lines: freshLines });
-            }
-
-            return res.json({ ok: true, date: todaySlug, lines: CONFIG.ROBOT.FALLBACK_BANTER.AI_OFFLINE });
+            // 3. Static Operation: Use hardcoded dialogues for stability
+            const lines = await generateRobotLines();
+            return res.json({ ok: true, date: todaySlug, lines: lines });
 
         } catch (e) {
             Logger.error('[Robot] Failed', e);

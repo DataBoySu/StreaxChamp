@@ -4,6 +4,7 @@ import { Logger } from '../Logger';
 import { generateUnifiedContent, GeneratedQuizPayload, GeneratedQuizQuestion } from '../services/GeminiService';
 import { slugify, toTitleCase } from '../utils/textUtils';
 import { AppError } from '../utils/AppError';
+import { CacheService } from '../services/CacheService';
 
 /**
  * Controller for managing topics, including listing, status checks, and AI-driven generation.
@@ -14,8 +15,18 @@ export class TopicController {
      */
     static async listTopics(_req: Request, res: Response) {
         try {
+            const cache = CacheService.getInstance();
+            const cached = cache.get('topics_list');
+            if (cached) {
+                return res.json(cached);
+            }
+
             const fs = new FirestoreRestService();
             const list = await fs.listTopics();
+
+            // Cache for 10 minutes (topics don't change THAT often)
+            cache.set('topics_list', list, 600);
+
             res.json(list);
         } catch (e) {
             Logger.error('[TopicsList] error', e);

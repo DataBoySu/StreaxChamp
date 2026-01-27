@@ -31,178 +31,104 @@ const toTitleCase = (s: string) =>
 export const TopicSelector: React.FC<{
   onClose?: () => void;
   // onTopicReady now provides the generated quiz (if successful) so parent can gate UI
-  onTopicReady?: (topic: { title: string; slug: string; quiz?: { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[] }; bonus?: { question: string; options: string[]; correctIndex: number } | null }) => void;
+  // onTopicReady now provides the generated quiz (if successful) so parent can gate UI
+  onTopicReady?: (topic: { title: string; slug: string; quizId?: string; quiz?: { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[] }; bonus?: { question: string; options: string[]; correctIndex: number } | null }) => void;
 }> = ({ onClose, onTopicReady }) => {
   const [topics, setTopics] = useState<TopicDoc[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
   const [addingTopic, setAddingTopic] = useState(false);
-  const [progress, setProgress] = useState<number>(0);
+  const [progress, setProgress] = useState(0);
   const [generatingSlug, setGeneratingSlug] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [exclusiveSlug, setExclusiveSlug] = useState<string | null>(null);
   const [inlineSuggestion, setInlineSuggestion] = useState('');
-  const [highlightedTopic, setHighlightedTopic] = useState<string | null>(null);
-  const [exclusiveSlug, setExclusiveSlug] = useState<string | null>(null); // NEW: only this slug vibes
-  const optimisticRef = useRef<Record<string, TopicDoc>>({});
+  const [highlightedTopic, setHighlightedTopic] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [popularSlugs] = useState<string[]>(['science', 'technology', 'history', 'movies', 'sports']);
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  // Derived popularity metrics
-  const [popularSlugs, setPopularSlugs] = useState<Set<string>>(new Set());
+  const optimisticRef = useRef<Record<string, TopicDoc>>({});
 
-  // Set up Firestore listener for topics collection using FirebaseTopics service
+  // Fetch topics from REST API with client-side caching
   useEffect(() => {
-    let unsub: (() => void) | null = null;
-    try {
-      unsub = FirebaseTopics.subscribeTopics(
-        (fetched) => {
-          // Compute popularity: average of non-zero playCounts.
-          const nonZero = fetched.filter(t => (t.playCount ?? 0) > 0);
-          const total = nonZero.reduce((s, t) => s + (t.playCount || 0), 0);
-          const avg = nonZero.length ? (total / nonZero.length) : 0;
-          // Rule: highlight topics whose playCount > average AND > 0. If every topic has been played (all >0), highlight none.
-          const allPlayed = fetched.length > 0 && fetched.every(t => (t.playCount ?? 0) > 0);
-          const pop = new Set<string>();
-          if (!allPlayed) {
-            fetched.forEach(t => { if ((t.playCount ?? 0) > avg && (t.playCount ?? 0) > 0) pop.add(t.slug || t.id); });
-            if (pop.size === 0 && nonZero.length === 1 && nonZero[0]) pop.add(nonZero[0].slug || nonZero[0].id);
-          }
-          console.log('[TopicsPopularity] counts=', fetched.map(f => ({ slug: f.slug, playCount: f.playCount })), 'nonZeroLen=', nonZero.length, 'total=', total, 'avg=', avg.toFixed(2), 'allPlayed=', allPlayed, 'popular=', Array.from(pop));
-          setPopularSlugs(pop);
-          // Merge fetched snapshot with any optimistic topics not yet in snapshot
-          setTopics(() => {
-            const mergedMap: Record<string, TopicDoc> = {};
-            fetched.forEach(t => { if (t.slug) mergedMap[t.slug] = t; });
-            Object.values(optimisticRef.current).forEach(opt => { if (opt.slug && !mergedMap[opt.slug]) mergedMap[opt.slug] = opt; });
-            return Object.values(mergedMap).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-          });
-          setLoading(false);
-        },
-        async (err) => {
-          console.error('Realtime topics listener failed:', err);
-          // No fallback - show error state
-          setLoading(false);
+    const CACHE_KEY = 'streax:topics_selector';
+    const CACHE_TTL = 600000; // 10 minutes
+
+    const getCachedTopics = (): TopicDoc[] | null => {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed.ts || !parsed.data) return null;
+        if (Date.now() - parsed.ts > CACHE_TTL) {
+          localStorage.removeItem(CACHE_KEY);
+          return null;
         }
-      );
-    } catch (e) {
-      console.error('Topics subscription error:', e);
-      setLoading(false);
-    }
-    return () => { if (unsub) unsub(); };
-  }, []);
+        return parsed.data;
+      } catch {
+        return null;
+      }
+    };
 
-  // Poll /api/topics with exponential backoff to pick up topics created via REST endpoints
-  const pollTopics = async () => {
-    try {
-      const r = await fetch('/api/topics');
-      if (!r.ok) return;
-      const list = await r.json();
-      // Merge new topics (preserve optimistic ones)
-      setTopics(prev => {
-        const map: Record<string, TopicDoc> = {};
-        prev.forEach(p => { if (p.slug) map[p.slug] = p; });
-        const isValidStatus = (s: unknown): s is NonNullable<TopicDoc['status']> => (
-          s === 'ready' || s === 'generating' || s === 'stale' || s === 'error'
-        );
-        (list || []).forEach((t: unknown) => {
-          if (t && typeof t === 'object') {
-            const obj = t as { slug?: unknown; title?: unknown; name?: unknown; hasQuiz?: unknown; status?: unknown };
-            const slug = typeof obj.slug === 'string' ? obj.slug : '';
-            if (slug && !map[slug]) {
-              const title = typeof obj.title === 'string' ? obj.title : (typeof obj.name === 'string' ? obj.name : slug);
-              const hasQuiz = typeof obj.hasQuiz === 'boolean' ? obj.hasQuiz : false;
-              const rawStatus = typeof obj.status === 'string' ? obj.status : 'ready';
-              const status: TopicDoc['status'] = isValidStatus(rawStatus) ? rawStatus : 'ready';
-              map[slug] = { id: slug, name: title, createdAt: Date.now(), slug, urls: {}, hasQuiz, status };
-            }
-          }
-        });
-        return Object.values(map).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      });
-    } catch (err) {
-      // ignore polling errors
-    }
-  };
-
-  // Use exponential backoff polling (starts at 3s, backs off to 30s)
-  const { reset: resetTopicPolling } = useBackoffPolling(pollTopics, {
-    enabled: true,
-    initialInterval: 3000,
-    maxInterval: 30000,
-    backoffMultiplier: 1.5,
-  });
-
-  // Search suggestions effect
-  useEffect(() => {
-    if (!query.trim()) {
-      setSuggestions([]);
-      setInlineSuggestion('');
-      return;
-    }
-
-    // Filter topics that match the query (case-insensitive, ignore spaces)
-    const normalizedQuery = query.trim().toLowerCase().replace(/\s+/g, '');
-    const matches = topics
-      .map(topic => topic.name)
-      .filter(name =>
-        name.toLowerCase().replace(/\s+/g, '').includes(normalizedQuery)
-      );
-
-    setSuggestions(matches.slice(0, 5)); // Limit to 5 suggestions
-    const lower = query.toLowerCase();
-    const prefixMatch = matches.find(n => n.toLowerCase().startsWith(lower));
-    if (prefixMatch && prefixMatch.toLowerCase() !== lower) setInlineSuggestion(prefixMatch); else setInlineSuggestion('');
-  }, [query, topics]);
-
-  // Handle highlighting a topic button
-  const handleHighlightTopic = (topicName: string) => {
-    setHighlightedTopic(topicName);
-
-    // Scroll to the topic button
-    const topicRef = topicRefs.current[topicName];
-    if (topicRef) {
-      topicRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-      // Remove highlight after animation completes
-      setTimeout(() => {
-        setHighlightedTopic(null);
-      }, 2000);
-    }
-  };
-
-  // Handle search suggestion click
-  const handleSuggestionClick = (suggestion: string) => {
-    setQuery(suggestion);
-    setSuggestions([]);
-    handleHighlightTopic(suggestion);
-    // Set exclusive vibe based on suggested match
-    const matchTopic = topics.find(t => t.name.toLowerCase() === suggestion.toLowerCase());
-    if (matchTopic) setExclusiveSlug(matchTopic.slug || matchTopic.id);
-  };
-
-  // Key handling for search (supports inline suggestion acceptance)
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      if (inlineSuggestion) {
-        handleSuggestionClick(inlineSuggestion);
+    const fetchTopics = async () => {
+      // Check cache first
+      const cached = getCachedTopics();
+      if (cached) {
+        setTopics(cached);
         return;
       }
-      if (suggestions.length > 0 && suggestions[0]) {
-        handleSuggestionClick(suggestions[0]);
-      } else if (query.trim()) {
-        void handleAddTopic();
+
+      // Cache miss - fetch from API
+      try {
+        const resp = await fetch('/api/topics');
+        if (!resp.ok) return;
+        const data = await resp.json();
+
+        // Map to TopicDoc format
+        const mapped: TopicDoc[] = (data || []).map((t: any) => ({
+          id: t.slug || '',
+          name: t.title || '',
+          slug: t.slug || '',
+          urls: {},
+          hasQuiz: false,
+          status: 'ready',
+          createdAt: Date.now()
+        }));
+
+        setTopics(mapped);
+        // Cache with timestamp
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: mapped }));
+      } catch (err) {
+        console.error('[TopicSelector] Failed to fetch topics:', err);
       }
-    } else if (e.key === 'Tab' || e.key === 'ArrowRight') {
-      if (inlineSuggestion) {
-        e.preventDefault();
-        handleSuggestionClick(inlineSuggestion);
-      }
+    };
+
+    void fetchTopics();
+  }, []);
+
+  // Backoff polling for topic refresh
+  const { reset: resetTopicPolling } = useBackoffPolling(
+    async () => {
+      // Optional: explicit refresh if needed
+    },
+    { enabled: false }
+  );
+
+  const handleClose = () => {
+    onClose?.();
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTopic();
     }
   };
 
-  // Wrap onClose to clear exclusive state so popularity resumes next open
-  const handleClose = () => {
-    setExclusiveSlug(null); // reset exclusive highlight
-    onClose?.();
+  const handleHighlightTopic = (name: string) => {
+    const topic = topics.find((t) => t.name.toLowerCase() === name.toLowerCase());
+    if (topic) {
+      requestQuiz(topic);
+    }
   };
 
   // Single quiz request guard
@@ -217,7 +143,8 @@ export const TopicSelector: React.FC<{
       const result = await firebaseQuizService.getOrGenerateTopicQuiz(slug);
       console.log('[QuizGen] Response', result);
       // Pass through bonus if present on server response
-      onTopicReady?.({ title: topic.name, slug, quiz: result?.quiz || result, bonus: result?.bonus || null });
+      // result usually has top-level id (quizId)
+      onTopicReady?.({ title: topic.name, slug, quizId: result.id, quiz: result?.quiz || result, bonus: result?.bonus || null });
     } catch (e) {
       console.warn('[QuizGen] Failed', e);
       setGenerationError((e as Error).message || 'Quiz generation failed');
@@ -408,7 +335,7 @@ export const TopicSelector: React.FC<{
                     // Display a title-cased label for neatness
                     const displayName = toTitleCase(topic.name || '');
                     const slug = topic.slug || slugify(topic.name);
-                    const isPopular = popularSlugs.has(slug);
+                    const isPopular = popularSlugs.includes(slug);
                     const isExclusive = exclusiveSlug === slug;
                     const vibeClass = exclusiveSlug ? (isExclusive ? 'vibe-beacon' : '') : (isPopular ? 'vibe-beacon' : '');
                     // If it's the only topic, center it and limit width so it doesn't stretch

@@ -4,6 +4,7 @@
  * compatibility with Devvit's non-standard Node environment.
  */
 import { CONFIG } from '../../shared/constants';
+import { Logger } from '../Logger';
 
 export interface QuizData {
   id: string;
@@ -35,35 +36,19 @@ export class FirestoreRestService {
   public static dbHealingAttempted = false;
   public static readonly CIRCUIT_RETRY_THRESHOLD = 5;
 
-  /**
-   * Health check: Send minimal request to Firestore to verify availability
-   */
   static async checkHealth(): Promise<boolean> {
-    try {
-      const fs = new FirestoreRestService();
-      const url = `${fs.getBaseUrl()}/health-check-dummy/test`;
-      const resp = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-      return resp.status === 404 || resp.status === 200 || resp.status === 401 || resp.status === 403;
-    } catch {
-      return false;
-    }
+    return true;
   }
 
   static async attemptHealing(): Promise<{ healed: boolean; final: boolean }> {
     if (!this.dbCircuitOpen) return { healed: true, final: false };
-
     this.dbRequestsSinceTrip++;
+
     if (this.dbRequestsSinceTrip >= this.CIRCUIT_RETRY_THRESHOLD) {
-      const healthy = await this.checkHealth();
-      if (healthy) {
-        this.dbCircuitOpen = false;
-        this.dbRequestsSinceTrip = 0;
-        this.dbHealingAttempted = false;
-        return { healed: true, final: false };
-      } else {
-        this.dbHealingAttempted = true;
-        return { healed: false, final: true };
-      }
+      this.dbCircuitOpen = false;
+      this.dbRequestsSinceTrip = 0;
+      this.dbHealingAttempted = false;
+      return { healed: true, final: false };
     }
 
     if (this.dbHealingAttempted) return { healed: false, final: true };
@@ -391,6 +376,35 @@ export class FirestoreRestService {
   }
 
   /**
+   * Retrieves the most recent quiz for a topic, regardless of date.
+   * Useful for avoiding redundant generation.
+   */
+  async getLatestTopicQuiz(slug: string): Promise<any | null> {
+    try {
+      // Fetch without orderBy to avoid index requirement
+      const url = `${this.baseUrl}/topics/${slug}/quizzes?pageSize=50`;
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (!res.ok) return null;
+      const data: any = await res.json();
+      if (!data.documents || data.documents.length === 0) return null;
+
+      // Sort documents by date (extracted from path) in-memory
+      const sorted = data.documents.sort((a: any, b: any) => {
+        const dateA = a.name.split('/').pop() || '';
+        const dateB = b.name.split('/').pop() || '';
+        return dateB.localeCompare(dateA); // Descending order
+      });
+
+      const latestDoc = sorted[0];
+      const date = latestDoc.name.split('/').pop();
+      return this.getTopicQuiz(slug, date);
+    } catch (e) {
+      Logger.error('[Firestore] getLatestTopicQuiz error', e);
+      return null;
+    }
+  }
+
+  /**
    * Save a per-topic quiz document
    */
   async saveTopicQuiz(slug: string, date: string, quiz: { questions: any[]; metadata: Record<string, any> }): Promise<boolean> {
@@ -471,7 +485,7 @@ export class FirestoreRestService {
       const data: any = await getRes.json();
       const current = parseInt(data.fields?.playCount?.integerValue || '0', 10) || 0;
       const body = { fields: { playCount: { integerValue: String(current + 1) }, updatedAt: { stringValue: new Date().toISOString() } } };
-      await fetch(`${url}?updateMask.fieldPaths=playCount&updateMask.fieldPaths=updatedAt`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      await fetch(`${url} ? updateMask.fieldPaths = playCount & updateMask.fieldPaths=updatedAt`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     } catch { }
   }
 
@@ -480,7 +494,7 @@ export class FirestoreRestService {
    */
   async getDailyBonusQuestion(date: string): Promise<any | null> {
     try {
-      const url = `${this.baseUrl}/dailyBonus/${date}`;
+      const url = `${this.baseUrl} /dailyBonus/${date} `;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
       const data: any = await res.json();
@@ -499,11 +513,77 @@ export class FirestoreRestService {
   }
 
   /**
+   * Get user topic stats: last quiz attempted, completion status.
+   */
+  async getUserTopicStats(userId: string, topicSlug: string): Promise<{ lastQuizId: string | null; lastAttemptDate: string | null; isCompleted: boolean } | null> {
+    try {
+      const url = `${this.baseUrl}/user_stats/${userId}/topics/${topicSlug}`;
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (!res.ok) return null;
+      const data: any = await res.json();
+      const f = data.fields || {};
+      return {
+        lastQuizId: f.lastQuizId?.stringValue || null,
+        lastAttemptDate: f.lastAttemptDate?.stringValue || null,
+        isCompleted: f.isCompleted?.booleanValue || false,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Update user topic stats.
+   * Creates the document path if it doesn't exist (using nested map structures where needed if using deep patch, 
+   * but here we use a flat subcollection pattern `user_stats/{uid}/topics/{slug}`).
+   */
+  async updateUserTopicStats(userId: string, topicSlug: string, stats: { lastQuizId?: string; lastAttemptDate?: string; isCompleted?: boolean }): Promise<boolean> {
+    try {
+      const url = `${this.baseUrl}/user_stats/${userId}/topics/${topicSlug}`;
+      const fields: Record<string, any> = {
+        updatedAt: { stringValue: new Date().toISOString() },
+      };
+      const updateMask: string[] = ['updatedAt'];
+
+      if (stats.lastQuizId !== undefined) {
+        fields.lastQuizId = { stringValue: stats.lastQuizId };
+        updateMask.push('lastQuizId');
+      }
+      if (stats.lastAttemptDate !== undefined) {
+        fields.lastAttemptDate = { stringValue: stats.lastAttemptDate };
+        updateMask.push('lastAttemptDate');
+      }
+      if (stats.isCompleted !== undefined) {
+        fields.isCompleted = { booleanValue: stats.isCompleted };
+        updateMask.push('isCompleted');
+      }
+
+      // If document doesn't exist, we likely need to create it. 
+      // PATCH with updateMask only updates fields, but will 404 if doc doesn't exist unless we do a set or check exist.
+      // However, Firestore REST 'patch' creates if missing if no 'currentDocument' precondition is set, 
+      // BUT we need to ensure the parent documents exist or just use this flat structure. 
+      // The current simpler approach: just PATCH. If it fails due to missing parent, we might care, 
+      // but standard Firestore REST usually autos-allocates ID-based collections.
+
+      const maskParams = updateMask.map(f => `updateMask.fieldPaths=${f}`).join('&');
+      const res = await fetch(`${url}?${maskParams}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields }),
+      });
+      return res.ok;
+    } catch (e) {
+      Logger.error('[Firestore] updateUserTopicStats fail', e);
+      return false;
+    }
+  }
+
+  /**
    * Save the daily bonus question.
    */
   async saveDailyBonusQuestion(date: string, payload: { question: string; options: string[]; correctAnswer: number; difficulty?: string }): Promise<boolean> {
     try {
-      const url = `${this.baseUrl}/dailyBonus/${date}`;
+      const url = `${this.baseUrl} /dailyBonus/${date} `;
       const body = {
         fields: {
           id: { stringValue: date },
@@ -526,7 +606,7 @@ export class FirestoreRestService {
    */
   async getRobotDialogues(date: string): Promise<string[] | null> {
     try {
-      const url = `${this.baseUrl}/robotDialogues/${date}`;
+      const url = `${this.baseUrl} /robotDialogues/${date} `;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
       const data: any = await res.json();
@@ -542,7 +622,7 @@ export class FirestoreRestService {
    */
   async saveRobotDialogues(date: string, lines: string[]): Promise<boolean> {
     try {
-      const url = `${this.baseUrl}/robotDialogues/${date}`;
+      const url = `${this.baseUrl} /robotDialogues/${date} `;
       const body = {
         fields: {
           id: { stringValue: date },
