@@ -8,6 +8,7 @@ import { useUsername } from './hooks/useUsername';
 import { useLeaderboard } from './hooks/useLeaderboard';
 import { useLandingSummary } from './hooks/useLandingSummary';
 import { useHistory } from './hooks/useHistory';
+import { useBackgroundMusic } from './hooks/useBackgroundMusic';
 import { CONFIG } from '../shared/constants';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { LandingHero } from './components/landing/LandingHero';
@@ -76,25 +77,20 @@ export const App = () => {
     return null;
   });
 
-  // Background music state
-  const [musicOn, setMusicOn] = useState<boolean>(() => {
-    try { const v = localStorage.getItem(CONFIG.STORAGE_KEYS.MUSIC); return v === 'on'; } catch { return false; }
-  });
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Background music system
+  const { isMuted, toggleMute, setMode, playClick } = useBackgroundMusic();
+
+  // Handle music mode switching
   useEffect(() => {
-    try { localStorage.setItem(CONFIG.STORAGE_KEYS.MUSIC, musicOn ? 'on' : 'off'); } catch {/* ignore */ }
-    const a = audioRef.current;
-    if (!a) return;
-    if (musicOn) {
-      // play only after user interaction; catch autoplay errors silently
-      const playAttempt = a.play();
-      if (playAttempt && typeof playAttempt.catch === 'function') {
-        playAttempt.catch(() => {/* autoplay blocked */ });
-      }
+    if (quizStarted) {
+      setMode('quiz');
     } else {
-      try { a.pause(); } catch {/* ignore */ }
+      setMode('landing');
     }
-  }, [musicOn]);
+  }, [quizStarted, setMode]);
+
+  // Handle volume toggle (replace setMusicOn with toggleMute)
+  // ... (UI binding happens in the render block)
 
   // Leaderboard hook (per selected topic)
   // Enable leaderboard as soon as quiz ends (showScore) or while viewing start screen for previously selected topic
@@ -471,14 +467,6 @@ export const App = () => {
   // duplicate completeQuiz removed (defined earlier to satisfy handler dependencies)
 
   const startQuiz = () => {
-    // Auto enable music on first quiz start if currently off (implicit consent via interaction)
-    try {
-      const pref = localStorage.getItem('streax.music');
-      if (pref === null || pref === 'on') {
-        // Turn on if not explicitly set to off
-        setMusicOn(true);
-      }
-    } catch {/* ignore */ }
     setQuizStarted(true);
     setCurrentQuestionIndex(0);
     setScore(0);
@@ -643,11 +631,11 @@ export const App = () => {
         <div className="flex justify-between items-center mb-4 min-h-10 gap-2">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setMusicOn(m => !m)}
-              className={`modern-button px-3 py-1 text-xs font-bold ${musicOn ? 'modern-button-primary' : 'modern-button-secondary'}`}
-              aria-label="Toggle background music"
+              onClick={toggleMute}
+              className={`modern-button px-3 py-1 text-xs font-bold ${!isMuted ? 'modern-button-primary' : 'modern-button-secondary'}`}
+              aria-label={isMuted ? 'Unmute music' : 'Mute music'}
             >
-              {musicOn ? '♪ Music On' : '♪ Music Off'}
+              {isMuted ? '♪ Music Off' : '♪ Music On'}
             </button>
           </div>
           {authUser && (
@@ -657,8 +645,6 @@ export const App = () => {
             </div>
           )}
         </div>
-        {/* Hidden audio element (user provided mp3 placed in public or assets). Fallback to /assets/bgm.mp3 */}
-        <audio ref={audioRef} src="/assets/bgm.mp3" loop preload="auto" style={{ display: 'none' }} />
 
         {/* AuthModal Removed - Implicit Auth Only */}
         <div
