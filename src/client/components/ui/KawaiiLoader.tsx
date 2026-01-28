@@ -11,6 +11,7 @@ export const KawaiiLoader: React.FC<KawaiiLoaderProps> = ({ isVisible, progress,
     const [show, setShow] = useState(isVisible);
 
     useEffect(() => {
+        console.log('[KawaiiLoader] isVisible changed:', isVisible, 'progress:', progress);
         if (isVisible) setShow(true);
         else {
             // Small delay to allow exit animation if desired, but for now instant unmount to be snappy
@@ -20,6 +21,8 @@ export const KawaiiLoader: React.FC<KawaiiLoaderProps> = ({ isVisible, progress,
     }, [isVisible]);
 
     if (!show && !isVisible) return null;
+
+    console.log('[KawaiiLoader] Rendering portal, show:', show, 'isVisible:', isVisible);
 
     return createPortal(
         <div

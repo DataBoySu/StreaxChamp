@@ -206,6 +206,7 @@ export const TopicSelector: React.FC<{
     }
 
     setAddingTopic(true);
+    console.log('[TopicSelector] setAddingTopic(true) called');
     setProgress(5);
     try {
       const formatted = toTitleCase(topicName);

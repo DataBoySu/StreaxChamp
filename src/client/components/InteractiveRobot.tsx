@@ -521,7 +521,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
         whiteSpace: 'nowrap',
         marginTop: 12
       }}>
-        SYSTEM ONLINE - USER: {username.toUpperCase()}
+        USER: {username.toUpperCase()}
       </div>
     </motion.div>
   );
