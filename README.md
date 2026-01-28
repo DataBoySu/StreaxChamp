@@ -13,11 +13,12 @@ StreaxChamp is a magical, AI-powered trivia game designed specifically for Reddi
 **We are actively looking for play-testers and fellow developers!**
 
 👉 **Development Subreddit:** [/r/streax_champ_dev](https://www.reddit.com/r/streax_champ_dev)
+👉 **GitHub Repository:** [DataBoySu/StreaxChamp](https://github.com/DataBoySu/StreaxChamp)
 
-Feel free to jump in and play-test the app!
-
-*   **For Players:** You can play any existing quiz instantly! Currently, to save resources, play-testers are limited to **1 AI Generation per day** (but unlimited plays on existing topics).
-*   **For Developers:** We'd love your help polishing the code, adding features, or just hanging out!
+**Start Playing Now!**
+*   **For Players:** You can play any existing quiz instantly! (Testers limited to 1 Generation/Day).
+*   **For Developers:** Help us polish the code or add features.
+*   **❤️ PLEASE UPVOTE & SHARE if you enjoy the app! It helps us a ton! (˶ᵔ ᵕ ᵔ˶)**
 
 ---
 

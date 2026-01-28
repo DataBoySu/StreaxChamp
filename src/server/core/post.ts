@@ -12,7 +12,7 @@ export const createPost = async (redditClient: any, subredditNameArg?: string) =
   try {
     const post = await redditClient.submitCustomPost({
       subredditName,
-      title: `${CONFIG.GAME.NAME} — Daily Quiz`,
+      title: `⚡ Can you beat the 5-Question Streak? Play now! 🏆`,
       entry: 'default'
     });
     console.log(`[createPost] Success! Post ID: ${post.id}`);
