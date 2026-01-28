@@ -16,6 +16,7 @@ export const CONFIG = {
         DEFAULT_QUESTIONS_COUNT: 5,
         TIMER_DURATION: 15, // seconds
         BONUS_TIMER_DURATION: 15,
+        TOP_HOT_TOPICS_COUNT: 5,
     },
     SERVER: {
         DEFAULT_SUBREDDIT: 'streax_champ_dev',
@@ -142,5 +143,9 @@ export const CONFIG = {
     GEMMA: {
         MODEL_ID: 'gemma-3-12b-it',
         API_ENDPOINT_TEMPLATE: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
+    },
+    LIMITS: {
+        DAILY_TOPIC_GEN: 1,
+        DEV_USERNAME: 'Pretend-Pangolin-846'
     }
 };

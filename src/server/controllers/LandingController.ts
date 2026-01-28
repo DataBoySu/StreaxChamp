@@ -3,6 +3,7 @@ import { LeaderboardService } from '../services/LeaderboardService';
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { Logger } from '../Logger';
 import { CacheService } from '../services/CacheService';
+import { CONFIG } from '../../shared/constants';
 
 /**
  * Controller for landing page summary data
@@ -26,17 +27,30 @@ export class LandingController {
                 fs.listTopics()
             ]);
 
-            // Map totalScore to score for UI compatibility (no topic info needed)
-            const globalTop = globalTotalsRaw.map(entry => ({
-                userKey: entry.userKey,
-                nickname: entry.nickname,
-                score: entry.totalScore
-            }));
+            // Map totalScore to score and deduplicate by nickname (taking highest score)
+            const uniqueMap = new Map<string, typeof globalTotalsRaw[0]>();
+
+            globalTotalsRaw.forEach(entry => {
+                const existing = uniqueMap.get(entry.nickname);
+                if (!existing || entry.totalScore > existing.totalScore) {
+                    uniqueMap.set(entry.nickname, entry);
+                }
+            });
+
+            // Convert map back to array and sort
+            const globalTop = Array.from(uniqueMap.values())
+                .sort((a, b) => b.totalScore - a.totalScore)
+                .map(entry => ({
+                    userKey: entry.userKey,
+                    nickname: entry.nickname,
+                    score: entry.totalScore
+                }));
+
 
             const summary = {
                 globalTop: globalTop.slice(0, 10),
                 globalTotals: globalTop.slice(0, 50),
-                hotTopics: topics.slice(0, 6), // Top 6 topics
+                hotTopics: topics.slice(0, CONFIG.GAME.TOP_HOT_TOPICS_COUNT),
                 popular: topics.slice(0, 10),
                 top3: globalTop.slice(0, 3)
             };

@@ -17,7 +17,7 @@ interface UseHistoryReturn {
 }
 
 const CACHE_KEY = 'play_history_cache';
-const CACHE_TTL = 30 * 1000; // 30 seconds aggressive cache
+const CACHE_TTL = 120 * 1000; // 2 minutes cache
 
 export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryReturn => {
     const [history, setHistory] = useState<PlayHistoryEntry[]>([]);
@@ -35,10 +35,7 @@ export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryRet
                     // Use cache if fresh enough and we have data
                     if (Date.now() - timestamp < CACHE_TTL && data.length > 0) {
                         setHistory(data);
-                        // Background refresh if cache is > 30s old (was 10s)
-                        if (Date.now() - timestamp > 30000) {
-                            void fetchHistory(true);
-                        }
+                        // Skip background refresh - let polling handle it
                         return;
                     }
                 } catch (e) { /* ignore */ }
@@ -62,27 +59,21 @@ export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryRet
         } finally {
             setLoading(false);
         }
-    }, [enabled]);
+    }, [enabled, history.length]);
 
     // Initial fetch
     useEffect(() => {
         void fetchHistory();
     }, [fetchHistory]);
 
-    // Auto-refresh interval (2 minutes)
-    // Reduce noise: polling is now 2 minutes instead of 60s
+    // Auto-refresh interval (5 minutes)
     useEffect(() => {
         if (!enabled || !pollingEnabled) return;
-        const interval = setInterval(() => void fetchHistory(true), 120000); // 2 minutes
+        const interval = setInterval(() => void fetchHistory(true), 300000); // 5 minutes
         return () => clearInterval(interval);
     }, [enabled, pollingEnabled, fetchHistory]);
 
-    // Window focus revalidation
-    useEffect(() => {
-        const onFocus = () => void fetchHistory(true);
-        window.addEventListener('focus', onFocus);
-        return () => window.removeEventListener('focus', onFocus);
-    }, [fetchHistory]);
+    // Window focus removed - caused too many requests
 
     const savePlay = useCallback(async (username: string, nickname: string, topicSlug: string, topicTitle: string) => {
         try {

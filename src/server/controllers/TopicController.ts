@@ -5,6 +5,8 @@ import { generateUnifiedContent, GeneratedQuizQuestion } from '../services/Gemin
 import { slugify, toTitleCase } from '../utils/textUtils';
 import { AppError } from '../utils/AppError';
 import { CacheService } from '../services/CacheService';
+import { reddit } from '@devvit/web/server';
+import { CONFIG } from '../../shared/constants';
 
 /**
  * Controller for managing topics, including listing, status checks, and AI-driven generation.
@@ -96,8 +98,47 @@ export class TopicController {
                 return res.status(400).json({ error: 'Topic is required' });
             }
 
+            // 0. CHECK RATE LIMITS
+            const { redis } = await import('@devvit/web/server');
+
+            // Resolve username: try context first, then userKey, then 'anon'
+            let username = 'anon';
+            try {
+                // Try to get from Devvit context (secure)
+                const curr = await reddit.getCurrentUsername();
+                if (curr) username = curr;
+            } catch { /* ignore */ }
+
+            // Fallback to client-provided key if server-side resolution fails (less secure but needed if context missing)
+            if (username === 'anon' && userKey) {
+                username = String(userKey);
+            }
+
+            // Bypass for Developer
+            const isDev = username === CONFIG.LIMITS.DEV_USERNAME;
+
+            if (!isDev) {
+                const today = new Date().toISOString().slice(0, 10);
+                const limitKey = `limit:topic_gen:${username}:${today}`;
+                const currentCount = Number((await redis.get(limitKey)) ?? 0);
+
+                if (currentCount >= CONFIG.LIMITS.DAILY_TOPIC_GEN) {
+                    Logger.warn(`[Generate] 🚫 Rate limit hit for ${username}`);
+                    return res.status(429).json({
+                        error: 'Daily generation limit reached. Come back tomorrow!',
+                        limitReached: true
+                    });
+                }
+
+                // Increment limit (expiry 24h)
+                await redis.incrBy(limitKey, 1);
+                await redis.expire(limitKey, 60 * 60 * 24);
+            } else {
+                Logger.info(`[Generate] 🛡️ Dev bypass active for ${username}`);
+            }
+
             const fs = new FirestoreRestService();
-            Logger.info('[Generate] starting atomic pipeline', { input: topic });
+            Logger.info('[Generate] starting atomic pipeline', { input: topic, username });
 
             // ═══════════════════════════════════════════════════════════════
             // PHASE 1: GENERATE & VALIDATE (100% IN-MEMORY, NO API CALLS)
@@ -244,6 +285,12 @@ export class TopicController {
             }
 
             Logger.info('[Generate] ✅ Pipeline complete', { slug, title });
+
+            // Invalidate caches so new topic appears immediately
+            const cache = CacheService.getInstance();
+            await cache.del('topics_list');
+            await cache.del('landing_summary');
+            Logger.info('[Generate] ✓ Caches invalidated', { keys: ['topics_list', 'landing_summary'] });
 
             res.status(200).json({
                 title,

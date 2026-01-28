@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import TopicButtonNew from './TopicButton';
 import './animations.css';
+import { RefreshCw, X } from 'lucide-react';
 import FirebaseTopics, { TopicDoc } from '../../services/FirebaseTopics';
 import { firebaseQuizService } from '../../services/FirebaseQuizService';
 import { useBackoffPolling } from '../../hooks/useBackoffPolling';
-import { QuizGenerationLoader } from '../ui/QuizGenerationLoader';
+import { KawaiiLoader } from '../ui/KawaiiLoader'; // [NEW] Import
 
 // Utility function to slugify a title (kept local)
 const slugify = (s: string) =>
@@ -49,59 +50,61 @@ export const TopicSelector: React.FC<{
   const optimisticRef = useRef<Record<string, TopicDoc>>({});
 
   // Fetch topics from REST API with client-side caching
-  useEffect(() => {
-    const CACHE_KEY = 'streax:topics_selector';
-    const CACHE_TTL = 600000; // 10 minutes
+  const CACHE_KEY = 'streax:topics_selector';
+  const CACHE_TTL = 600000; // 10 minutes
 
-    const getCachedTopics = (): TopicDoc[] | null => {
-      try {
-        const raw = localStorage.getItem(CACHE_KEY);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (!parsed.ts || !parsed.data) return null;
-        if (Date.now() - parsed.ts > CACHE_TTL) {
-          localStorage.removeItem(CACHE_KEY);
-          return null;
-        }
-        return parsed.data;
-      } catch {
+  const getCachedTopics = (): TopicDoc[] | null => {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed.ts || !parsed.data) return null;
+      if (Date.now() - parsed.ts > CACHE_TTL) {
+        localStorage.removeItem(CACHE_KEY);
         return null;
       }
-    };
+      return parsed.data;
+    } catch {
+      return null;
+    }
+  };
 
-    const fetchTopics = async () => {
-      // Check cache first
+  const fetchTopics = async (force = false) => {
+    // Check cache first (unless forced)
+    if (!force) {
       const cached = getCachedTopics();
       if (cached) {
         setTopics(cached);
         return;
       }
+    }
 
-      // Cache miss - fetch from API
-      try {
-        const resp = await fetch('/api/topics');
-        if (!resp.ok) return;
-        const data = await resp.json();
+    // Cache miss or forced refresh - fetch from API
+    try {
+      const resp = await fetch('/api/topics');
+      if (!resp.ok) return;
+      const data = await resp.json();
 
-        // Map to TopicDoc format
-        const mapped: TopicDoc[] = (data || []).map((t: any) => ({
-          id: t.slug || '',
-          name: t.title || '',
-          slug: t.slug || '',
-          urls: {},
-          hasQuiz: false,
-          status: 'ready',
-          createdAt: Date.now()
-        }));
+      // Map to TopicDoc format
+      const mapped: TopicDoc[] = (data || []).map((t: any) => ({
+        id: t.slug || '',
+        name: t.title || '',
+        slug: t.slug || '',
+        urls: {},
+        hasQuiz: false,
+        status: 'ready',
+        createdAt: Date.now()
+      }));
 
-        setTopics(mapped);
-        // Cache with timestamp
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: mapped }));
-      } catch (err) {
-        console.error('[TopicSelector] Failed to fetch topics:', err);
-      }
-    };
+      setTopics(mapped);
+      // Cache with timestamp
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: mapped }));
+    } catch (err) {
+      console.error('[TopicSelector] Failed to fetch topics:', err);
+    }
+  };
 
+  useEffect(() => {
     void fetchTopics();
   }, []);
 
@@ -135,21 +138,47 @@ export const TopicSelector: React.FC<{
   const requestQuiz = async (topic: TopicDoc) => {
     if (generatingSlug) return; // Already generating
     const slug = topic.slug || slugify(topic.name);
+
     setGeneratingSlug(slug);
+    // NEW: Also trigger progress for the Kawaii Loader
+    setProgress(10);
+
     setGenerationError(null);
     setExclusiveSlug(slug); // lock exclusive vibe on the chosen topic
     console.log('[QuizGen] Requesting quiz for topic', slug);
+
+    // Simulate progress while fetching
+    const progressTimer = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 10;
+      });
+    }, 500);
+
     try {
       const result = await firebaseQuizService.getOrGenerateTopicQuiz(slug);
       console.log('[QuizGen] Response', result);
+
+      clearInterval(progressTimer);
+      setProgress(100);
+
       // Pass through bonus if present on server response
       // result usually has top-level id (quizId)
+
+      // Delay slightly for effect
+      await new Promise(r => setTimeout(r, 800));
+
       onTopicReady?.({ title: topic.name, slug, quizId: result.id, quiz: result?.quiz || result, bonus: result?.bonus || null });
     } catch (e) {
       console.warn('[QuizGen] Failed', e);
       setGenerationError((e as Error).message || 'Quiz generation failed');
+      clearInterval(progressTimer);
+      setProgress(0);
     } finally {
-      setGeneratingSlug(null);
+      // Generating slug stays explicitly true until onTopicReady unmounts us or we fail
+      if (generationError) {
+        setGeneratingSlug(null);
+      }
     }
   };
 
@@ -207,28 +236,35 @@ export const TopicSelector: React.FC<{
         }
         const data = await resp.json();
         console.log('[GenerateTopic] provider:', data.provider, data.fallbackReason ? `reason=${data.fallbackReason}` : '');
-        setProgress(85);
-        // Optimistic add to local list if not already present (since snapshot may be unavailable in CSP)
-        setTopics((prev) => {
-          if (prev.some((t) => t.slug === data.slug)) return prev;
-          const urlMap: Record<string, string> = {};
-          (data.sources || []).forEach((url: string, i: number) => { urlMap[`src${i + 1}`] = url; });
-          const optimistic: TopicDoc = {
-            id: data.slug,
-            name: data.title,
-            createdAt: Date.now(),
-            slug: data.slug,
-            urls: urlMap,
-            hasQuiz: !!data.hasQuiz, // STRICT: Only true if server successfully saved the quiz
-            status: 'ready',
-          };
-          if (optimistic.slug) optimisticRef.current[optimistic.slug] = optimistic;
-          return [optimistic, ...prev];
+
+        // Success! Now initiate the smooth fill for the artificial delay.
+        setProgress(90);
+
+        // USER REQUEST: Extend loading state by 3s + Smoothly fill progress bar
+        const delayDuration = 3000;
+        const startTime = Date.now();
+        const startVal = 90;
+
+        await new Promise<void>(resolve => {
+          const timer = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const p = Math.min(100, startVal + (elapsed / delayDuration) * (100 - startVal));
+            setProgress(p);
+
+            if (elapsed >= delayDuration) {
+              clearInterval(timer);
+              resolve();
+            }
+          }, 30); // ~30fps smooth update
         });
 
         // Invalidate selector cache
         localStorage.removeItem('streax:topics_selector');
+
+        // Fetch fresh list from server (now that we waited for indexing)
+        await fetchTopics(true);
       }
+
       setQuery('');
       // Trigger immediate poll to refresh list
       resetTopicPolling();
@@ -236,7 +272,11 @@ export const TopicSelector: React.FC<{
       console.error('Error adding topic:', err);
     } finally {
       setProgress(100);
-      setTimeout(() => { setAddingTopic(false); setProgress(0); }, 500);
+      // Small delay before unmounting to show 100% complete
+      setTimeout(() => {
+        setAddingTopic(false);
+        setProgress(0);
+      }, 500);
     }
   }
 
@@ -266,8 +306,16 @@ export const TopicSelector: React.FC<{
             )}
           </div>
 
-          {/* Close Action */}
-          <div className="flex-[1] flex justify-center">
+          {/* Close/Refresh Action */}
+          <div className="flex-[1] flex justify-center items-center gap-2">
+            <button
+              onClick={() => fetchTopics(true)}
+              className="p-3 rounded-lg bg-slate-800/80 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition-all transform hover:rotate-180"
+              title="Refresh Topics"
+            >
+              <RefreshCw size={20} />
+            </button>
+
             <button
               onClick={handleClose}
               className="p-3 rounded-lg bg-slate-800/80 border border-white/10 text-slate-300 hover:bg-red-500/20 hover:text-white transition-all transform hover:rotate-90"
@@ -310,24 +358,13 @@ export const TopicSelector: React.FC<{
 
       {/* Main content area - flex-1 to take available space between header and footer */}
       <div className="flex-1 w-full max-w-full overflow-y-auto">
-        {/* Loading indicator */}
-        {/* Loading indicator (unified for topic & quiz gen) */}
-        {(loading || addingTopic || generatingSlug) && (
+
+        {/* Keep generic loading for fetch only */}
+        {(loading && !addingTopic && !generatingSlug) && (
           <div className="w-full max-w-4xl mx-auto px-5 pt-6 pb-2">
-            <div className="bg-slate-800/60 rounded-lg p-4 mb-5">
-              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-orange-500 via-red-500 to-red-600 transition-all duration-300"
-                  style={{ width: `${addingTopic ? progress : 100}%` }}
-                />
-              </div>
-              <div className="mt-3 text-center text-sm text-slate-400">
-                {addingTopic
-                  ? (progress < 90 ? 'Generating topic with AI...' : 'Finalizing...')
-                  : (generatingSlug ? 'Generating specific quiz...' : 'Loading topics...')}
-              </div>
+            <div className="bg-slate-800/60 rounded-lg p-4 mb-5 animate-pulse">
+              <div className="text-center text-sm text-slate-400">Loading topics...</div>
             </div>
-            {/* Spacer to avoid overlap with footer note while loading */}
             <div className="h-8" aria-hidden />
           </div>
         )}
@@ -344,52 +381,52 @@ export const TopicSelector: React.FC<{
             {!loading && topics.length > 0 && (
               <div className={`w-full ${topics.length === 1 ? 'flex justify-center' : ''}`}>
                 <div className={topics.length === 1 ? 'w-full max-w-md' : 'grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full'}>
-                  {topics.filter(t => (t.name && t.name.trim().length > 0)).map((topic) => {
-                    const isHighlighted = topic.name === highlightedTopic;
-                    // Display a title-cased label for neatness
-                    const displayName = toTitleCase(topic.name || '');
-                    const slug = topic.slug || slugify(topic.name);
-                    const isPopular = popularSlugs.includes(slug);
-                    const isExclusive = exclusiveSlug === slug;
-                    const vibeClass = exclusiveSlug ? (isExclusive ? 'vibe-beacon' : '') : (isPopular ? 'vibe-beacon' : '');
-                    // If it's the only topic, center it and limit width so it doesn't stretch
-                    if (topics.length === 1) {
+                  {topics
+                    .filter(t => (t.name && t.name.trim().length > 0))
+                    // [SEARCH FILTER] Real-time filtering (starts with query, case-insensitive)
+                    .filter(t => !query || t.name.toLowerCase().startsWith(query.trim().toLowerCase()))
+                    .map((topic) => {
+                      const isHighlighted = topic.name === highlightedTopic;
+                      const displayName = toTitleCase(topic.name || '');
+                      const slug = topic.slug || slugify(topic.name);
+                      const isPopular = popularSlugs.includes(slug);
+                      const isExclusive = exclusiveSlug === slug;
+                      const vibeClass = exclusiveSlug ? (isExclusive ? 'vibe-beacon' : '') : (isPopular ? 'vibe-beacon' : '');
+
+                      if (topics.length === 1) {
+                        return (
+                          <div
+                            key={topic.id}
+                            ref={(el) => { topicRefs.current[topic.name] = el; }}
+                          >
+                            <div className="relative w-full flex justify-center">
+                              <TopicButtonNew
+                                title={displayName}
+                                compact
+                                onClick={() => requestQuiz(topic)}
+                                className={`${isHighlighted ? 'animate-shake' : ''} ${vibeClass} ${generatingSlug === (slug) ? 'opacity-60 pointer-events-none' : ''}`}
+                              />
+                            </div>
+                          </div>
+                        );
+                      }
+
                       return (
                         <div
                           key={topic.id}
                           ref={(el) => { topicRefs.current[topic.name] = el; }}
-                          className={`${isHighlighted ? 'animate-glow' : ''} w-full mx-auto flex justify-center`}
+                          className={`${isHighlighted ? 'animate-glow' : ''} w-full`}
                         >
-                          <div className="relative w-full flex justify-center">
+                          <div className="relative w-full">
                             <TopicButtonNew
                               title={displayName}
-                              compact
                               onClick={() => requestQuiz(topic)}
                               className={`${isHighlighted ? 'animate-shake' : ''} ${vibeClass} ${generatingSlug === (slug) ? 'opacity-60 pointer-events-none' : ''}`}
                             />
-                            {/* Loader handled globally */}
                           </div>
                         </div>
                       );
-                    }
-
-                    return (
-                      <div
-                        key={topic.id}
-                        ref={(el) => { topicRefs.current[topic.name] = el; }}
-                        className={`${isHighlighted ? 'animate-glow' : ''} w-full`}
-                      >
-                        <div className="relative w-full">
-                          <TopicButtonNew
-                            title={displayName}
-                            onClick={() => requestQuiz(topic)}
-                            className={`${isHighlighted ? 'animate-shake' : ''} ${vibeClass} ${generatingSlug === (slug) ? 'opacity-60 pointer-events-none' : ''}`}
-                          />
-                          {/* Loader handled globally */}
-                        </div>
-                      </div>
-                    );
-                  })}
+                    })}
                   {topics.length > 0 && topics.filter(t => (t.name && t.name.trim().length > 0)).length === 0 && (
                     <div className="text-sm text-red-400 col-span-full">
                       Topics fetched but missing 'name' field. Check seeding / backfill.
@@ -428,12 +465,14 @@ export const TopicSelector: React.FC<{
         )}
       </div>
 
-      <QuizGenerationLoader
-        isVisible={!!generatingSlug}
-        {...(generatingSlug ? {
-          topicName: toTitleCase(topics.find(t => (t.slug === generatingSlug || slugify(t.name) === generatingSlug))?.name || generatingSlug)
-        } : {})}
+      {/* UNIVERSAL KAWAII LOADER */}
+      {/* Shows for addingTopic (Add) OR generatingSlug (Quiz Gen) */}
+      <KawaiiLoader
+        isVisible={addingTopic || !!generatingSlug}
+        progress={progress}
+        message={addingTopic ? "loading" : "generating quiz"}
       />
+
     </div>
   );
 };

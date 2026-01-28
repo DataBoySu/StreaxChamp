@@ -114,6 +114,7 @@ export class FirestoreRestService {
         },
       }));
 
+      const meta = quiz.metadata || {};
       const body = {
         fields: {
           id: { stringValue: today },
@@ -121,13 +122,13 @@ export class FirestoreRestService {
           metadata: {
             mapValue: {
               fields: {
-                generatedAt: { stringValue: quiz.metadata.generatedAt || nowIso },
-                sourceWikis: { arrayValue: { values: (quiz.metadata.sourceWikis || []).map((s: string) => ({ stringValue: s })) } },
-                version: { stringValue: quiz.metadata.version || 'v1' },
-                model: { stringValue: quiz.metadata.model || 'gemini' },
-                generator: { stringValue: quiz.metadata.generator || 'system' },
-                topic: { stringValue: quiz.metadata.topic || 'General Knowledge' },
-                difficulty: { stringValue: quiz.metadata.difficulty || 'mixed' },
+                generatedAt: { stringValue: meta.generatedAt || nowIso },
+                sourceWikis: { arrayValue: { values: (meta.sourceWikis || []).map((s: string) => ({ stringValue: s || '' })) } },
+                version: { stringValue: meta.version || 'v1' },
+                model: { stringValue: meta.model || 'gemini' },
+                generator: { stringValue: meta.generator || 'system' },
+                topic: { stringValue: meta.topic || 'General Knowledge' },
+                difficulty: { stringValue: meta.difficulty || 'mixed' },
                 source: { stringValue: 'system' }
               },
             },
@@ -483,6 +484,7 @@ export class FirestoreRestService {
           },
         },
       }));
+      const meta = quiz.metadata || {};
       const body = {
         fields: {
           id: { stringValue: date },
@@ -492,19 +494,25 @@ export class FirestoreRestService {
           metadata: {
             mapValue: {
               fields: {
-                generatedAt: { stringValue: quiz.metadata.generatedAt || nowIso },
-                sourceWikis: { arrayValue: { values: (quiz.metadata.sourceWikis || []).map((s: string) => ({ stringValue: s })) } },
-                version: { stringValue: quiz.metadata.version || 'v1' },
-                model: { stringValue: quiz.metadata.model || 'gemini' },
-                generator: { stringValue: quiz.metadata.generator || 'system' },
+                generatedAt: { stringValue: meta.generatedAt || nowIso },
+                sourceWikis: { arrayValue: { values: (meta.sourceWikis || []).map((s: string) => ({ stringValue: s || '' })) } },
+                version: { stringValue: meta.version || 'v1' },
+                model: { stringValue: meta.model || 'gemini' },
+                generator: { stringValue: meta.generator || 'system' },
               },
             },
           },
         },
       };
       const res = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      return res.ok;
-    } catch {
+      if (!res.ok) {
+        const txt = await res.text();
+        Logger.error(`[Firestore] saveTopicQuiz FAIL ${res.status}`, { url, response: txt });
+        return false;
+      }
+      return true;
+    } catch (e) {
+      Logger.error('[Firestore] saveTopicQuiz EXCEPTION', e);
       return false;
     }
   }

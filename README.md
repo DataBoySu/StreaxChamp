@@ -9,6 +9,18 @@ StreaxChamp is a magical, AI-powered trivia game designed specifically for Reddi
 
 ---
 
+### 💌 Join the Party!
+**We are actively looking for play-testers and fellow developers!**
+
+👉 **Development Subreddit:** [/r/streax_champ_dev](https://www.reddit.com/r/streax_champ_dev)
+
+Feel free to jump in and play-test the app!
+
+*   **For Players:** You can play any existing quiz instantly! Currently, to save resources, play-testers are limited to **1 AI Generation per day** (but unlimited plays on existing topics).
+*   **For Developers:** We'd love your help polishing the code, adding features, or just hanging out!
+
+---
+
 ### 💖 Why your community will love it...
 
 *   **Infinite Variety** 🧠: Powered by Google Gemini AI, it can generate high-quality quizzes on *anything*. Whether your sub is about space, retro games, or medieval history—we've got it covered!
