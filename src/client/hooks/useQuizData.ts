@@ -55,11 +55,22 @@ export const useQuizData = (): UseQuizDataResult => {
 
       interface ApiQuestion { question?: string; options?: unknown[]; correctAnswer?: string; difficulty?: string; }
       const mapped: AppQuestion[] = (raw.questions as ApiQuestion[]).map((q) => {
-        // Strict validation: Server MUST provide 'options' as per contract.
-        const rawOptions = q.options;
+        // Robust validation: Server SHOULD provide 'options', but cached Daily Quizzes might use 'answers'
+        // We accept either to ensure today's cached quiz (generated before the prompt fix) still loads.
+        const rawOptions = q.options || (q as any).answers;
         const ans = Array.isArray(rawOptions) ? rawOptions.map(a => String(a)) : [];
-        // If options are missing, this question is invalid - but for now we map it as empty to fail gracefully downstream
-        const corr = q.correctAnswer && ans.includes(q.correctAnswer) ? q.correctAnswer : ans[0] || '';
+
+        // Handle correct Answer: support both string match (preferred) and legacy/AI numeric index
+        let corr = '';
+        if (typeof q.correctAnswer === 'number' && ans[q.correctAnswer]) {
+          corr = ans[q.correctAnswer] || '';
+        } else if (typeof q.correctAnswer === 'string') {
+          // Try exact match first, then fallback
+          corr = ans.includes(q.correctAnswer) ? q.correctAnswer : '';
+        }
+
+        // Final fallback: if no valid correct answer found, use first option (prevent crash, effectively makes Q1 correct)
+        if (!corr && ans.length > 0) corr = ans[0] || '';
         return {
           question: String(q.question || ''),
           answers: ans,

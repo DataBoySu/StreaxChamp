@@ -91,8 +91,12 @@ export const CONFIG = {
                             - NO PREAMBLE. NO CODE BLOCKS. NO MARKDOWN.
                             - NO EXPLANATIONS OUTSIDE THE "explanation" FIELD.
                             - START WITH { AND END WITH }.
-                            SCHEMA: {"questions": [{"id": "uuid", "question": "...", "options": ["...", "...", "...", "..."], "correctAnswer": 0_3, "difficulty": "...", "category": "...", "explanation": "..."}]}
-                            GOAL: 5 challenging, unique, and factually accurate questions.`,
+                            SCHEMA: {"questions": [{"id": "uuid", "question": "...", "options": ["...", "...", "...", "..."], "correctAnswer": "Exact String Match", "difficulty": "...", "category": "...", "explanation": "..."}]}
+                            GOAL: 5 challenging, unique, and factually accurate questions.
+                            IMPORTANT:
+                            - "options" MUST be an array of 4 distinct string choices.
+                            - "correctAnswer" MUST be an exact string match to one of the "options".
+                            - Do not use "answers", use "options".`,
 
             UNIFIED_GENERATOR: `SYSTEM ROLE: You are a KNOWLEDGE GRAPH & QUIZ ENGINE.
                                 INPUT: A raw user topic string which may be deformed.

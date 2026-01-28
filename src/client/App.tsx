@@ -652,6 +652,24 @@ export const App = () => {
                 setShowNoTopicPrompt(false);
                 setShowTopicMenu(true);
               }}
+              onPlayDaily={() => {
+                // Explicitly start Daily Quiz Mode
+                setShowNoTopicPrompt(false);
+                setSelectedTopic(null);
+                setSelectedTopicQuiz(null);
+                setTopicQuizStatus('idle');
+
+                // Verify data integrity
+                const dq = dailyQuestions || [];
+                const corrupt = dq.length < NUM_QUESTIONS || dq.some(q => !q || !q.question || !Array.isArray(q.answers) || q.answers.length < 2 || !q.correctAnswer);
+
+                if (corrupt) {
+                  setMessage({ text: 'Daily quiz unavailable. Please try again later or choose a topic.', type: 'error', timesUp: false });
+                  return;
+                }
+
+                startQuiz();
+              }}
             />
           )}
 

@@ -4,11 +4,13 @@ import { motion } from 'framer-motion';
 interface NoTopicPromptProps {
     onClose: () => void;
     onChooseTopic: () => void;
+    onPlayDaily: () => void;
 }
 
 export const NoTopicPrompt: React.FC<NoTopicPromptProps> = ({
     onClose,
     onChooseTopic,
+    onPlayDaily,
 }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -38,6 +40,12 @@ export const NoTopicPrompt: React.FC<NoTopicPromptProps> = ({
                         className="modern-button modern-button-primary w-full py-3 font-bold"
                     >
                         Choose Topic
+                    </button>
+                    <button
+                        onClick={onPlayDaily}
+                        className="modern-button w-full py-3 font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-lg hover:shadow-purple-500/30 transition-all"
+                    >
+                        Play Daily Quiz
                     </button>
                     <button
                         onClick={onClose}
