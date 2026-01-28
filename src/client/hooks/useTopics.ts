@@ -58,6 +58,12 @@ export function useTopics() {
   async function generateTopic(name: string) {
     // call server endpoint to request generation
     const resp = await firebaseQuizService.requestTopicGeneration?.(name);
+
+    // VERIFICATION: Only invalidate cache if the backend returned a valid topic (sanity check)
+    if (resp && (resp.slug || resp.id)) {
+      localStorage.removeItem(CACHE_KEY);
+    }
+
     // return server response but do not mutate topics list yet; the TopicSelector will poll for readiness
     return resp;
   }

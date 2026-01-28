@@ -103,6 +103,109 @@ export async function validateGeminiKey(): Promise<boolean> {
     return true;
 }
 
+// --- Validation ---
+
+/**
+ * STRICT VALIDATOR: Ensures quiz payload meets all requirements before DB persistence.
+ * Returns detailed error list for debugging. Zero tolerance for malformed data.
+ */
+function validateQuizPayload(quiz: any): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // 1. Structure check
+    if (!quiz || typeof quiz !== 'object') {
+        errors.push('Quiz payload is not an object');
+        return { valid: false, errors };
+    }
+
+    if (!Array.isArray(quiz.questions)) {
+        errors.push('quiz.questions is not an array');
+        return { valid: false, errors };
+    }
+
+    const questions = quiz.questions;
+
+    // 2. Quantity check
+    if (questions.length < 5) {
+        errors.push(`Insufficient questions: ${questions.length} (minimum 5 required)`);
+    }
+
+    // 3. Individual question validation
+    questions.forEach((q: any, idx: number) => {
+        const qNum = idx + 1;
+
+        // 3a. Question text
+        if (!q.question || typeof q.question !== 'string' || q.question.trim().length === 0) {
+            errors.push(`Q${qNum}: Missing or empty question text`);
+        } else if (q.question.length > 500) {
+            errors.push(`Q${qNum}: Question too long (${q.question.length} chars, max 500)`);
+        }
+
+        // 3b. Options array
+        if (!Array.isArray(q.options)) {
+            errors.push(`Q${qNum}: options is not an array`);
+        } else {
+            if (q.options.length !== 4) {
+                errors.push(`Q${qNum}: Wrong number of options (${q.options.length}, expected 4)`);
+            }
+
+            const seenOptions = new Set<string>();
+            q.options.forEach((opt: any, optIdx: number) => {
+                if (typeof opt !== 'string') {
+                    errors.push(`Q${qNum}: Option ${optIdx + 1} is not a string`);
+                } else if (opt.trim().length === 0) {
+                    errors.push(`Q${qNum}: Option ${optIdx + 1} is empty`);
+                } else if (opt.length > 200) {
+                    errors.push(`Q${qNum}: Option ${optIdx + 1} too long (${opt.length} chars, max 200)`);
+                } else {
+                    const normalized = opt.trim().toLowerCase();
+                    if (seenOptions.has(normalized)) {
+                        errors.push(`Q${qNum}: Duplicate option detected "${opt}"`);
+                    }
+                    seenOptions.add(normalized);
+                }
+            });
+        }
+
+        // 3c. Correct answer validation
+        if (q.correctAnswer === undefined || q.correctAnswer === null) {
+            errors.push(`Q${qNum}: correctAnswer is missing`);
+        } else if (typeof q.correctAnswer === 'number') {
+            if (q.correctAnswer < 0 || q.correctAnswer > 3) {
+                errors.push(`Q${qNum}: correctAnswer index out of bounds (${q.correctAnswer})`);
+            }
+        } else if (typeof q.correctAnswer === 'string') {
+            // Verify it matches one of the options
+            const hasMatch = q.options?.some((opt: string) =>
+                opt.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()
+            );
+            if (!hasMatch) {
+                errors.push(`Q${qNum}: correctAnswer "${q.correctAnswer}" does not match any option`);
+            }
+        } else {
+            errors.push(`Q${qNum}: correctAnswer has invalid type (${typeof q.correctAnswer})`);
+        }
+
+        // 3d. Difficulty
+        const validDifficulties = ['easy', 'medium', 'hard'];
+        if (!q.difficulty || !validDifficulties.includes(String(q.difficulty).toLowerCase())) {
+            errors.push(`Q${qNum}: Invalid difficulty "${q.difficulty}" (must be easy/medium/hard)`);
+        }
+
+        // 3e. Category
+        if (!q.category || typeof q.category !== 'string' || q.category.trim().length === 0) {
+            errors.push(`Q${qNum}: Missing or empty category`);
+        }
+
+        // 3f. Explanation (optional but validated if present)
+        if (q.explanation !== undefined && (typeof q.explanation !== 'string' || q.explanation.length > 1000)) {
+            errors.push(`Q${qNum}: Invalid explanation (must be string, max 1000 chars)`);
+        }
+    });
+
+    return { valid: errors.length === 0, errors };
+}
+
 // --- Helpers ---
 
 // --- Generators ---
@@ -174,9 +277,20 @@ export async function generateUnifiedContent(rawTopic: string): Promise<{ topic:
         const qList = parsed.quiz?.questions;
         if (!Array.isArray(qList) || qList.length < 5) {
             Logger.warn('[UnifiedGen] Rejected: Insufficient questions', { count: qList?.length });
-            throw new AppError('INSUFFICIENT_QUESTIONS', 422);
+            throw new AppError('QUIZ_INSUFFICIENT_QUESTIONS', 422);
         }
 
+        // STRICT VALIDATION: Verify quiz structure before accepting
+        const validation = validateQuizPayload(parsed.quiz);
+        if (!validation.valid) {
+            Logger.error('[UnifiedGen] VALIDATION FAILED - Quiz rejected', {
+                errorCount: validation.errors.length,
+                errors: validation.errors
+            });
+            throw new AppError(`QUIZ_VALIDATION_FAILED: ${validation.errors[0]}`, 422);
+        }
+
+        Logger.ai('[UnifiedGen] ✅ Quiz passed strict validation');
         return { topic: parsed.topic, quiz: parsed.quiz, model, latencyMs };
 
     } catch (e: any) {

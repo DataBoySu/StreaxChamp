@@ -292,6 +292,64 @@ export class FirestoreRestService {
   }
 
   /**
+   * Delete a topic document from Firestore.
+   * Used for rollback when quiz save fails.
+   */
+  async deleteTopic(slug: string): Promise<boolean> {
+    try {
+      const url = `${this.baseUrl}/topics/${slug}`;
+      const res = await fetch(url, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+      return res.ok;
+    } catch (error) {
+      Logger.error('[Firestore] deleteTopic failed', { slug, error });
+      return false;
+    }
+  }
+
+  /**
+   * Patch specific fields of a topic document.
+   * Used primarily for updating hasQuiz status after quiz save.
+   */
+  async patchTopic(slug: string, updates: Record<string, any>): Promise<boolean> {
+    try {
+      const url = `${this.baseUrl}/topics/${slug}`;
+
+      // Convert updates to Firestore field format
+      const fields: Record<string, any> = {};
+      const updateMask: string[] = [];
+
+      Object.entries(updates).forEach(([key, value]) => {
+        updateMask.push(key);
+
+        // Type-specific encoding
+        if (typeof value === 'boolean') {
+          fields[key] = { booleanValue: value };
+        } else if (typeof value === 'number') {
+          fields[key] = { integerValue: String(value) };
+        } else if (typeof value === 'string') {
+          fields[key] = { stringValue: value };
+        } else if (Array.isArray(value)) {
+          fields[key] = { arrayValue: { values: value.map((v: any) => ({ stringValue: String(v) })) } };
+        } else {
+          fields[key] = { stringValue: String(value) };
+        }
+      });
+
+      const maskParams = updateMask.map(f => `updateMask.fieldPaths=${f}`).join('&');
+      const res = await fetch(`${url}?${maskParams}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields }),
+      });
+
+      return res.ok;
+    } catch (error) {
+      Logger.error('[Firestore] patchTopic failed', { slug, error });
+      return false;
+    }
+  }
+
+  /**
    * Get a single topic document by slug
    */
   async getTopic(slug: string): Promise<any | null> {

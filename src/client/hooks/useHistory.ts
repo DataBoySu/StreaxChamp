@@ -72,7 +72,7 @@ export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryRet
     // Auto-refresh interval (30s)
     useEffect(() => {
         if (!enabled || !pollingEnabled) return;
-        const interval = setInterval(() => void fetchHistory(true), 30000);
+        const interval = setInterval(() => void fetchHistory(true), 60000);
         return () => clearInterval(interval);
     }, [enabled, pollingEnabled, fetchHistory]);
 

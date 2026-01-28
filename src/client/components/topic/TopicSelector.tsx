@@ -208,12 +208,15 @@ export const TopicSelector: React.FC<{
             createdAt: Date.now(),
             slug: data.slug,
             urls: urlMap,
-            hasQuiz: false,
+            hasQuiz: !!data.hasQuiz, // STRICT: Only true if server successfully saved the quiz
             status: 'ready',
           };
           if (optimistic.slug) optimisticRef.current[optimistic.slug] = optimistic;
           return [optimistic, ...prev];
         });
+
+        // Invalidate selector cache
+        localStorage.removeItem('streax:topics_selector');
       }
       setQuery('');
       // Trigger immediate poll to refresh list

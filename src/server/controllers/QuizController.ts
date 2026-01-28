@@ -275,7 +275,12 @@ export class QuizController {
             };
 
             const successStatus = await fs.saveTopicQuiz(slug, todayStr, quizPayload);
-            if (!successStatus) Logger.error('[QuizSaveFail]', { slug, today: todayStr });
+            if (!successStatus) {
+                Logger.error('[QuizSaveFail]', { slug, today: todayStr });
+            } else {
+                // IMPORTANT: Sync parent metadata so UI knows this topic is playable
+                await fs.patchTopic(slug, { hasQuiz: true, lastGenerated: todayStr });
+            }
 
             // Update user stats
             if (userId) {
