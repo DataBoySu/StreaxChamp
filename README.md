@@ -13,6 +13,7 @@ StreaxChamp is a magical, AI-powered trivia game designed specifically for Reddi
 **We are actively looking for play-testers and fellow developers!**
 
 👉 **Development Subreddit:** [/r/streax_champ_dev](https://www.reddit.com/r/streax_champ_dev)
+
 👉 **GitHub Repository:** [DataBoySu/StreaxChamp](https://github.com/DataBoySu/StreaxChamp)
 
 **Start Playing Now!**
