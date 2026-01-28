@@ -25,6 +25,7 @@ router.post('/topics/:slug/quiz', QuizController.getTopicQuiz);
 
 // --- Leaderboard ---
 router.get('/leaderboard/global', LeaderboardController.listGlobal);
+router.get('/leaderboard/:slug', LeaderboardController.listTopicLeaderboard); // Added alias to match frontend
 router.post('/leaderboard/:slug/submit', LeaderboardController.submitScore);
 router.post('/leaderboard/submit', LeaderboardController.submitScore); // Fallback for any legacy calls
 router.get('/topics/:slug/leaderboard', LeaderboardController.listTopicLeaderboard);

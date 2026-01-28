@@ -104,7 +104,7 @@ export const CONFIG = {
                                 5. OUTPUT as a single Atomic JSON object.
 
                                 CONSTRAINTS:
-                                - If topic is nonsense or not a real factory entity, strict sources > 0 check will fail it.
+                                - If topic is a broad category (e.g. "General Knowledge"), provide general reference URLs (e.g. Wikipedia's "Knowledge" page, Britannica, etc).
                                 - SOURCES MUST BE VALID URLs.
                                 - QUESTIONS must be non-repetitive and non-general.
                                 - NO PREAMBLE. START WITH { AND END WITH }.
@@ -114,21 +114,25 @@ export const CONFIG = {
                                   "topic": {
                                     "title": "Canonical Title",
                                     "slug": "kebab-case-slug",
-                                    "sources": ["url1", "url2", "url3"]
+                                    "sources": ["https://en.wikipedia.org/wiki/Topic_Name", "url2", "url3"]
                                   },
                                   "quiz": {
                                     "questions": [
                                       {
                                         "question": "...",
                                         "options": ["A", "B", "C", "D"],
-                                        "correctAnswer": "A" | "B" | "C" | "D",
+                                        "correctAnswer": "A",
                                         "difficulty": "medium or high",
                                         "category": "Lore/Gameplay/History/etc",
                                         "explanation": "Concise fact."
                                       }
                                     ]
                                   }
-                                }`
+                                }
+                                IMPORTANT:
+                                - "options" MUST be an array of 4 distinct string choices.
+                                - "correctAnswer" MUST be an exact string match to one of the "options".
+                                - Do not use "answers", use "options".`
         }
     },
     GEMMA: {

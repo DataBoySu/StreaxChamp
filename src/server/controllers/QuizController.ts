@@ -170,10 +170,11 @@ export class QuizController {
             const rawSlug = req.params.slug;
             if (!rawSlug || typeof rawSlug !== 'string') return res.status(400).json({ error: 'Slug required' });
             const slug: string = rawSlug;
-
             const fs = new FirestoreRestService();
             const todayStr = new Date().toISOString().split('T')[0] || '';
             const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
+
+            Logger.info(`[TopicQuiz] Request received for slug="${slug}"`, { userId }, 'API');
 
             // 1. Check user stats for this topic
             let targetQuizId: string | null = null;
@@ -233,6 +234,7 @@ export class QuizController {
                 const ageDays = ageMs / (1000 * 60 * 60 * 24);
 
                 if (ageDays < 7) {
+                    Logger.info(`[TopicQuiz] Serving recent quiz from DB (Age: ${ageDays.toFixed(1)} days)`, { quizId: quizToServe.id }, 'DATABASE');
                     // Update user stats that they are starting this quiz
                     if (userId) {
                         await fs.updateUserTopicStats(userId, slug, {

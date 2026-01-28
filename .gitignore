@@ -34,3 +34,6 @@ coverage/
 # OS Specific
 Thumbs.db
 Desktop.ini
+
+__pycache__
+__pycache__/*

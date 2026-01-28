@@ -66,7 +66,6 @@ export const App = () => {
   const [selectedTopicQuiz, setSelectedTopicQuiz] = useState<SelectedTopicQuiz | null>(null);
   const [topicQuizStatus, setTopicQuizStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [showNoTopicPrompt, setShowNoTopicPrompt] = useState(false);
-  const [usingRandomFallback, setUsingRandomFallback] = useState(false);
   const [authUser, setAuthUser] = useState<{ redditUsername: string; nickname: string } | null>(() => {
     try {
       const raw = localStorage.getItem(CONFIG.STORAGE_KEYS.AUTH);
@@ -124,7 +123,7 @@ export const App = () => {
   // Derive active questions: prefer topic quiz if present
   interface TopicQuizQuestionRaw { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string; }
   const questions = useMemo(() => {
-    if (!usingRandomFallback && selectedTopicQuiz && Array.isArray(selectedTopicQuiz.questions)) {
+    if (selectedTopicQuiz && Array.isArray(selectedTopicQuiz.questions)) {
       return (selectedTopicQuiz.questions as TopicQuizQuestionRaw[]).map((q) => {
         const options: string[] = q.options || q.answers || [];
         let correct: string;
@@ -135,7 +134,7 @@ export const App = () => {
       });
     }
     return dailyQuestions;
-  }, [selectedTopicQuiz, dailyQuestions, usingRandomFallback]);
+  }, [selectedTopicQuiz, dailyQuestions]);
   // username fetching/debugging removed
 
 
@@ -462,6 +461,11 @@ export const App = () => {
   // duplicate completeQuiz removed (defined earlier to satisfy handler dependencies)
 
   const startQuiz = () => {
+    console.log('[App] ⚡ START QUIZ button clicked', {
+      selectedTopic: selectedTopic?.slug,
+      hasQuestions: questions.length > 0,
+      status: topicQuizStatus
+    });
     setQuizStarted(true);
     setCurrentQuestionIndex(0);
     setScore(0);
@@ -648,23 +652,6 @@ export const App = () => {
                 setShowNoTopicPrompt(false);
                 setShowTopicMenu(true);
               }}
-              onPlayRandom={() => {
-                // Start random (dailyQuestions) mode
-                setUsingRandomFallback(true);
-                setShowNoTopicPrompt(false);
-                // Ensure any topic selection is cleared so logic branches treat as random
-                setSelectedTopic(null);
-                setSelectedTopicQuiz(null);
-                setTopicQuizStatus('ready');
-                // Validate random quiz integrity before starting
-                const dq = dailyQuestions || [];
-                const corrupt = dq.length < NUM_QUESTIONS || dq.some(q => !q || !q.question || !Array.isArray(q.answers) || q.answers.length < 2 || !q.correctAnswer);
-                if (corrupt) {
-                  setMessage({ text: 'Daily quiz data incomplete. Please choose a topic instead.', type: 'error', timesUp: false });
-                  return;
-                }
-                startQuiz();
-              }}
             />
           )}
 
@@ -688,7 +675,6 @@ export const App = () => {
                     setSelectedTopic(null);
                     setSelectedTopicQuiz(null);
                     setTopicQuizStatus('idle'); // Reset status so it doesn't show "Quiz Loaded" immediately
-                    setUsingRandomFallback(false);
                     setMessage({ text: '', type: '', timesUp: false });
                     setTimerActive(false);
                     setTimeLeft(0);
@@ -750,8 +736,16 @@ export const App = () => {
                       setTopicQuizStatus('idle');
                     }}
                     onStartQuiz={() => {
-                      if (selectedTopic && (!selectedTopicQuiz || topicQuizStatus !== 'ready')) return;
-                      if (!selectedTopic) { setShowNoTopicPrompt(true); return; }
+                      if (selectedTopic && (!selectedTopicQuiz || topicQuizStatus !== 'ready')) {
+                        console.warn('[App] 🚫 Quiz flow blocked: topic selected but quiz not ready/error', { topic: selectedTopic.slug, status: topicQuizStatus });
+                        return;
+                      }
+                      if (!selectedTopic) {
+                        console.log('[App] ℹ️ No topic selected, showing prompt');
+                        setShowNoTopicPrompt(true);
+                        return;
+                      }
+                      console.log('[App] 🚀 Starting selected topic quiz:', selectedTopic.slug);
                       startQuiz();
                     }}
                     totalQuestions={NUM_QUESTIONS}

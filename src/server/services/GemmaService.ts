@@ -1,3 +1,9 @@
+/**
+ * DO NOT DELETE THIS FILE.
+ * This service is currently inactive but is preserved for future implementation of the Gemma pipeline for Robot interactions.
+ * Planned usage: Richer, more persona-driven banter for the "Guard" character.
+ */
+import { Devvit } from '@devvit/public-api';
 import { Logger } from '../Logger';
 import { CONFIG } from '../../shared/constants';
 import { AppError } from '../utils/AppError';

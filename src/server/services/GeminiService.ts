@@ -104,36 +104,6 @@ export async function validateGeminiKey(): Promise<boolean> {
 }
 
 // --- Helpers ---
-function extractJSONCandidate(text: string): unknown | null {
-    if (!text || typeof text !== 'string') return null;
-    const fenceMatch = text.match(/```(?:\s*json)?\s*([\s\S]*?)```/i);
-    const rawCandidate = fenceMatch && fenceMatch[1] ? String(fenceMatch[1]) : String(text);
-    const raw = rawCandidate
-        .split(/\r?\n/)
-        .map((line) => line.replace(/^\s*(?:\[[A-Z0-9_-]+\]|DEVVIT)\s*/i, ''))
-        .join('\n')
-        .replace(/^```[a-z]*\s*/i, '')
-        .replace(/\s*```$/i, '');
-    try { return JSON.parse(raw.trim()); } catch (e) { /* fall through */ }
-    const idx = raw.indexOf('{') !== -1 ? (raw.indexOf('[') !== -1 ? Math.min(raw.indexOf('{'), raw.indexOf('[')) : raw.indexOf('{')) : raw.indexOf('[');
-    if (idx === -1) return null;
-    const slice = raw.slice(idx);
-    const stack: string[] = [];
-    for (let i = 0; i < slice.length; i++) {
-        const ch = slice[i];
-        if (ch === '{' || ch === '[') stack.push(ch);
-        else if (ch === '}' || ch === ']') {
-            const last = stack[stack.length - 1];
-            if ((ch === '}' && last === '{') || (ch === ']' && last === '[')) {
-                stack.pop();
-                if (stack.length === 0) {
-                    try { return JSON.parse(slice.slice(0, i + 1)); } catch (err) { break; }
-                }
-            } else break;
-        }
-    }
-    return null;
-}
 
 // --- Generators ---
 
@@ -160,44 +130,8 @@ export async function generateUnifiedContent(rawTopic: string): Promise<{ topic:
                     contents: [{ role: 'user', parts: [{ text: rawTopic }] }],
                     generationConfig: {
                         temperature: 0.3,
-                        maxOutputTokens: 16384,
-                        response_mime_type: "application/json",
-                        response_schema: {
-                            type: "object",
-                            properties: {
-                                topic: {
-                                    type: "object",
-                                    properties: {
-                                        title: { type: "string" },
-                                        slug: { type: "string" },
-                                        sources: { type: "array", items: { type: "string" } }
-                                    },
-                                    required: ["title", "sources"]
-                                },
-                                quiz: {
-                                    type: "object",
-                                    properties: {
-                                        questions: {
-                                            type: "array",
-                                            items: {
-                                                type: "object",
-                                                properties: {
-                                                    question: { type: "string" },
-                                                    options: { type: "array", items: { type: "string" } },
-                                                    correctAnswer: { type: "string" },
-                                                    difficulty: { type: "string" },
-                                                    category: { type: "string" },
-                                                    explanation: { type: "string" }
-                                                },
-                                                required: ["question", "options", "correctAnswer", "difficulty", "category"]
-                                            }
-                                        }
-                                    },
-                                    required: ["questions"]
-                                }
-                            },
-                            required: ["topic", "quiz"]
-                        }
+                        maxOutputTokens: 8192,
+                        response_mime_type: "application/json"
                     }
                 })
             }
@@ -210,12 +144,31 @@ export async function generateUnifiedContent(rawTopic: string): Promise<{ topic:
 
         const data: any = await resp.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const parsed = extractJSONCandidate(text) as { topic: any, quiz: any };
+        Logger.ai('[UnifiedGen] Raw AI Response received', { textSnippet: text.slice(0, 300) + '...' });
+
+        let parsed: { topic: any, quiz: any };
+        try {
+            parsed = JSON.parse(text);
+        } catch (e) {
+            Logger.error('[UnifiedGen] JSON Parse Error', { textSnippet: text.slice(0, 100) });
+            throw new AppError('AI_JSON_PARSE_FAIL', 500);
+        }
         const latencyMs = Date.now() - start;
 
+        if (parsed?.quiz?.questions) {
+            Logger.ai(`[UnifiedGen] Successfully parsed ${parsed.quiz.questions.length} questions`);
+            parsed.quiz.questions.forEach((q: any, i: number) => {
+                Logger.ai(`  Q${i + 1}: ${q.question.slice(0, 50)}...`);
+            });
+        }
+
         if (!parsed?.topic?.sources || !Array.isArray(parsed.topic.sources) || parsed.topic.sources.length === 0) {
-            Logger.warn('[UnifiedGen] Rejected: No sources found', { input: rawTopic });
-            throw new AppError('NO_SOURCES_FOUND', 422);
+            // Log as warning but don't fail if we have a valid quiz
+            // This allows broad categories like "General Knowledge" to work even if AI doesn't find specific source URLs
+            Logger.warn('[UnifiedGen] No sources found, but questions provided. Continuing.', { input: rawTopic });
+            // Ensure sources is at least an empty array for downstream
+            if (!parsed?.topic) parsed.topic = {};
+            parsed.topic.sources = [];
         }
 
         const qList = parsed.quiz?.questions;

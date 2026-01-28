@@ -53,9 +53,12 @@ export const useQuizData = (): UseQuizDataResult => {
       const raw = await apiRes.json();
       if (!raw || !Array.isArray(raw.questions)) throw new Error('Malformed quiz payload');
 
-      interface ApiQuestion { question?: string; answers?: unknown[]; correctAnswer?: string; difficulty?: string; }
+      interface ApiQuestion { question?: string; options?: unknown[]; correctAnswer?: string; difficulty?: string; }
       const mapped: AppQuestion[] = (raw.questions as ApiQuestion[]).map((q) => {
-        const ans = Array.isArray(q.answers) ? q.answers.map(a => String(a)) : [];
+        // Strict validation: Server MUST provide 'options' as per contract.
+        const rawOptions = q.options;
+        const ans = Array.isArray(rawOptions) ? rawOptions.map(a => String(a)) : [];
+        // If options are missing, this question is invalid - but for now we map it as empty to fail gracefully downstream
         const corr = q.correctAnswer && ans.includes(q.correctAnswer) ? q.correctAnswer : ans[0] || '';
         return {
           question: String(q.question || ''),

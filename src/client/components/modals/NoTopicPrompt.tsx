@@ -4,13 +4,11 @@ import { motion } from 'framer-motion';
 interface NoTopicPromptProps {
     onClose: () => void;
     onChooseTopic: () => void;
-    onPlayRandom: () => void;
 }
 
 export const NoTopicPrompt: React.FC<NoTopicPromptProps> = ({
     onClose,
     onChooseTopic,
-    onPlayRandom,
 }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -32,7 +30,7 @@ export const NoTopicPrompt: React.FC<NoTopicPromptProps> = ({
                 </button>
                 <h3 className="text-2xl font-extrabold mb-3 text-gradient">Select a Topic</h3>
                 <p className="text-secondary mb-6 leading-relaxed">
-                    You have not selected a topic. Would you like to pick one now or play a random daily quiz?
+                    You have not selected a topic. Please pick a topic to generate a quiz.
                 </p>
                 <div className="flex flex-col gap-3">
                     <button
@@ -42,14 +40,11 @@ export const NoTopicPrompt: React.FC<NoTopicPromptProps> = ({
                         Choose Topic
                     </button>
                     <button
-                        onClick={onPlayRandom}
+                        onClick={onClose}
                         className="modern-button modern-button-secondary w-full py-3 font-bold"
                     >
-                        Play Random Quiz
+                        Cancel
                     </button>
-                </div>
-                <div className="mt-4 text-xs text-center text-secondary">
-                    Random quiz will use the daily curated questions.
                 </div>
             </motion.div>
         </div>
