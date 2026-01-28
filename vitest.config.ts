@@ -12,6 +12,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'html'],
     },
+    // @ts-ignore
     projects: [
       {
         test: {

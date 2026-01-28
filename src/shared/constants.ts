@@ -126,7 +126,7 @@ export const CONFIG = {
                                         "question": "...",
                                         "options": ["A", "B", "C", "D"],
                                         "correctAnswer": "A",
-                                        "difficulty": "medium or high",
+                                        "difficulty": "easy, medium, or hard",
                                         "category": "Lore/Gameplay/History/etc",
                                         "explanation": "Concise fact."
                                       }

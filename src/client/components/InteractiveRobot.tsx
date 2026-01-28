@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface InteractiveRobotProps {
   username: string;
+  errorMessage?: string | null | undefined; // Allow undefined explicitly
 }
 
-export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) => {
+export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, errorMessage }) => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
@@ -42,6 +43,11 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
   */
 
   const messages = useMemo(() => {
+    // PRIORITY: If an error message is provided, show only that
+    if (errorMessage) {
+      return [errorMessage];
+    }
+
     const statusLines: string[] = [];
     if (healingActive) {
       statusLines.push('STAND BY. REPAIRING DATA-STREAM...');
@@ -63,7 +69,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
     ];
     const base = lines.length ? lines : fallback;
     return [...statusLines, ...base.slice(0, 20)];
-  }, [lines, username, systemStatus]);
+  }, [lines, username, systemStatus, errorMessage, healingActive]);
 
   // Track global mouse position for robot following
   useEffect(() => {
@@ -177,7 +183,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
       <div ref={headRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '140px' }}>
         {/* Speech Bubble moved to the parent container so left:50% reliably centers over the head */}
         <AnimatePresence>
-          {isHovered && (
+          {(isHovered || errorMessage) && (
             <motion.div
               ref={bubbleRef}
               initial={{ opacity: 0, scale: 0.8, y: 10, x: '-50%' }}
@@ -187,7 +193,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
                 position: 'absolute',
                 top: -40,
                 left: '50%',
-                backgroundColor: '#7c3aed',
+                backgroundColor: errorMessage ? '#ef4444' : '#7c3aed', // Red background for errors
                 color: 'white',
                 padding: '8px 12px',
                 borderRadius: 12,
@@ -196,7 +202,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
                 zIndex: 20,
                 whiteSpace: 'nowrap',
                 maxWidth: 'unset',
-                boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
+                boxShadow: errorMessage ? '0 4px 12px rgba(239, 68, 68, 0.4)' : '0 4px 12px rgba(124, 58, 237, 0.3)',
                 textAlign: 'center',
                 overflow: 'hidden',
               }}
@@ -227,7 +233,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
                   height: 0,
                   borderLeft: '8px solid transparent',
                   borderRight: '8px solid transparent',
-                  borderTop: '8px solid #7c3aed',
+                  borderTop: errorMessage ? '8px solid #ef4444' : '8px solid #7c3aed', // Match bubble color
                 }}
               />
             </motion.div>
@@ -244,12 +250,14 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
             height: '120px',
             background: 'linear-gradient(135deg, #374151 0%, #1f2937 50%, #111827 100%)',
             borderRadius: '20px',
-            border: '3px solid #dc2626',
+            border: errorMessage ? '3px solid #ef4444' : '3px solid #dc2626', // Red border on error
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 8px 25px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
+            boxShadow: errorMessage
+              ? '0 0 20px rgba(239, 68, 68, 0.4), inset 0 1px 0 rgba(255,255,255,0.1)'
+              : '0 8px 25px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
             marginTop: 30,
             overflow: 'visible',
           }}
@@ -352,27 +360,31 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
               {/* Left eye */}
               <motion.div
                 animate={{
-                  boxShadow: isHovered ? '0 0 15px #00ff88, 0 0 25px #00ff88' : '0 0 8px #00ff88',
+                  boxShadow: errorMessage
+                    ? '0 0 15px #ef4444, 0 0 25px #ef4444' // Red eyes on error
+                    : isHovered ? '0 0 15px #00ff88, 0 0 25px #00ff88' : '0 0 8px #00ff88',
                 }}
                 style={{
                   width: '8px',
                   height: '8px',
-                  backgroundColor: '#00ff88',
+                  backgroundColor: errorMessage ? '#ef4444' : '#00ff88', // Red eyes on error
                   borderRadius: '50%',
-                  boxShadow: '0 0 8px #00ff88',
+                  boxShadow: errorMessage ? '0 0 8px #ef4444' : '0 0 8px #00ff88',
                 }}
               />
               {/* Right eye */}
               <motion.div
                 animate={{
-                  boxShadow: isHovered ? '0 0 15px #00ff88, 0 0 25px #00ff88' : '0 0 8px #00ff88',
+                  boxShadow: errorMessage
+                    ? '0 0 15px #ef4444, 0 0 25px #ef4444' // Red eyes on error
+                    : isHovered ? '0 0 15px #00ff88, 0 0 25px #00ff88' : '0 0 8px #00ff88',
                 }}
                 style={{
                   width: '8px',
                   height: '8px',
-                  backgroundColor: '#00ff88',
+                  backgroundColor: errorMessage ? '#ef4444' : '#00ff88', // Red eyes on error
                   borderRadius: '50%',
-                  boxShadow: '0 0 8px #00ff88',
+                  boxShadow: errorMessage ? '0 0 8px #ef4444' : '0 0 8px #00ff88',
                 }}
               />
             </motion.div>
@@ -393,8 +405,10 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
                 top: '0',
                 bottom: '0',
                 width: '2px',
-                background: 'linear-gradient(to bottom, transparent, #00ff88, transparent)',
-                boxShadow: '0 0 10px #00ff88',
+                background: errorMessage
+                  ? 'linear-gradient(to bottom, transparent, #ef4444, transparent)' // Red scan line
+                  : 'linear-gradient(to bottom, transparent, #00ff88, transparent)',
+                boxShadow: errorMessage ? '0 0 10px #ef4444' : '0 0 10px #00ff88',
               }}
             />
           </div>
@@ -418,7 +432,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
 
       {/* Exhausted message overlay (nudge into app) */}
       <AnimatePresence>
-        {exhausted && (
+        {exhausted && !errorMessage && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -485,7 +499,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
         {/* New System Status LED */}
         <motion.div
           animate={{
-            backgroundColor: (!systemStatus.ai || !systemStatus.db) ? '#ef4444' : '#00ff88',
+            backgroundColor: (errorMessage || !systemStatus.ai || !systemStatus.db) ? '#ef4444' : '#00ff88', // Red on error or offline
             opacity: [0.6, 1, 0.6],
           }}
           transition={{ duration: 1.5, repeat: Infinity }}
@@ -493,7 +507,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username }) 
             width: '6px',
             height: '6px',
             borderRadius: '50%',
-            boxShadow: (!systemStatus.ai || !systemStatus.db) ? '0 0 8px #ef4444' : '0 0 8px #00ff88',
+            boxShadow: (errorMessage || !systemStatus.ai || !systemStatus.db) ? '0 0 8px #ef4444' : '0 0 8px #00ff88',
           }}
         />
       </motion.div>

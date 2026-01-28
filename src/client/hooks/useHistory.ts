@@ -35,8 +35,8 @@ export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryRet
                     // Use cache if fresh enough and we have data
                     if (Date.now() - timestamp < CACHE_TTL && data.length > 0) {
                         setHistory(data);
-                        // Background refresh if cache is > 10s old
-                        if (Date.now() - timestamp > 10000) {
+                        // Background refresh if cache is > 30s old (was 10s)
+                        if (Date.now() - timestamp > 30000) {
                             void fetchHistory(true);
                         }
                         return;
@@ -69,10 +69,11 @@ export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryRet
         void fetchHistory();
     }, [fetchHistory]);
 
-    // Auto-refresh interval (30s)
+    // Auto-refresh interval (2 minutes)
+    // Reduce noise: polling is now 2 minutes instead of 60s
     useEffect(() => {
         if (!enabled || !pollingEnabled) return;
-        const interval = setInterval(() => void fetchHistory(true), 60000);
+        const interval = setInterval(() => void fetchHistory(true), 120000); // 2 minutes
         return () => clearInterval(interval);
     }, [enabled, pollingEnabled, fetchHistory]);
 

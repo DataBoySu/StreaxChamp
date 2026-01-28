@@ -31,9 +31,9 @@ const toTitleCase = (s: string) =>
 export const TopicSelector: React.FC<{
   onClose?: () => void;
   // onTopicReady now provides the generated quiz (if successful) so parent can gate UI
-  // onTopicReady now provides the generated quiz (if successful) so parent can gate UI
   onTopicReady?: (topic: { title: string; slug: string; quizId?: string; quiz?: { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[] }; bonus?: { question: string; options: string[]; correctIndex: number } | null }) => void;
-}> = ({ onClose, onTopicReady }) => {
+  onError?: (code: string, robotDialogue: string) => void; // NEW: Callback for robot errors
+}> = ({ onClose, onTopicReady, onError }) => {
   const [topics, setTopics] = useState<TopicDoc[]>([]);
   const [query, setQuery] = useState('');
   const [addingTopic, setAddingTopic] = useState(false);
@@ -193,7 +193,18 @@ export const TopicSelector: React.FC<{
           body: JSON.stringify({ topic: formatted }),
         });
         setProgress(60);
-        if (!resp.ok) throw new Error('Generate failed');
+        if (!resp.ok) {
+          // Try to parse structured error
+          try {
+            const errorData = await resp.json();
+            if (errorData.code && errorData.robotDialogue) {
+              onError?.(errorData.code, errorData.robotDialogue);
+            }
+            throw new Error(errorData.message || 'Generate failed');
+          } catch (parseErr) {
+            throw new Error('Generate failed');
+          }
+        }
         const data = await resp.json();
         console.log('[GenerateTopic] provider:', data.provider, data.fallbackReason ? `reason=${data.fallbackReason}` : '');
         setProgress(85);

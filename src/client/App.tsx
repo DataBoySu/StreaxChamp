@@ -10,6 +10,7 @@ import { useLandingSummary } from './hooks/useLandingSummary';
 import { useHistory } from './hooks/useHistory';
 import { useBackgroundMusic } from './hooks/useBackgroundMusic';
 import { useUserActivity } from './hooks/useUserActivity';
+import { useRobotError } from './hooks/useRobotError';
 import { CONFIG } from '../shared/constants';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { LandingHero } from './components/landing/LandingHero';
@@ -106,6 +107,9 @@ export const App = () => {
 
   // Use new global play history hook
   const { history: globalHistory, loading: globalHistoryLoading, savePlay, hasPlayed } = useHistory(!quizStarted, pollingEnabled);
+
+  // Robot error message queue (for user-friendly error feedback)
+  const { currentError, addError } = useRobotError();
 
   // Transform global history to match UI expectations
   const history = useMemo(() => {
@@ -593,6 +597,10 @@ export const App = () => {
             setTopicQuizStatus('error');
           }
         }}
+        onError={(code, robotDialogue) => {
+          setShowTopicMenu(false);
+          addError(code, robotDialogue);
+        }}
       />
     );
   }
@@ -768,6 +776,7 @@ export const App = () => {
                     }}
                     totalQuestions={NUM_QUESTIONS}
                     showTimeoutMessage={showTimeoutMessage}
+                    errorMessage={currentError?.robotDialogue}
                   />
                 ) : showGap ? (
                   <GapView multiplier={multiplier} />

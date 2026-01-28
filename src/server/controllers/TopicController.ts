@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { Logger } from '../Logger';
-import { generateUnifiedContent, GeneratedQuizPayload, GeneratedQuizQuestion } from '../services/GeminiService';
+import { generateUnifiedContent, GeneratedQuizQuestion } from '../services/GeminiService';
 import { slugify, toTitleCase } from '../utils/textUtils';
 import { AppError } from '../utils/AppError';
 import { CacheService } from '../services/CacheService';
@@ -257,9 +257,24 @@ export class TopicController {
             });
 
         } catch (error: any) {
-            Logger.error('Error in /api/topics/generate:', error);
-            const code = error instanceof AppError ? error.statusCode : 500;
-            res.status(code).json({ error: error.message || 'Failed to generate topic' });
+            Logger.error('[Generate] Error in topic generation pipeline', {
+                error: error.message,
+                code: error.code || 'UNKNOWN',
+                stack: error.stack
+            });
+
+            // Return structured error with user-friendly messages
+            if (error instanceof AppError) {
+                return res.status(error.statusCode).json(error.toJSON());
+            }
+
+            // Handle unexpected errors with fallback
+            const unknownError = new AppError(
+                error.message || 'Unexpected error during topic generation',
+                500,
+                'UNKNOWN_ERROR'
+            );
+            return res.status(500).json(unknownError.toJSON());
         }
     }
 }

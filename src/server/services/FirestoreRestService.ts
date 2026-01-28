@@ -509,28 +509,6 @@ export class FirestoreRestService {
     }
   }
 
-  /**
-   * Patch topic fields
-   */
-  async patchTopic(slug: string, patch: Record<string, any>): Promise<boolean> {
-    try {
-      const url = `${this.baseUrl}/topics/${slug}`;
-      const fields: Record<string, any> = {};
-      const updateMask: string[] = [];
-      Object.entries(patch).forEach(([k, v]) => {
-        if (typeof v === 'string') { fields[k] = { stringValue: v }; updateMask.push(k); }
-        else if (typeof v === 'number') { fields[k] = { integerValue: String(v) }; updateMask.push(k); }
-        else if (typeof v === 'boolean') { fields[k] = { booleanValue: v }; updateMask.push(k); }
-      });
-      fields.updatedAt = { stringValue: new Date().toISOString() };
-      updateMask.push('updatedAt');
-      const maskParams = updateMask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
-      const res = await fetch(`${url}?${maskParams}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
 
   /**
    * Increment a topic's playCount field

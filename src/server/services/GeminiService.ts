@@ -188,6 +188,14 @@ function validateQuizPayload(quiz: any): { valid: boolean; errors: string[] } {
 
         // 3d. Difficulty
         const validDifficulties = ['easy', 'medium', 'hard'];
+        // Normalize common AI hallucinations
+        if (q.difficulty) {
+            const d = String(q.difficulty).toLowerCase();
+            if (d === 'high') q.difficulty = 'hard';
+            else if (d === 'low') q.difficulty = 'easy';
+            else q.difficulty = d;
+        }
+
         if (!q.difficulty || !validDifficulties.includes(String(q.difficulty).toLowerCase())) {
             errors.push(`Q${qNum}: Invalid difficulty "${q.difficulty}" (must be easy/medium/hard)`);
         }

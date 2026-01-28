@@ -11,6 +11,7 @@ interface LandingHeroProps {
     onStartQuiz: () => void;
     totalQuestions: number;
     showTimeoutMessage?: boolean;
+    errorMessage?: string | null | undefined; // NEW: robot error message
 }
 
 export const LandingHero: React.FC<LandingHeroProps> = ({
@@ -21,6 +22,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
     onStartQuiz,
     totalQuestions,
     showTimeoutMessage,
+    errorMessage, // NEW
 }) => {
     return (
         <motion.div
@@ -75,7 +77,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                 {/* Interactive Robot */}
                 <div className="mx-auto mt-2 mb-4 flex flex-col items-center justify-center w-full">
                     <div className="relative">
-                        <InteractiveRobot username={username} />
+                        <InteractiveRobot username={username} errorMessage={errorMessage} />
                     </div>
                 </div>
 
