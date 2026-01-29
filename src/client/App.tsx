@@ -101,7 +101,7 @@ export const App = () => {
   // Leaderboard hook (per selected topic)
   // Enable leaderboard as soon as quiz ends (showScore) or while viewing start screen for previously selected topic
   const { entries: topicLeaderboard, loading: topicLbLoading, submitScore: submitLeaderboardScore, refresh: refreshTopicLeaderboard } = useLeaderboard({ slug: selectedTopic?.slug || null, enabled: !!selectedTopic && (showScore || !quizStarted) });
-  const { data: landingSummary, loading: landingSummaryLoading } = useLandingSummary(!quizStarted && !showScore, pollingEnabled);
+  const { data: landingSummary, loading: landingSummaryLoading, refresh: refreshLandingSummary } = useLandingSummary(!quizStarted && !showScore, pollingEnabled);
   const { username: hookUsername } = useUsername();
 
   // No manual sign-in logic needed
@@ -564,6 +564,13 @@ export const App = () => {
 
       // Step 3: Refresh local state
       void loadUserData();
+      // Refresh landing summary to show new scores on home
+      // We only delete the leaderboard part, topics stay cached for 30m
+      try {
+        const cache = (window as any).CacheService?.getInstance?.();
+        if (cache) await cache.del('landing_leaderboard');
+      } catch {/* ignore */ }
+      try { void refreshLandingSummary?.(); } catch {/* ignore */ }
       setTimeout(() => { try { void refreshTopicLeaderboard?.(); } catch {/* ignore */ } }, 300);
     };
 

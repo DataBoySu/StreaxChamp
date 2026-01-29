@@ -37,14 +37,14 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                             const rank = i + 1;
 
                             if (rank === 1) {
-                                rankClass = 'bg-yellow-900/20 border-yellow-500/50 text-yellow-100 shadow-[0_0_15px_rgba(234,179,8,0.2)] scale-[1.02] z-10';
-                                rankNumberStyle = 'text-yellow-400 text-2xl drop-shadow-[0_2px_4px_rgba(234,179,8,0.5)]';
+                                rankClass = 'bg-yellow-900/40 border-yellow-400 text-yellow-100 shadow-[0_0_20px_rgba(255,215,0,0.4)] scale-[1.03] z-10 border-2';
+                                rankNumberStyle = 'text-yellow-400 text-2xl drop-shadow-[0_0_8px_rgba(255,215,0,0.8)] font-pixel';
                             } else if (rank === 2) {
-                                rankClass = 'bg-slate-700/30 border-slate-400/50 text-slate-100 shadow-[0_0_10px_rgba(148,163,184,0.2)]';
-                                rankNumberStyle = 'text-slate-300 text-xl drop-shadow-[0_2px_2px_rgba(148,163,184,0.4)]';
+                                rankClass = 'bg-slate-700/40 border-slate-300 text-slate-100 shadow-[0_0_15px_rgba(192,192,192,0.3)] border-2';
+                                rankNumberStyle = 'text-slate-300 text-xl drop-shadow-[0_0_6px_rgba(192,192,192,0.6)] font-pixel';
                             } else if (rank === 3) {
-                                rankClass = 'bg-orange-900/20 border-orange-500/50 text-orange-100 shadow-[0_0_10px_rgba(249,115,22,0.2)]';
-                                rankNumberStyle = 'text-orange-400 text-xl drop-shadow-[0_2px_2px_rgba(249,115,22,0.4)]';
+                                rankClass = 'bg-orange-950/40 border-orange-700 text-orange-100 shadow-[0_0_12px_rgba(205,127,50,0.2)] border-2';
+                                rankNumberStyle = 'text-orange-600 text-xl drop-shadow-[0_0_4px_rgba(205,127,50,0.5)] font-pixel';
                             }
 
                             return (
@@ -59,7 +59,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                                         {e.nickname}
                                     </span>
                                     <span className={`font-extrabold text-lg text-right ${rank <= 3 ? 'text-white' : 'text-success'}`}>
-                                        {e.totalScore !== undefined ? e.totalScore : e.score} PTS
+                                        {e.score} PTS
                                     </span>
                                 </div>
                             );

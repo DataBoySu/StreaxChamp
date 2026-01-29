@@ -18,11 +18,8 @@ export interface LandingSummaryData {
   popular: LandingPopularEntry[];
   globalTop: { userKey: string; nickname: string; score: number }[];
   hotTopics: { slug: string; title: string }[];
-  globalTotals?: { userKey: string; nickname: string; totalScore: number }[];
 }
 
-const CACHE_KEY = 'streax.landingSummary';
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export const useLandingSummary = (enabled: boolean, pollingEnabled = true) => {
   const [data, setData] = useState<LandingSummaryData | null>(null);
@@ -32,19 +29,6 @@ export const useLandingSummary = (enabled: boolean, pollingEnabled = true) => {
 
   const fetchSummary = useCallback(async () => {
     if (!enabled) return;
-
-    // Strict cache check - if fresh, don't fetch
-    try {
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { ts: number; summary: LandingSummaryData };
-        if (parsed && parsed.ts && Date.now() - parsed.ts < CACHE_TTL) {
-          // Cache is fresh, skip fetch entirely
-          if (!data) setData(parsed.summary);
-          return;
-        }
-      }
-    } catch {/* ignore */ }
 
     abortRef.current?.abort();
     const ac = new AbortController();
@@ -61,35 +45,15 @@ export const useLandingSummary = (enabled: boolean, pollingEnabled = true) => {
           top3: json.top3 || [],
           popular: json.popular || [],
           globalTop: json.globalTop || [],
-          hotTopics: json.hotTopics || [],
-          globalTotals: json.globalTotals || []
+          hotTopics: json.hotTopics || []
         };
         setData(summary);
-        // Cache with timestamp
-        try {
-          const cache = { ts: Date.now(), summary };
-          localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-        } catch {/* ignore */ }
       }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [enabled, data]);
-
-  // Load initial cache immediately
-  useEffect(() => {
-    if (!enabled) return;
-    try {
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { ts: number; summary: LandingSummaryData };
-        if (parsed && parsed.ts && Date.now() - parsed.ts < CACHE_TTL) {
-          setData(parsed.summary);
-        }
-      }
-    } catch {/* ignore */ }
   }, [enabled]);
 
   // Initial fetch (once) if polling is disabled/not starting immediately

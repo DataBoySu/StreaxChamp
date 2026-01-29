@@ -119,8 +119,8 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
       // Proximity Check (using headRef if available, or just center screen)
       // Check if mouse is within a certain radius of the center (roughly where robot is)
       const dist = Math.sqrt(relativeX * relativeX + relativeY * relativeY);
-      // Threshold: 0.5 means within 50% of the screen center
-      setIsNear(dist < 0.4);
+      // Threshold: 0.15 means very close to the screen center (precise visor focus)
+      setIsNear(dist < 0.15);
     };
 
     window.addEventListener('mousemove', handleMouseMove);

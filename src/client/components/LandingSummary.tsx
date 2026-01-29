@@ -30,13 +30,20 @@ function useRandomPositions(count: number) {
 }
 
 export const LandingSummary = ({ summary, loading, onSelectTopic }: Props) => {
-  const top3 = summary?.top3 || [];
-  const popular = summary?.popular || [];
-  const combined = [...top3.map(t => ({ ...t, kind: 'top' as const })), ...popular.map(p => ({ ...p, kind: 'popular' as const }))];
-  const positions = useRandomPositions(combined.length);
+  const hotTopics = useMemo(() => {
+    const raw = summary?.hotTopics || [];
+    // Shuffle the items for a more organic feel
+    return [...raw].sort(() => Math.random() - 0.5);
+  }, [summary]);
+
+  const maxPlays = useMemo(() => {
+    return Math.max(...(summary?.hotTopics || []).map(t => (t as any).playCount || 0), 1);
+  }, [summary]);
+
+  const positions = useRandomPositions(hotTopics.length);
 
   return (
-  <div className="relative w-full min-h-[260px] md:min-h-[320px] rounded-xl border border-accent/30 overflow-hidden modern-card p-2">
+    <div className="relative w-full min-h-[260px] md:min-h-[320px] rounded-xl border border-accent/30 overflow-hidden modern-card p-2">
       <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-success/5" />
       <div className="absolute top-2 left-3 text-xs font-semibold text-secondary uppercase tracking-wider z-10">
         Hot Topics
@@ -48,15 +55,21 @@ export const LandingSummary = ({ summary, loading, onSelectTopic }: Props) => {
           ))}
         </div>
       )}
-      {combined.map((item, idx) => {
+      {hotTopics.map((item: any, idx) => {
         const pos = positions[idx] || { top: '50%', left: '50%', rotation: 0 };
-        const label = item.kind === 'top' ? `${item.title} · ${item.topScore}` : `${item.title} · ${item.totalCompletions}`;
-        const flair = item.kind === 'top' ? '🏆' : '🔥';
+        const playCount = item.playCount || 0;
+        const relativeSize = 1.0 + (playCount / maxPlays) * 0.6; // Scale 1.0 to 1.6
+
         return (
           <motion.button
-            key={item.slug + item.kind}
-            className={`absolute text-xs md:text-sm font-bold px-3 py-2 rounded-lg shadow-md backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-accent/60 ${item.kind === 'top' ? 'bg-accent/25 border border-accent/40 hover:bg-accent/35' : 'bg-success/25 border border-success/40 hover:bg-success/35'}`}
-            style={{ top: pos.top, left: pos.left, transform: `translate(-50%, -50%) rotate(${pos.rotation}deg)` }}
+            key={item.slug}
+            className="absolute text-xs md:text-sm font-bold px-3 py-2 rounded-lg shadow-md backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-accent/60 bg-accent/25 border border-accent/40 hover:bg-accent/35"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              transform: `translate(-50%, -50%) rotate(${pos.rotation}deg)`,
+              fontSize: `${relativeSize}rem`
+            }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => onSelectTopic(item.slug, item.title)}
@@ -64,7 +77,7 @@ export const LandingSummary = ({ summary, loading, onSelectTopic }: Props) => {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: 'spring', stiffness: 260, damping: 18, delay: idx * 0.05 }}
           >
-            <span className="mr-1">{flair}</span>{label}
+            <span className="mr-1">🔥</span>{item.title}
           </motion.button>
         );
       })}

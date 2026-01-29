@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { Logger } from '../Logger';
 import { CacheService } from '../services/CacheService';
-import { CONFIG } from '../../shared/constants';
+
 
 /**
  * Controller for landing page summary data
@@ -14,34 +14,42 @@ export class LandingController {
     static async getSummary(_req: Request, res: Response) {
         try {
             const cache = CacheService.getInstance();
-            const cached = await cache.get('landing_summary');
-            if (cached) return res.json({ ok: true, ...cached });
-
             const fs = new FirestoreRestService();
 
-            // Fetch data: use fs.getTopUsers (from users collection) for canonical global leaderboard
-            const [globalTopRaw, topics] = await Promise.all([
-                fs.getTopUsers(50),
-                fs.listTopics()
-            ]);
+            // 1. Handle Hot Topics (30 min cache)
+            let popularTopics = await cache.get<any[]>('hot_topics_data');
+            if (!popularTopics) {
+                popularTopics = await fs.getHotTopics(5);
+                // Cache hot topics for 30 minutes (stable data)
+                await cache.set('hot_topics_data', popularTopics, 1800);
+            }
 
-            // Map totalScore to the expected leaderboard fields
-            const globalTop = globalTopRaw.map(entry => ({
-                userKey: entry.userKey,
-                nickname: entry.nickname,
-                score: entry.totalScore
-            }));
+            // 2. Handle Leaderboard (5 min cache)
+            let leaderboardData = await cache.get<any>('landing_leaderboard');
+            if (!leaderboardData) {
+                const globalTopRaw = await fs.getTopUsers(50);
+                const globalTop = globalTopRaw.map(entry => ({
+                    userKey: entry.userKey,
+                    nickname: entry.nickname,
+                    score: entry.totalScore
+                }));
+                leaderboardData = {
+                    globalTop: globalTop.slice(0, 50),
+                    top3: globalTop.slice(0, 3)
+                };
+                // Cache leaderboard for 5 minutes
+                await cache.set('landing_leaderboard', leaderboardData, 300);
+            }
 
             const summary = {
-                globalTop: globalTop.slice(0, 10),
-                globalTotals: globalTop.slice(0, 50),
-                hotTopics: topics.slice(0, CONFIG.GAME.TOP_HOT_TOPICS_COUNT),
-                popular: topics.slice(0, 10),
-                top3: globalTop.slice(0, 3)
+                ...leaderboardData,
+                hotTopics: popularTopics,
+                popular: popularTopics.map(t => ({
+                    slug: t.slug,
+                    title: t.title,
+                    totalCompletions: t.playCount
+                }))
             };
-
-            // Cache for 5 minutes (invalidated manually on quiz completion)
-            await cache.set('landing_summary', summary, 300);
 
             return res.json({ ok: true, ...summary });
         } catch (e) {

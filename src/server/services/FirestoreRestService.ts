@@ -895,4 +895,50 @@ export class FirestoreRestService {
       return [];
     }
   }
+
+  /**
+   * Get hot topics (played at least once) ordered by playCount
+   */
+  async getHotTopics(limit = 5): Promise<Array<{ title: string; slug: string; playCount: number }>> {
+    try {
+      const body = {
+        structuredQuery: {
+          from: [{ collectionId: 'topics' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'playCount' },
+              op: 'GREATER_THAN',
+              value: { integerValue: '0' }
+            }
+          },
+          orderBy: [{ field: { fieldPath: 'playCount' }, direction: 'DESCENDING' }],
+          limit
+        }
+      };
+
+      const url = `${this.baseUrl}:runQuery`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) return [];
+
+      const data: any = await res.json();
+      if (!Array.isArray(data)) return [];
+
+      return data.map((item: any) => {
+        if (!item.document) return null;
+        const f = item.document.fields || {};
+        const slug = f.slug?.stringValue || item.document.name.split('/').pop() || '';
+        const title = f.title?.stringValue || f.name?.stringValue || slug;
+        const playCount = f.playCount?.integerValue ? parseInt(f.playCount.integerValue, 10) : 0;
+        return { title, slug, playCount };
+      }).filter((t: any): t is { title: string; slug: string; playCount: number } => t !== null);
+    } catch (error) {
+      Logger.error('[FirestoreRest.getHotTopics] error', error);
+      return [];
+    }
+  }
 }
