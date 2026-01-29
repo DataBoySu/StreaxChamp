@@ -16,11 +16,36 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
   const [progress, setProgress] = useState(0); // Progress bar (0-100)
   const [systemStatus] = useState<{ ai: boolean; db: boolean }>({ ai: true, db: true });
   const [healingActive] = useState(false);
+  const [blinkOpen, setBlinkOpen] = useState(true); // Control for eye blinking
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
 
+  // --- BLINKING LOGIC ---
+  // Only blink if there is NO error (circuits unbroken)
+  useEffect(() => {
+    if (errorMessage) {
+      setBlinkOpen(true); // Force eyes open on error
+      return;
+    }
+
+    let timeoutId: number;
+    const triggerBlink = () => {
+      setBlinkOpen(false); // Close eyes
+      setTimeout(() => {
+        setBlinkOpen(true); // Open eyes after short duration
+        // Schedule next blink randomly between 2.5s and 6s
+        timeoutId = window.setTimeout(triggerBlink, Math.random() * 3500 + 2500);
+      }, 150); // Blink duration
+    };
+
+    // Initial blink schedule
+    timeoutId = window.setTimeout(triggerBlink, Math.random() * 3000 + 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [errorMessage]);
+
   // Robot dialogues are now hardcoded - no need to fetch from API
-  // Disabled API polling to reduce unnecessary requests
+  // Disabled API polling to reduce unnecessary requests - > lines for future implementation
   /*
   useEffect(() => {
     let cancelled = false;
@@ -360,6 +385,8 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
               {/* Left eye */}
               <motion.div
                 animate={{
+                  // Blink effect: scale Y to 0.1 when closed
+                  scaleY: blinkOpen ? 1 : 0.1,
                   boxShadow: errorMessage
                     ? '0 0 15px #ef4444, 0 0 25px #ef4444' // Red eyes on error
                     : isHovered ? '0 0 15px #00ff88, 0 0 25px #00ff88' : '0 0 8px #00ff88',
@@ -375,6 +402,8 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
               {/* Right eye */}
               <motion.div
                 animate={{
+                  // Blink effect: scale Y to 0.1 when closed
+                  scaleY: blinkOpen ? 1 : 0.1,
                   boxShadow: errorMessage
                     ? '0 0 15px #ef4444, 0 0 25px #ef4444' // Red eyes on error
                     : isHovered ? '0 0 15px #00ff88, 0 0 25px #00ff88' : '0 0 8px #00ff88',
