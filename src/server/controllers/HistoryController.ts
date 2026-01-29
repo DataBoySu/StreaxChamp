@@ -20,7 +20,7 @@ export class HistoryController {
      */
     static async savePlay(req: Request, res: Response) {
         try {
-            const { username, nickname, topicSlug, topicTitle, quizDate } = req.body;
+            const { username, nickname, topicSlug, topicTitle, quizDate, score } = req.body;
 
             if (!username || !topicSlug || !topicTitle) {
                 return res.status(400).json({ ok: false, error: 'Missing required fields' });
@@ -36,8 +36,29 @@ export class HistoryController {
                 quizDate: quizDate || new Date().toISOString().split('T')[0]
             };
 
+            // Always save to play history
             await fs.savePlayHistory(entry);
-            res.json({ ok: true });
+
+            // Fetch stats using proper username primary key
+            const stats = await fs.getUserTopicStats(username, topicSlug);
+            const today = quizDate || new Date().toISOString().split('T')[0];
+
+            // ALWAYS update user stats (lastAttemptDate, etc.)
+            await fs.updateUserTopicStats(username, topicSlug, {
+                lastAttemptDate: today,
+                isCompleted: true
+            });
+
+            // ONLY increment score if not already played today
+            if (!stats || stats.lastAttemptDate !== today) {
+                if (typeof score === 'number' && score > 0) {
+                    await fs.incrementUserTotalScore(username, score, nickname || username);
+                }
+            } else {
+                Logger.info(`[History] Score skipped for ${username} (already played today)`);
+            }
+
+            return res.json({ ok: true });
         } catch (e) {
             Logger.error('[History] Save error', e);
             res.status(500).json({ ok: false, error: 'Failed to save play history' });

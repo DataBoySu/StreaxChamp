@@ -58,8 +58,10 @@ export const App = () => {
   const [bonusAnswered, setBonusAnswered] = useState(false);
   // User session state (deprecated)
   const [userInfo, setUserInfo] = useState<{ userId: string | null; username: string | null; displayName: string | null } | null>(null);
-  const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
+  // Remove showTimeoutMessage state as it's now internal to Robot (derived from time)
+  // But we still need to track user activity/idleness if needed, but Robot does it.
   const [showTopicMenu, setShowTopicMenu] = useState(false);
+  const [userTotalScore, setUserTotalScore] = useState(0); // New state for aggregated score
   const [selectedTopic, setSelectedTopic] = useState<{ title: string; slug: string } | null>(null);
   interface SelectedTopicQuiz { id?: string | undefined; questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[]; bonus?: { question: string; options: string[]; correctIndex: number } | null }
   const [selectedTopicQuiz, setSelectedTopicQuiz] = useState<SelectedTopicQuiz | null>(null);
@@ -183,6 +185,22 @@ export const App = () => {
           const auth = { redditUsername: cData.userId, nickname: cData.username || cData.userId };
           setAuthUser(auth);
           setUserInfo({ userId: cData.userId, username: cData.userId, displayName: cData.username });
+          setAuthUser(auth);
+          setUserInfo({ userId: cData.userId, username: cData.userId, displayName: cData.username });
+
+          // Fetch full profile to get totalScore using USERNAME (Primary Key)
+          try {
+            const profileRes = await fetch(`/api/users/resolve?userId=${cData.username || cData.userId}`);
+            if (profileRes.ok) {
+              const pData = await profileRes.json();
+              if (pData.found && pData.user && typeof pData.user.totalScore === 'number') {
+                setUserTotalScore(pData.user.totalScore);
+              }
+            }
+          } catch (e) {
+            console.error('[Session] Profile fetch failed', e);
+          }
+
           return;
         }
       }
@@ -241,25 +259,8 @@ export const App = () => {
     };
   }, [timer]);
 
-  // Timeout message for landing page
-  useEffect(() => {
-    let timeoutTimer: number | undefined;
-
-    if (!quizStarted && !showScore) {
-      // Show timeout message after user can see all hover messages (9 messages * 3 seconds + buffer)
-      timeoutTimer = Number(
-        window.setTimeout(() => {
-          setShowTimeoutMessage(true);
-        }, 30000)
-      ); // Show message after 30 seconds
-    } else {
-      setShowTimeoutMessage(false);
-    }
-
-    return () => {
-      if (typeof timeoutTimer !== 'undefined') clearTimeout(timeoutTimer);
-    };
-  }, [quizStarted, showScore]);
+  // Timeout message logic moved to InteractiveRobot
+  // Removed old useEffect for showTimeoutMessage
 
   // Stable refs for handlers and startTimer to avoid circular deps
   const handleAnswerRef = useRef<((selected: string | null, correct: string) => void) | null>(null);
@@ -522,7 +523,8 @@ export const App = () => {
     submittedRef.current = true;
     const slug = selectedTopic?.slug || 'daily-quizzes';
     const nickname = authUser?.nickname || hookUsername || localStorage.getItem('streax.nickname') || 'Player';
-    const key = authUser?.redditUsername || 'anon';
+    // STRICT: Use username (nickname) as the Primary Key for saving/fetching
+    const key = nickname;
     const totalMs = totalTime * 1000;
     // Optimistic insert so player sees themselves immediately
     try {
@@ -538,31 +540,34 @@ export const App = () => {
     // Check if replay (deferred implementation - check hasPlayed)
     const isReplay = hasPlayed(slug);
 
-    if (isReplay) {
-      // Replay mode: Notification only, no submission, no history update
-      setMessage({
-        type: 'info',
-        text: '🔁 Replay mode - score not submitted',
-        timesUp: false
-      });
-      // We still mark as submitted to prevent loop
-    } else {
-      // New play: Submit score AND save to history
-      void submitLeaderboardScore(slug, submissionPayload).then(async (ok) => {
-        if (!ok) console.error('[Leaderboard] submit failed');
-        else {
-          // Successfully submitted, now save to history
-          await savePlay(
-            key, // username
-            nickname, // nickname
-            slug, // topicSlug
-            selectedTopic?.title || 'Daily Quiz' // topicTitle
-          );
-        }
-        // Force refresh to get proper ordering/ranks
-        setTimeout(() => { try { void refreshTopicLeaderboard?.(); } catch {/* ignore */ } }, 300);
-      });
-    }
+    // Unified Play Handler: Log history AND submit score
+    const finalizePlay = async () => {
+      // Step 1: Save to History (ALWAYS, even on replays)
+      await savePlay(
+        key, // username
+        nickname, // nickname
+        slug, // topicSlug
+        selectedTopic?.title || 'Daily Quiz', // topicTitle
+        score
+      );
+
+      // Step 2: Submit to Leaderboard if not replay (one-a-day logic is mostly backend-enforced now)
+      if (!isReplay) {
+        await submitLeaderboardScore(slug, submissionPayload);
+      } else {
+        setMessage({
+          type: 'info',
+          text: '🔁 Replay mode - stats updated',
+          timesUp: false
+        });
+      }
+
+      // Step 3: Refresh local state
+      void loadUserData();
+      setTimeout(() => { try { void refreshTopicLeaderboard?.(); } catch {/* ignore */ } }, 300);
+    };
+
+    void finalizePlay();
   }, [showScore, selectedTopic?.slug, authUser?.nickname, authUser?.redditUsername, hookUsername, score, totalTime, submitLeaderboardScore, topicLeaderboard, refreshTopicLeaderboard]);
 
   useEffect(() => { if (!showScore) submittedRef.current = false; }, [showScore]);
@@ -585,7 +590,7 @@ export const App = () => {
           // Otherwise fall back to fetch
           setTopicQuizStatus('loading');
           try {
-            const quiz = await firebaseQuizService.getOrGenerateTopicQuiz(topic.slug);
+            const quiz = await firebaseQuizService.getOrGenerateTopicQuiz(topic.slug, authUser?.nickname);
             if (quiz && Array.isArray(quiz.questions)) {
               setSelectedTopicQuiz({ id: quiz.id, questions: quiz.questions, bonus: quiz.bonus || null });
               setTopicQuizStatus('ready');
@@ -768,9 +773,9 @@ export const App = () => {
                       startQuiz();
                     }}
                     totalQuestions={NUM_QUESTIONS}
-                    showTimeoutMessage={showTimeoutMessage}
                     errorMessage={currentError?.robotDialogue}
                     hasPlayed={hasCompletedQuizSession}
+                    totalPoints={userTotalScore}
                   />
                 ) : showGap ? (
                   <GapView multiplier={multiplier} />

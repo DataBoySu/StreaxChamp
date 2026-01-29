@@ -17,8 +17,9 @@ export class LeaderboardController {
             const cached = await cache.get('lb_global');
             if (cached) return res.json(cached);
 
-            const svc = new LeaderboardService();
-            const list = await svc.listGlobalTotals(50);
+            // Switch to using FirestoreRestService.getTopUsers (Total Scores)
+            const fs = new FirestoreRestService();
+            const list = await fs.getTopUsers(50);
 
             await cache.set('lb_global', list, 300); // Cache for 5 mins
             res.json(list);

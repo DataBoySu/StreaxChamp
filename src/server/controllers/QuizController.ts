@@ -164,6 +164,7 @@ export class QuizController {
 
     /**
      * Retrieves or generates a quiz for a specific topic.
+     * Uses query.username or devvit userId as identity.
      */
     static async getTopicQuiz(req: Request, res: Response) {
         try {
@@ -174,79 +175,54 @@ export class QuizController {
             const todayStr = new Date().toISOString().split('T')[0] || '';
             const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
 
-            Logger.info(`[TopicQuiz] Request received for slug="${slug}"`, { userId }, 'API');
+            // USE USERNAME if provided (Primary Key as per User Request)
+            const queryUser = (req.query.username as string || '').trim();
+            const effectiveUserId = queryUser || userId;
 
-            // 1. Check user stats for this topic
-            let targetQuizId: string | null = null;
-            let forceSameQuiz = false;
+            Logger.info(`[TopicQuiz] Request received for slug="${slug}"`, { userId: effectiveUserId }, 'API');
 
-            if (userId) {
-                const userStats = await fs.getUserTopicStats(userId, slug);
-                if (userStats) {
-                    const isNewDay = userStats.lastAttemptDate !== todayStr;
-                    const wasCompleted = userStats.isCompleted;
-
-                    if (!isNewDay || !wasCompleted) {
-                        // RULE: Same day OR previous unfinished -> Same Quiz
-                        if (userStats.lastQuizId) {
-                            targetQuizId = userStats.lastQuizId;
-                            forceSameQuiz = true;
-                            Logger.info('[QuizPolicy] Enforcing previous quiz', { userId, slug, quizId: targetQuizId });
-                        }
-                    }
-                }
-            }
-
-            // 2. If we need a specific quiz, try to fetch it
-            if (targetQuizId && forceSameQuiz) {
-                const existing = await fs.getTopicQuiz(slug, targetQuizId);
-                // If found, return it. If missing (rare data drift), fall through to generation.
-                if (existing) return res.json(existing);
-            }
-
-            // 3. Smart Fallback: Look for *any* reusable recent quiz if we don't have a forced one
-            // (If user is new or finished yesterday, they get the "Latest" available in the pool)
+            // 2. Simplified "Global Latest with Personal Trigger" Logic
             const latest = await fs.getLatestTopicQuiz(slug);
             let quizToServe = latest;
+            let shouldGenerate = false;
 
-            // If latest is too old (e.g. > 7 days) we might want to generate fresh, 
-            // BUT for now we prioritize serving *something*. 
-            // Optimization: If the user just played 'latest' yesterday and finished it,
-            // we really should generate a NEW one if age < 1 day (meaning it's the same one).
-            // For MVP simplicty: If they obtain 'latest', we serve it. 
-            // Future: check if latset.id == userStats.lastQuizId to ensure freshness.
+            if (!latest) {
+                shouldGenerate = true;
+            } else if (latest.date) {
+                const isDifferentDay = latest.date !== todayStr;
 
-            if (quizToServe) {
-                // Check if user has already completed THIS specific quiz
-                // If so, and we want a fresh experience, we might need to generate.
-                // But per "Campaign" logic, maybe they just re-play it?
-                // Current strict rule: New Day + Completed = New Content.
-                // If 'latest' is the SAME as what they completed, we must generate fresh.
-                const userStats = userId ? await fs.getUserTopicStats(userId, slug) : null;
-                if (userStats?.isCompleted && userStats?.lastQuizId === quizToServe.id && userStats.lastAttemptDate !== todayStr) {
-                    Logger.info('[QuizPolicy] User finished latest content, forcing generation', { userId, slug });
-                    quizToServe = null; // Force generation
-                }
-            }
-
-            if (quizToServe && quizToServe.metadata?.generatedAt) {
-                const ageMs = Date.now() - new Date(quizToServe.metadata.generatedAt).getTime();
-                const ageDays = ageMs / (1000 * 60 * 60 * 24);
-
-                if (ageDays < 7) {
-                    Logger.info(`[TopicQuiz] Serving recent quiz from DB (Age: ${ageDays.toFixed(1)} days)`, { quizId: quizToServe.id }, 'DATABASE');
-                    // Update user stats that they are starting this quiz
-                    if (userId) {
-                        await fs.updateUserTopicStats(userId, slug, {
-                            lastQuizId: quizToServe.id,
-                            lastAttemptDate: todayStr,
-                            isCompleted: false
-                        });
+                // Rule: "Day 2 is only generated if User has already played previous one AND its a new day"
+                if (isDifferentDay) {
+                    // Check if this specific user completed the current latest quiz
+                    let userFinishedLatest = false;
+                    if (effectiveUserId) {
+                        const stats = await fs.getUserTopicStats(effectiveUserId, slug);
+                        if (stats && stats.isCompleted && stats.lastQuizId === latest.id) {
+                            userFinishedLatest = true;
+                        }
                     }
-                    return res.json({ id: quizToServe.id, date: quizToServe.date, topicSlug: slug, ...quizToServe });
+
+                    if (userFinishedLatest) {
+                        shouldGenerate = true;
+                        Logger.info('[QuizPolicy] User finished latest content, triggering NEW generation', { userId: effectiveUserId });
+                    }
                 }
             }
 
+            // Serve logic
+            if (!shouldGenerate && quizToServe) {
+                Logger.info(`[TopicQuiz] Serving latest quiz (${quizToServe.date})`, { userId: effectiveUserId });
+                if (effectiveUserId) {
+                    await fs.updateUserTopicStats(effectiveUserId, slug, {
+                        lastQuizId: quizToServe.id,
+                        lastAttemptDate: todayStr,
+                        isCompleted: false
+                    });
+                }
+                return res.json({ id: quizToServe.id, date: quizToServe.date, topicSlug: slug, ...quizToServe });
+            }
+
+            // Generation logic
             const topicBase = await fs.getTopic(slug);
             if (!topicBase) return res.status(404).json({ error: 'TOPIC_NOT_FOUND' });
 
@@ -278,13 +254,12 @@ export class QuizController {
             if (!successStatus) {
                 Logger.error('[QuizSaveFail]', { slug, today: todayStr });
             } else {
-                // IMPORTANT: Sync parent metadata so UI knows this topic is playable
                 await fs.patchTopic(slug, { hasQuiz: true, lastGenerated: todayStr });
             }
 
             // Update user stats
-            if (userId) {
-                await fs.updateUserTopicStats(userId, slug, {
+            if (effectiveUserId) {
+                await fs.updateUserTopicStats(effectiveUserId, slug, {
                     lastQuizId: todayStr,
                     lastAttemptDate: todayStr,
                     isCompleted: false

@@ -11,7 +11,7 @@ interface PlayHistoryEntry {
 interface UseHistoryReturn {
     history: PlayHistoryEntry[];
     loading: boolean;
-    savePlay: (username: string, nickname: string, topicSlug: string, topicTitle: string) => Promise<void>;
+    savePlay: (username: string, nickname: string, topicSlug: string, topicTitle: string, score: number) => Promise<void>;
     hasPlayed: (topicSlug: string) => boolean;
     refresh: () => Promise<void>;
 }
@@ -75,7 +75,7 @@ export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryRet
 
     // Window focus removed - caused too many requests
 
-    const savePlay = useCallback(async (username: string, nickname: string, topicSlug: string, topicTitle: string) => {
+    const savePlay = useCallback(async (username: string, nickname: string, topicSlug: string, topicTitle: string, score: number) => {
         try {
             const quizDate = new Date().toISOString().split('T')[0];
             await fetch('/api/history/save', {
@@ -86,7 +86,8 @@ export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryRet
                     nickname,
                     topicSlug,
                     topicTitle,
-                    quizDate
+                    quizDate,
+                    score // NEW
                 })
             });
 

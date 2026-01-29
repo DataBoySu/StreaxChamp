@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { InteractiveRobot } from '../InteractiveRobot';
 import LoadingDots from '../LoadingDots';
 
@@ -11,8 +11,9 @@ interface LandingHeroProps {
     onStartQuiz: () => void;
     totalQuestions: number;
     showTimeoutMessage?: boolean;
-    errorMessage?: string | null | undefined; // NEW: robot error message
+    errorMessage?: string | undefined;
     hasPlayed?: boolean;
+    totalPoints?: number;
 }
 
 export const LandingHero: React.FC<LandingHeroProps> = ({
@@ -22,9 +23,9 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
     onOpenTopicMenu,
     onStartQuiz,
     totalQuestions,
-    showTimeoutMessage,
     errorMessage, // NEW
     hasPlayed = false,
+    totalPoints = 0,
 }) => {
     return (
         <motion.div
@@ -69,41 +70,29 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.6 }}
             >
-                <h1 className="text-4xl md:text-5xl font-bold text-gradient mb-4">
-                    Daily Subreddit Quiz
-                </h1>
-                <p className="text-lg text-secondary max-w-2xl mx-auto">
+                <motion.h1
+                    className="text-3xl md:text-4xl font-bold text-gradient mb-4 font-pixel tracking-tighter"
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                >
+                    Infinity Quiz Generator
+                </motion.h1>
+                <motion.p
+                    className="text-sm md:text-base text-secondary max-w-2xl mx-auto font-pixel leading-relaxed"
+                    animate={{ opacity: [1, 0.5, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                >
                     Test your knowledge and climb the leaderboard!
-                </p>
+                </motion.p>
 
                 {/* Interactive Robot */}
                 <div className="mx-auto mt-2 mb-4 flex flex-col items-center justify-center w-full">
                     <div className="relative">
-                        <InteractiveRobot username={username} errorMessage={errorMessage} hasPlayed={hasPlayed} />
+                        <InteractiveRobot username={username} errorMessage={errorMessage} hasPlayed={hasPlayed} totalPoints={totalPoints} />
                     </div>
                 </div>
 
-                {/* Playful Timeout Message */}
-                <AnimatePresence>
-                    {showTimeoutMessage && (
-                        <motion.div
-                            className="mt-4 p-4 rounded-lg mx-auto max-w-md"
-                            style={{
-                                background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
-                                border: '2px solid rgba(255,255,255,0.3)',
-                                boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-                            }}
-                            initial={{ opacity: 0, y: 20, scale: 0.8 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -20, scale: 0.8 }}
-                            transition={{ type: 'spring', damping: 15 }}
-                        >
-                            <p className="text-white font-semibold text-lg">
-                                Hey, it was real hard to build this app, please try it out!
-                            </p>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                {/* Playful Timeout Message - REMOVED (Robot handles this now) */}
 
                 {/* Topic Select Button */}
                 <motion.div className="text-center mb-2">

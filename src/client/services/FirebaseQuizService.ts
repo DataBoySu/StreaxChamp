@@ -173,9 +173,10 @@ export class FirebaseQuizService {
   /**
    * Requests a topic-specific quiz from the server.
    */
-  async getOrGenerateTopicQuiz(topicSlug: string): Promise<any> {
+  async getOrGenerateTopicQuiz(topicSlug: string, username?: string): Promise<any> {
     try {
-      const res = await fetch(`/api/topics/${encodeURIComponent(topicSlug)}/quiz`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const qs = username ? `?username=${encodeURIComponent(username)}` : '';
+      const res = await fetch(`/api/topics/${encodeURIComponent(topicSlug)}/quiz${qs}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) throw new Error(`Quiz generation failed (${res.status})`);
       return await res.json();
     } catch (e) {

@@ -754,4 +754,140 @@ export class FirestoreRestService {
       return [];
     }
   }
+
+  /**
+   * Executes a structured query against Firestore.
+   */
+  async runQuery(query: any): Promise<any[]> {
+    try {
+      const url = `${this.baseUrl}:runQuery`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(query)
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        Logger.error('[FirestoreRest.runQuery] query failed', { status: res.status, error: txt });
+        return [];
+      }
+
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      Logger.error('[FirestoreRest.runQuery] exception', e);
+      return [];
+    }
+  }
+
+  /**
+   * Increment user's total score (Atomic Commit)
+   * Automatically creates user doc if missing (upsert behavior).
+   * If nickname is provided, ensures the document has the correct nickname field.
+   */
+  async incrementUserTotalScore(userId: string, points: number, nickname?: string): Promise<boolean> {
+    try {
+      const dbPath = `projects/${this.projectId}/databases/(default)/documents`;
+      // We need the full resource path for the transformation
+      const docPath = `${dbPath}/users/${userId}`;
+
+      const writes: any[] = [
+        {
+          transform: {
+            document: docPath,
+            fieldTransforms: [
+              {
+                fieldPath: 'totalScore',
+                increment: { integerValue: String(points) }
+              },
+              {
+                fieldPath: 'updatedAt',
+                setToServerValue: 'REQUEST_TIME'
+              }
+            ]
+          }
+        }
+      ];
+
+      // If we have a nickname, add an update write to ensure it's set
+      if (nickname) {
+        writes.push({
+          update: {
+            name: docPath,
+            fields: {
+              nickname: { stringValue: nickname },
+              userId: { stringValue: userId },
+              lastActiveAt: { stringValue: new Date().toISOString() }
+            }
+          },
+          updateMask: { fieldPaths: ['nickname', 'userId', 'lastActiveAt'] }
+        });
+      }
+
+      const body = { writes };
+      const url = `${this.baseUrl}:commit`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        Logger.error('[FirestoreRest.incrementUserTotalScore] commit failed', txt);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      Logger.error('[FirestoreRest.incrementUserTotalScore] error', e);
+      return false;
+    }
+  }
+
+  /**
+   * Get top users by totalScore from 'users' collection
+   */
+  async getTopUsers(limit = 50): Promise<Array<{ userKey: string; nickname: string; totalScore: number }>> {
+    try {
+      // Query users collection, order by totalScore desc
+      const body = {
+        structuredQuery: {
+          from: [{ collectionId: 'users' }],
+          orderBy: [{ field: { fieldPath: 'totalScore' }, direction: 'DESCENDING' }],
+          limit: limit
+        }
+      };
+
+      const url = `${this.baseUrl}:runQuery`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) return [];
+
+      const data: any = await res.json();
+      // data is array of objects { document: ..., readTime: ... }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return data.map((item: any) => {
+        if (!item.document) return null;
+        const f = item.document.fields || {};
+        const pathParts = item.document.name.split('/');
+        const id = pathParts[pathParts.length - 1]; // userKey/userId
+
+        return {
+          userKey: id,
+          nickname: f.nickname?.stringValue || f.username?.stringValue || id, // Prefer nickname
+          totalScore: f.totalScore?.integerValue ? parseInt(f.totalScore.integerValue, 10) : 0
+        };
+      }).filter((u: any) => u !== null && typeof u.totalScore === 'number');
+
+    } catch (e) {
+      Logger.error('[FirestoreRest.getTopUsers] error', e);
+      return [];
+    }
+  }
 }

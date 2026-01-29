@@ -3,17 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface InteractiveRobotProps {
   username: string;
-  errorMessage?: string | null | undefined; // Allow undefined explicitly
-  hasPlayed?: boolean; // New prop to prevent interruptions if user returned
+  errorMessage?: string | undefined;
+  hasPlayed?: boolean;
+  totalPoints?: number; // New prop for aggregated score
 }
 
-export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, errorMessage, hasPlayed = false }) => {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, errorMessage, hasPlayed, totalPoints = 0 }) => {
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
   const [lines] = useState<string[]>([]);
   // Removed exhausted state, using time-based trigger
-  const [globalMousePosition, setGlobalMousePosition] = useState({ x: 0, y: 0 });
+  // Removed globalMousePosition state
   const [progress, setProgress] = useState(0); // Progress bar (0-100)
   const [systemStatus] = useState<{ ai: boolean; db: boolean }>({ ai: true, db: true });
   const [healingActive] = useState(false);
@@ -113,7 +114,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
       const relativeX = (event.clientX - centerX) / (window.innerWidth / 2);
       const relativeY = (event.clientY - centerY) / (window.innerHeight / 2);
 
-      setGlobalMousePosition({ x: relativeX, y: relativeY });
+      // setGlobalMousePosition({ x: relativeX, y: relativeY }); // Removed
 
       // Proximity Check (using headRef if available, or just center screen)
       // Check if mouse is within a certain radius of the center (roughly where robot is)
@@ -136,46 +137,55 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
     return () => clearInterval(timer);
   }, [hasPlayed]);
 
-  // Calculate robot horizontal position based on mouse
+  // Calculate robot position (parallax effect)
   const robotHorizontalOffset = useMemo(() => {
-    // If NOT near and NOT interacting, return to center
-    if (!isNear && !isHovered && !isVisorHovered && !errorMessage) return 0;
+    // Strict Focus: If Timeout is active AND Visor NOT hovered -> Robot stays center (0)
+    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !errorMessage && !isVisorHovered) {
+      return 0;
+    }
 
-    const maxMove = 150; // Maximum pixels to move left/right
-    return globalMousePosition.x * maxMove;
-  }, [globalMousePosition.x, isNear, isHovered, isVisorHovered, errorMessage]);
+    if (isNear || isHovered) {
+      return (mousePos.x / window.innerWidth - 0.5) * 20; // Reverted centering
+    }
+    return 0; // Default center
+  }, [mousePos.x, isNear, isHovered, timeOnPage, hasPlayed, errorMessage, isVisorHovered]);
 
   // Handle mouse movement for local eye tracking
-  const handleMouseMove = (event: React.MouseEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+  const containerRef = useRef<HTMLDivElement>(null);
 
-    setMousePosition({
-      x: event.clientX - centerX,
-      y: event.clientY - centerY,
-    });
-  };
+  // Handle global mouse movement for eye tracking
+  useEffect(() => {
+    const handleWindowMouseMove = (event: MouseEvent) => {
+      // If we have a ref to the container, calculate relative position
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        setMousePos({
+          x: event.clientX - centerX,
+          y: event.clientY - centerY
+        });
+      }
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    return () => window.removeEventListener('mousemove', handleWindowMouseMove);
+  }, []);
 
   // Calculate eye position for the visor display
   const getEyeOffset = () => {
-    // If Timeout Active -> Look down
-    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !isHovered && !errorMessage) {
-      return { x: 0, y: 15 }; // Look down at the CTA 
+    // If Timeout Active -> Look down strictly
+    // EXCEPTION: If user hovers VISOR, we allow tracking/interaction
+    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !errorMessage && !isVisorHovered) {
+      return { x: 0, y: 15 }; // Look down at the CTA, ignore cursor
     }
 
-    // If IDLE (not near) -> Centered eyes
-    if (!isNear && !isHovered && !isVisorHovered && !errorMessage) {
-      return { x: 0, y: 0 };
+    if (isNear || isHovered) {
+      const x = (mousePos.x - window.innerWidth / 2) / 30;
+      const y = (mousePos.y - window.innerHeight / 2) / 30;
+      return { x, y };
     }
-
-    const maxMove = 8;
-    // Use global mouse Y position for vertical eye movement
-    const verticalOffset = globalMousePosition.y * maxMove;
-    // Use local mouse X position for horizontal eye movement
-    const horizontalOffset = (mousePosition.x / 100) * maxMove;
-
-    return { x: horizontalOffset, y: verticalOffset };
+    return { x: 0, y: 0 };
   };
 
   const eyeOffset = getEyeOffset();
@@ -294,7 +304,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
         x: robotHorizontalOffset
       }}
       transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-      onMouseMove={handleMouseMove}
+      ref={containerRef}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -635,33 +645,32 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
             boxShadow: '0 0 4px currentColor',
           }}
         />
-        {/* New System Status LED */}
-        <motion.div
-          animate={{
-            backgroundColor: (errorMessage || !systemStatus.ai || !systemStatus.db) ? '#ef4444' : '#00ff88', // Red on error or offline
-            opacity: [0.6, 1, 0.6],
-          }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-          style={{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            boxShadow: (errorMessage || !systemStatus.ai || !systemStatus.db) ? '0 0 8px #ef4444' : '0 0 8px #00ff88',
-          }}
-        />
       </motion.div>
 
-      {/* System online text */}
-      <div style={{
-        fontFamily: 'monospace',
-        color: '#00ff88',
-        textShadow: '0 0 5px #00ff88',
-        fontSize: 11,
-        whiteSpace: 'nowrap',
-        marginTop: 12
-      }}>
-        USER: {username.toUpperCase()}
-      </div>
+      {/* Username label */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginTop: 12,
+        }}
+      >
+
+        <span style={{
+          fontFamily: 'monospace',
+          fontSize: 11,
+          color: '#00ff88',
+          textShadow: '0 0 5px #00ff88',
+          whiteSpace: 'nowrap',
+          letterSpacing: '0.05em'
+        }}>
+          {username}: {totalPoints}
+        </span>
+      </motion.div>
     </motion.div>
   );
 };
