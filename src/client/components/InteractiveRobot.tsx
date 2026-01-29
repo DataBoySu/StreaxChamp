@@ -4,21 +4,28 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface InteractiveRobotProps {
   username: string;
   errorMessage?: string | null | undefined; // Allow undefined explicitly
+  hasPlayed?: boolean; // New prop to prevent interruptions if user returned
 }
 
-export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, errorMessage }) => {
+export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, errorMessage, hasPlayed = false }) => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
   const [lines] = useState<string[]>([]);
-  const [exhausted, setExhausted] = useState(false);
+  // Removed exhausted state, using time-based trigger
   const [globalMousePosition, setGlobalMousePosition] = useState({ x: 0, y: 0 });
   const [progress, setProgress] = useState(0); // Progress bar (0-100)
   const [systemStatus] = useState<{ ai: boolean; db: boolean }>({ ai: true, db: true });
   const [healingActive] = useState(false);
   const [blinkOpen, setBlinkOpen] = useState(true); // Control for eye blinking
+  const [timeOnPage, setTimeOnPage] = useState(0); // Track time for timeout message
+  const [isNear, setIsNear] = useState(false); // Proximity detection
+  const [isVisorHovered, setIsVisorHovered] = useState(false); // New specific hover state
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
+
+  const TIMEOUT_LIMIT = 20; // Seconds before "Inside with you" message
+  const TIMEOUT_MSG = "That’s all you get. Inside with you. The real challenge awaits.";
 
   // --- BLINKING LOGIC ---
   // Only blink if there is NO error (circuits unbroken)
@@ -96,7 +103,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
     return [...statusLines, ...base.slice(0, 20)];
   }, [lines, username, systemStatus, errorMessage, healingActive]);
 
-  // Track global mouse position for robot following
+  // Track global mouse position for robot following AND proximity
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       const centerX = window.innerWidth / 2;
@@ -107,17 +114,36 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
       const relativeY = (event.clientY - centerY) / (window.innerHeight / 2);
 
       setGlobalMousePosition({ x: relativeX, y: relativeY });
+
+      // Proximity Check (using headRef if available, or just center screen)
+      // Check if mouse is within a certain radius of the center (roughly where robot is)
+      const dist = Math.sqrt(relativeX * relativeX + relativeY * relativeY);
+      // Threshold: 0.5 means within 50% of the screen center
+      setIsNear(dist < 0.4);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
+  // Timer for "Timeout" state
+  useEffect(() => {
+    if (hasPlayed) return; // Don't run timer if user has played
+
+    const timer = setInterval(() => {
+      setTimeOnPage(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [hasPlayed]);
+
   // Calculate robot horizontal position based on mouse
   const robotHorizontalOffset = useMemo(() => {
+    // If NOT near and NOT interacting, return to center
+    if (!isNear && !isHovered && !isVisorHovered && !errorMessage) return 0;
+
     const maxMove = 150; // Maximum pixels to move left/right
     return globalMousePosition.x * maxMove;
-  }, [globalMousePosition.x]);
+  }, [globalMousePosition.x, isNear, isHovered, isVisorHovered, errorMessage]);
 
   // Handle mouse movement for local eye tracking
   const handleMouseMove = (event: React.MouseEvent) => {
@@ -133,11 +159,19 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
 
   // Calculate eye position for the visor display
   const getEyeOffset = () => {
-    const maxMove = 8;
+    // If Timeout Active -> Look down
+    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !isHovered && !errorMessage) {
+      return { x: 0, y: 15 }; // Look down at the CTA 
+    }
 
+    // If IDLE (not near) -> Centered eyes
+    if (!isNear && !isHovered && !isVisorHovered && !errorMessage) {
+      return { x: 0, y: 0 };
+    }
+
+    const maxMove = 8;
     // Use global mouse Y position for vertical eye movement
     const verticalOffset = globalMousePosition.y * maxMove;
-
     // Use local mouse X position for horizontal eye movement
     const horizontalOffset = (mousePosition.x / 100) * maxMove;
 
@@ -150,25 +184,27 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
 
   // Cycle through messages when hovered
   useEffect(() => {
-    if (isHovered && !exhausted) {
+    // Stop cycling if timeout reached
+    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed) return;
+
+    if (isHovered) {
       const interval = window.setInterval(() => {
         setCurrentMessage((prev) => {
           const next = prev + 1;
-          if (next >= messages.length) {
-            setExhausted(true);
-            return prev; // stop advancing
-          }
+          if (next >= messages.length) return 0; // Loop or stay? User said "never finish". Let's loop.
           setProgress(0); // Reset progress when advancing
           return next;
         });
       }, 3000);
       return () => clearInterval(Number(interval));
     }
-  }, [isHovered, messages.length, exhausted]);
+  }, [isHovered, messages.length, timeOnPage, hasPlayed]);
 
   // Progress bar animation (fills up to 100% over 3 seconds)
   useEffect(() => {
-    if (isHovered && !exhausted) {
+    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed) return;
+
+    if (isHovered) {
       setProgress(0);
       const startTime = Date.now();
       const duration = 3000;
@@ -182,11 +218,9 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
       };
       requestAnimationFrame(frame);
     }
-  }, [isHovered, currentMessage, exhausted]);
+  }, [isHovered, currentMessage, timeOnPage, hasPlayed]);
 
   // --- FACIAL EXPRESSION LOGIC ---
-  const [isVisorHovered, setIsVisorHovered] = useState(false); // New specific hover state
-
   type FaceState = 'neutral' | 'happy' | 'angry' | 'dead' | 'surprised';
 
   const currentFace: FaceState = useMemo(() => {
@@ -198,27 +232,36 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
 
   // Eye Variants for Morphing
   const leftEyeVariant = {
-    neutral: { height: 12, width: 8, borderRadius: '50%', rotate: 0, scaleY: 1 },
+    neutral: { height: 10, width: 10, borderRadius: '50%', rotate: 0, scaleY: 1 }, // Default Circle
     happy: { height: 6, width: 14, borderRadius: '4px', rotate: -15, scaleY: 1 }, // Inverse arch hint
     angry: { height: 4, width: 14, borderRadius: '2px', rotate: 20, scaleY: 1 },
     dead: { height: 2, width: 14, borderRadius: '0px', rotate: 45, scaleY: 1 }, // X shape part 1 (simulated with line)
     surprised: { height: 16, width: 12, borderRadius: '50%', rotate: 0, scaleY: 1 },
-    blink: { scaleY: 0.1 }
+    blink: { scaleY: 0.1 },
+    active: { height: 12, width: 8, borderRadius: '50%', rotate: 0, scaleY: 1 } // Oval (Active)
   };
 
   const rightEyeVariant = {
-    neutral: { height: 12, width: 8, borderRadius: '50%', rotate: 0, scaleY: 1 },
+    neutral: { height: 10, width: 10, borderRadius: '50%', rotate: 0, scaleY: 1 }, // Default Circle
     happy: { height: 6, width: 14, borderRadius: '4px', rotate: 15, scaleY: 1 },
     angry: { height: 4, width: 14, borderRadius: '2px', rotate: -20, scaleY: 1 },
     dead: { height: 2, width: 14, borderRadius: '0px', rotate: -45, scaleY: 1 },
     surprised: { height: 16, width: 12, borderRadius: '50%', rotate: 0, scaleY: 1 },
-    blink: { scaleY: 0.1 }
+    blink: { scaleY: 0.1 },
+    active: { height: 12, width: 8, borderRadius: '50%', rotate: 0, scaleY: 1 } // Oval (Active)
   };
 
   // Determine current variant based on blink state
   // If blinking (and not dead/angry which shouldn't blink usually, but logic marks blinking disabled on error)
   const getEyeState = () => {
     if (!blinkOpen && currentFace !== 'dead') return 'blink';
+    // If neutral (no specific face triggers), check if we should be in "Active" (Oval) or "Idle" (Circle/Neutral)
+    if (currentFace === 'neutral') {
+      // If Near OR Hovered -> Active (Oval)
+      if (isNear || isHovered) return 'active';
+      // Else -> Neutral (Circle)
+      return 'neutral';
+    }
     return currentFace;
   };
 
@@ -292,7 +335,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
               {/* Top accent line */}
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: errorMessage ? '#ef4444' : '#a78bfa', opacity: 0.8 }} />
               {/* Translucent progress bar */}
-              {!exhausted && (
+              {!(timeOnPage > TIMEOUT_LIMIT && !hasPlayed) && (
                 <div
                   style={{
                     position: 'absolute',
@@ -306,7 +349,12 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
                   }}
                 />
               )}
-              <span style={{ position: 'relative', zIndex: 1 }}>{tempEmote || messages[currentMessage]}</span>
+              <span style={{ position: 'relative', zIndex: 1 }}>
+                {(timeOnPage > TIMEOUT_LIMIT && !hasPlayed)
+                  ? TIMEOUT_MSG
+                  : (tempEmote || messages[currentMessage])
+                }
+              </span>
               <div
                 style={{
                   position: 'absolute',
@@ -512,24 +560,33 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
         </motion.div>
       </div>
 
-      {/* Exhausted message overlay (nudge into app) */}
+      {/* Styled Call-to-Action Box (replaces exhausted message) */}
       <AnimatePresence>
-        {exhausted && !errorMessage && (
+        {timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !errorMessage && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
             style={{
-              marginTop: 12,
-              color: '#f59e0b',
-              background: 'rgba(17,24,39,0.6)',
-              border: '1px solid rgba(245,158,11,0.5)',
-              padding: '6px 10px',
-              borderRadius: 8,
-              fontSize: 12,
+              marginTop: 20,
+              background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.8) 0%, rgba(45, 212, 191, 0.8) 100%)', // Red to Teal
+              padding: '2px', // Border gradient
+              borderRadius: '12px',
+              boxShadow: '0 0 20px rgba(45, 212, 191, 0.5)', // Teal glow
+              cursor: 'pointer'
             }}
           >
-            That’s all you get. Inside with you — the real challenge awaits.
+            <div style={{
+              background: '#111827',
+              borderRadius: '10px',
+              padding: '12px 20px',
+              color: '#fff',
+              fontFamily: 'monospace',
+              textAlign: 'center',
+              textShadow: '0 0 5px rgba(255,255,255,0.5)'
+            }}>
+              Hey, it was real hard to build this app, please try it out!
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -65,6 +65,7 @@ export const App = () => {
   const [selectedTopicQuiz, setSelectedTopicQuiz] = useState<SelectedTopicQuiz | null>(null);
   const [topicQuizStatus, setTopicQuizStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [showNoTopicPrompt, setShowNoTopicPrompt] = useState(false);
+  const [hasCompletedQuizSession, setHasCompletedQuizSession] = useState(false); // Track if user has finished a quiz
   const [authUser, setAuthUser] = useState<{ redditUsername: string; nickname: string } | null>(() => {
     try {
       const raw = localStorage.getItem(CONFIG.STORAGE_KEYS.AUTH);
@@ -352,6 +353,7 @@ export const App = () => {
             }
           } else if (!showBonusQuestion) {
             setShowScore(true);
+            setHasCompletedQuizSession(true); // User completed a quiz
             completeQuiz(newScore);
           }
         } else {
@@ -768,6 +770,7 @@ export const App = () => {
                     totalQuestions={NUM_QUESTIONS}
                     showTimeoutMessage={showTimeoutMessage}
                     errorMessage={currentError?.robotDialogue}
+                    hasPlayed={hasCompletedQuizSession}
                   />
                 ) : showGap ? (
                   <GapView multiplier={multiplier} />

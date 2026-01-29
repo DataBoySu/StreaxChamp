@@ -12,6 +12,7 @@ interface LandingHeroProps {
     totalQuestions: number;
     showTimeoutMessage?: boolean;
     errorMessage?: string | null | undefined; // NEW: robot error message
+    hasPlayed?: boolean;
 }
 
 export const LandingHero: React.FC<LandingHeroProps> = ({
@@ -23,6 +24,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
     totalQuestions,
     showTimeoutMessage,
     errorMessage, // NEW
+    hasPlayed = false,
 }) => {
     return (
         <motion.div
@@ -77,7 +79,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                 {/* Interactive Robot */}
                 <div className="mx-auto mt-2 mb-4 flex flex-col items-center justify-center w-full">
                     <div className="relative">
-                        <InteractiveRobot username={username} errorMessage={errorMessage} />
+                        <InteractiveRobot username={username} errorMessage={errorMessage} hasPlayed={hasPlayed} />
                     </div>
                 </div>
 
