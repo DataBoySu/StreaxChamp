@@ -184,6 +184,57 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
     }
   }, [isHovered, currentMessage, exhausted]);
 
+  // --- FACIAL EXPRESSION LOGIC ---
+  const [isVisorHovered, setIsVisorHovered] = useState(false); // New specific hover state
+
+  type FaceState = 'neutral' | 'happy' | 'angry' | 'dead' | 'surprised';
+
+  const currentFace: FaceState = useMemo(() => {
+    if (errorMessage) return 'dead'; // Dead/Error takes priority
+    if (isVisorHovered) return 'happy'; // Direct interaction = Happy
+    if (isHovered) return 'surprised'; // General attention = Alert/Surprised
+    return 'neutral';
+  }, [errorMessage, isVisorHovered, isHovered]);
+
+  // Eye Variants for Morphing
+  const leftEyeVariant = {
+    neutral: { height: 12, width: 8, borderRadius: '50%', rotate: 0, scaleY: 1 },
+    happy: { height: 6, width: 14, borderRadius: '4px', rotate: -15, scaleY: 1 }, // Inverse arch hint
+    angry: { height: 4, width: 14, borderRadius: '2px', rotate: 20, scaleY: 1 },
+    dead: { height: 2, width: 14, borderRadius: '0px', rotate: 45, scaleY: 1 }, // X shape part 1 (simulated with line)
+    surprised: { height: 16, width: 12, borderRadius: '50%', rotate: 0, scaleY: 1 },
+    blink: { scaleY: 0.1 }
+  };
+
+  const rightEyeVariant = {
+    neutral: { height: 12, width: 8, borderRadius: '50%', rotate: 0, scaleY: 1 },
+    happy: { height: 6, width: 14, borderRadius: '4px', rotate: 15, scaleY: 1 },
+    angry: { height: 4, width: 14, borderRadius: '2px', rotate: -20, scaleY: 1 },
+    dead: { height: 2, width: 14, borderRadius: '0px', rotate: -45, scaleY: 1 },
+    surprised: { height: 16, width: 12, borderRadius: '50%', rotate: 0, scaleY: 1 },
+    blink: { scaleY: 0.1 }
+  };
+
+  // Determine current variant based on blink state
+  // If blinking (and not dead/angry which shouldn't blink usually, but logic marks blinking disabled on error)
+  const getEyeState = () => {
+    if (!blinkOpen && currentFace !== 'dead') return 'blink';
+    return currentFace;
+  };
+
+  const [tempEmote, setTempEmote] = useState<string | null>(null);
+
+  // Trigger random emote on happy state (visor hover)
+  useEffect(() => {
+    if (currentFace === 'happy') {
+      const emotes = [':)', ':D', ':O', 'UwU', '^.^', '<3', 'xD'];
+      // Ensure we always fallback to a string if something goes wrong, though index is safe here
+      setTempEmote(emotes[Math.floor(Math.random() * emotes.length)] || ':)');
+    } else {
+      setTempEmote(null);
+    }
+  }, [currentFace]);
+
   return (
     <motion.div
       style={{
@@ -216,22 +267,30 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
               exit={{ opacity: 0, scale: 0.8, y: 10, x: '-50%' }}
               style={{
                 position: 'absolute',
-                top: -40,
+                top: -55,
                 left: '50%',
-                backgroundColor: errorMessage ? '#ef4444' : '#7c3aed', // Red background for errors
+                backgroundColor: errorMessage ? 'rgba(239, 68, 68, 0.95)' : 'rgba(17, 24, 39, 0.95)', // Darker, more opaque
+                backdropFilter: 'blur(8px)',
+                border: errorMessage ? '1px solid #ef4444' : '1px solid #7c3aed',
                 color: 'white',
-                padding: '8px 12px',
-                borderRadius: 12,
+                padding: '12px 18px',
+                borderRadius: '16px 16px 16px 0', // Chat bubble style
                 fontSize: 14,
                 fontWeight: 'bold',
-                zIndex: 20,
+                fontFamily: '"Share Tech Mono", monospace', // Tech font feel
+                zIndex: 30,
                 whiteSpace: 'nowrap',
                 maxWidth: 'unset',
-                boxShadow: errorMessage ? '0 4px 12px rgba(239, 68, 68, 0.4)' : '0 4px 12px rgba(124, 58, 237, 0.3)',
+                boxShadow: errorMessage
+                  ? '0 10px 25px rgba(239, 68, 68, 0.4), inset 0 0 0 1px rgba(255,255,255,0.1)'
+                  : '0 10px 25px rgba(124, 58, 237, 0.3), inset 0 0 0 1px rgba(255,255,255,0.1)',
                 textAlign: 'center',
                 overflow: 'hidden',
+                transformOrigin: 'bottom left'
               }}
             >
+              {/* Top accent line */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: errorMessage ? '#ef4444' : '#a78bfa', opacity: 0.8 }} />
               {/* Translucent progress bar */}
               {!exhausted && (
                 <div
@@ -247,7 +306,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
                   }}
                 />
               )}
-              <span style={{ position: 'relative', zIndex: 1 }}>{messages[currentMessage]}</span>
+              <span style={{ position: 'relative', zIndex: 1 }}>{tempEmote || messages[currentMessage]}</span>
               <div
                 style={{
                   position: 'absolute',
@@ -273,18 +332,19 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
             position: 'relative',
             width: '140px',
             height: '120px',
-            background: 'linear-gradient(135deg, #374151 0%, #1f2937 50%, #111827 100%)',
-            borderRadius: '20px',
-            border: errorMessage ? '3px solid #ef4444' : '3px solid #dc2626', // Red border on error
+            background: 'linear-gradient(135deg, #374151 0%, #111827 100%)',
+            borderRadius: '24px', // Slightly rounder
+            border: errorMessage ? '3px solid #ef4444' : '3px solid #dc2626',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: errorMessage
-              ? '0 0 20px rgba(239, 68, 68, 0.4), inset 0 1px 0 rgba(255,255,255,0.1)'
-              : '0 8px 25px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
+              ? '0 0 30px rgba(239, 68, 68, 0.6), inset 0 1px 0 rgba(255,255,255,0.2), 0 10px 20px rgba(0,0,0,0.5)'
+              : '0 15px 35px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15), 0 0 0 1px rgba(0,0,0,0.5)', // Deep shadow + rim light
             marginTop: 30,
             overflow: 'visible',
+            filter: errorMessage ? 'grayscale(0.8) sepia(0.5) hue-rotate(-50deg)' : 'none'
           }}
         >
           {/* (speech bubble removed from here; parent now renders the bubble centered over the head) */}
@@ -299,6 +359,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
               background: 'linear-gradient(45deg, #374151, #1f2937)',
               border: '2px solid #dc2626',
               borderRadius: '3px',
+              boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.8), 0 2px 5px rgba(0,0,0,0.3)'
             }}
           />
           <div
@@ -311,6 +372,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
               background: 'linear-gradient(45deg, #374151, #1f2937)',
               border: '2px solid #dc2626',
               borderRadius: '3px',
+              boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.8), 0 2px 5px rgba(0,0,0,0.3)'
             }}
           />
 
@@ -325,6 +387,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
               background: 'linear-gradient(90deg, #374151, #1f2937)',
               border: '2px solid #dc2626',
               borderRadius: '0 3px 3px 0',
+              boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.8), 0 5px 10px rgba(0,0,0,0.4)'
             }}
           />
           <div
@@ -337,11 +400,14 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
               background: 'linear-gradient(90deg, #1f2937, #374151)',
               border: '2px solid #dc2626',
               borderRadius: '3px 0 0 3px',
+              boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.8), 0 5px 10px rgba(0,0,0,0.4)'
             }}
           />
 
           {/* Main visor/screen */}
           <div
+            onMouseEnter={() => setIsVisorHovered(true)} // DETECT VISOR HOVER
+            onMouseLeave={() => setIsVisorHovered(false)}
             style={{
               position: 'relative',
               width: '110px',
@@ -354,6 +420,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
               justifyContent: 'center',
               overflow: 'hidden',
               boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)',
+              cursor: 'cell' // Indicate interaction
             }}
           >
             {/* Visor reflection effect */}
@@ -384,36 +451,22 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
             >
               {/* Left eye */}
               <motion.div
-                animate={{
-                  // Blink effect: scale Y to 0.1 when closed
-                  scaleY: blinkOpen ? 1 : 0.1,
-                  boxShadow: errorMessage
-                    ? '0 0 15px #ef4444, 0 0 25px #ef4444' // Red eyes on error
-                    : isHovered ? '0 0 15px #00ff88, 0 0 25px #00ff88' : '0 0 8px #00ff88',
-                }}
+                variants={leftEyeVariant}
+                animate={getEyeState()}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                 style={{
-                  width: '8px',
-                  height: '8px',
-                  backgroundColor: errorMessage ? '#ef4444' : '#00ff88', // Red eyes on error
-                  borderRadius: '50%',
-                  boxShadow: errorMessage ? '0 0 8px #ef4444' : '0 0 8px #00ff88',
+                  backgroundColor: errorMessage ? '#ef4444' : (currentFace === 'happy' ? '#ff69b4' : '#00ff88'), // Pink for happy
+                  boxShadow: errorMessage ? '0 0 8px #ef4444' : (currentFace === 'happy' ? '0 0 10px #ff69b4' : '0 0 8px #00ff88'),
                 }}
               />
               {/* Right eye */}
               <motion.div
-                animate={{
-                  // Blink effect: scale Y to 0.1 when closed
-                  scaleY: blinkOpen ? 1 : 0.1,
-                  boxShadow: errorMessage
-                    ? '0 0 15px #ef4444, 0 0 25px #ef4444' // Red eyes on error
-                    : isHovered ? '0 0 15px #00ff88, 0 0 25px #00ff88' : '0 0 8px #00ff88',
-                }}
+                variants={rightEyeVariant}
+                animate={getEyeState()}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                 style={{
-                  width: '8px',
-                  height: '8px',
-                  backgroundColor: errorMessage ? '#ef4444' : '#00ff88', // Red eyes on error
-                  borderRadius: '50%',
-                  boxShadow: errorMessage ? '0 0 8px #ef4444' : '0 0 8px #00ff88',
+                  backgroundColor: errorMessage ? '#ef4444' : (currentFace === 'happy' ? '#ff69b4' : '#00ff88'), // Pink for happy
+                  boxShadow: errorMessage ? '0 0 8px #ef4444' : (currentFace === 'happy' ? '0 0 10px #ff69b4' : '0 0 8px #00ff88'),
                 }}
               />
             </motion.div>
