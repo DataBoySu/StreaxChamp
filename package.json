@@ -49,6 +49,7 @@
     "framer-motion": "^12.23.12",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.542.0",
+    "nes.css": "^2.3.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "tailwind-merge": "3.3.0",

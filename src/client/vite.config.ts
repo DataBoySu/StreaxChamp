@@ -20,6 +20,10 @@ export default defineConfig({
           'vendor-firebase': ['firebase/app', 'firebase/firestore'],
         },
       },
+      input: {
+        splash: 'splash.html',
+        game: 'game.html',
+      },
     },
   },
   define: {

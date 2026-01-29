@@ -16,9 +16,13 @@
     "dir": "dist/client",
     "entrypoints": {
       "default": {
-        "entry": "index.html",
+        "entry": "splash.html",
         "inline": true,
         "height": "tall"
+      },
+      "game": {
+        "entry": "game.html",
+        "inline": false
       }
     }
   },

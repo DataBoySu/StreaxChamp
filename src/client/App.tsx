@@ -12,7 +12,6 @@ import { useBackgroundMusic } from './hooks/useBackgroundMusic';
 import { useUserActivity } from './hooks/useUserActivity';
 import { useRobotError } from './hooks/useRobotError';
 import { CONFIG } from '../shared/constants';
-import { SplashScreen } from './components/splash/SplashScreen';
 import { LandingHero } from './components/landing/LandingHero';
 import { QuizActiveView } from './components/quiz/QuizActiveView';
 import { QuizResult } from './components/quiz/QuizResult';
@@ -23,6 +22,7 @@ import { NoTopicPrompt } from './components/modals/NoTopicPrompt';
 import { GameSidebar } from './components/dashboard/GameSidebar';
 import { GlobalDashboard } from './components/dashboard/GlobalDashboard';
 import { MessageDisplay } from './components/ui/MessageDisplay';
+import { KawaiiLoader } from './components/loading/KawaiiLoader';
 
 const QUIZ_DURATIONS = Array(CONFIG.GAME.DEFAULT_QUESTIONS_COUNT).fill(CONFIG.GAME.TIMER_DURATION);
 const BONUS_QUIZ_DURATION = CONFIG.GAME.BONUS_TIMER_DURATION;
@@ -35,10 +35,8 @@ const NUM_QUESTIONS = CONFIG.GAME.DEFAULT_QUESTIONS_COUNT;
  */
 export const App = () => {
   const theme = useTheme();
-  // Daily quiz (fallback) hook
   const { questions: dailyQuestions, quiz: dailyQuiz, loading } = useQuizData();
 
-  const [showSplash, setShowSplash] = useState(true);
   const [quizStarted, setQuizStarted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -95,7 +93,7 @@ export const App = () => {
 
   // Activity detection for smart polling (60s timeout)
   const isUserActive = useUserActivity(60000);
-  const pollingEnabled = !showSplash && isUserActive;
+  const pollingEnabled = isUserActive;
 
   // Leaderboard hook (per selected topic)
   // Enable leaderboard as soon as quiz ends (showScore) or while viewing start screen for previously selected topic
@@ -609,10 +607,7 @@ export const App = () => {
   if (loading && !selectedTopicQuiz) {
     return (
       <div className="min-h-screen bg-primary text-primary flex items-center justify-center">
-        <div className="text-center">
-          <div className="loading-spinner mb-4"></div>
-          <p className="text-lg">Loading today's quiz...</p>
-        </div>
+        <KawaiiLoader />
       </div>
     );
   }
@@ -746,10 +741,6 @@ export const App = () => {
               </AnimatePresence>
 
               <MessageDisplay message={message} />
-
-              <AnimatePresence>
-                {showSplash && <SplashScreen onDismiss={() => setShowSplash(false)} />}
-              </AnimatePresence>
 
               <AnimatePresence mode="wait">
                 {!quizStarted ? (

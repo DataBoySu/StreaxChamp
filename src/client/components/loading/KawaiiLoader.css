@@ -1,0 +1,273 @@
+/* Kawaii Pixel Art Loading Animation */
+.kawaii-loader-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 48px;
+    padding: 60px;
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 40px;
+    border: 8px solid #212529;
+    box-shadow: 16px 16px 0px rgba(0, 0, 0, 0.2);
+    /* Deep block shadow */
+    width: auto;
+    min-width: 400px;
+    transform-origin: center;
+    animation: pop-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes pop-in {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.kawaii-loader {
+    width: 200px;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: float 2.5s ease-in-out infinite;
+}
+
+/* Pixel Heart Animation - MASSIVE SCALE & DARKER */
+.pixel-heart {
+    width: 140px;
+    height: 120px;
+    position: relative;
+    transform: scale(2.0);
+    animation: heartbeat 1.2s cubic-bezier(0.21, 1.11, 0.81, 0.99) infinite;
+    filter: drop-shadow(0 10px 15px rgba(220, 20, 60, 0.5));
+    /* VIBE GLOW */
+}
+
+.heart-row {
+    position: absolute;
+    background: #D9381E;
+    /* Darker Red */
+    box-shadow:
+        0 0 0 2px #8B0000,
+        /* Dark crimson border definition */
+        inset 4px 4px 0px rgba(255, 255, 255, 0.2),
+        /* Top-left highlight */
+        inset -4px -4px 0px rgba(0, 0, 0, 0.2);
+    /* Bottom-right shade */
+}
+
+/* Improved Pixel Heart Shape (70px wide grid base logic x 2) */
+.row-top-left {
+    top: 0px;
+    left: 10px;
+    width: 50px;
+    height: 20px;
+    border-radius: 4px 4px 0 0;
+}
+
+.row-top-right {
+    top: 0px;
+    left: 80px;
+    width: 50px;
+    height: 20px;
+    border-radius: 4px 4px 0 0;
+}
+
+.row-2 {
+    top: 20px;
+    left: 0px;
+    width: 140px;
+    height: 30px;
+}
+
+.row-3 {
+    top: 50px;
+    left: 10px;
+    width: 120px;
+    height: 20px;
+}
+
+.row-4 {
+    top: 70px;
+    left: 20px;
+    width: 100px;
+    height: 20px;
+}
+
+.row-5 {
+    top: 90px;
+    left: 40px;
+    width: 60px;
+    height: 20px;
+}
+
+.row-6 {
+    top: 110px;
+    left: 60px;
+    width: 20px;
+    height: 10px;
+    border-radius: 0 0 4px 4px;
+}
+
+
+/* Heartbeat Animation - Intense bounce */
+@keyframes heartbeat {
+
+    0%,
+    100% {
+        transform: scale(1.8);
+    }
+
+    15% {
+        transform: scale(2.1);
+    }
+
+    30% {
+        transform: scale(1.8);
+    }
+
+    45% {
+        transform: scale(2.1);
+    }
+
+    60% {
+        transform: scale(1.8);
+    }
+}
+
+/* Float Animation */
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+/* Loading Text - BLOCK EFFECT & BOLD */
+.kawaii-loader-text {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 2.2rem;
+    font-weight: 900;
+    /* BOLD */
+    color: #FF4500;
+    text-align: center;
+    text-transform: uppercase;
+    /* Retro Block Shadow Effect */
+    text-shadow:
+        2px 2px 0px #8B0000,
+        4px 4px 0px #8B0000,
+        6px 6px 0px #212529;
+    letter-spacing: 4px;
+    margin: 0;
+    /* Removed pulse-text animation for static blocky look */
+}
+
+/* Custom Progress Bar - WIDER & TALLER */
+.kawaii-progress-track {
+    width: 100%;
+    min-width: 350px;
+    height: 48px;
+    background-color: white;
+    border: 6px solid #212529;
+    padding: 4px;
+    position: relative;
+    box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.kawaii-progress-fill {
+    width: 100%;
+    height: 100%;
+    background-color: #D9381E;
+    /* Darker Red Match */
+    background-image: linear-gradient(45deg,
+            rgba(255, 255, 255, 0.2) 25%,
+            transparent 25%,
+            transparent 50%,
+            rgba(255, 255, 255, 0.2) 50%,
+            rgba(255, 255, 255, 0.2) 75%,
+            transparent 75%,
+            transparent);
+    background-size: 60px 60px;
+    animation: progress-stripe 0.8s linear infinite;
+    /* Faster stripe */
+    border-radius: 2px;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes progress-stripe {
+    0% {
+        background-position: 60px 0;
+    }
+
+    100% {
+        background-position: 0 0;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .kawaii-loader-container {
+        width: 90%;
+        min-width: 280px;
+        padding: 30px;
+        gap: 32px;
+    }
+
+    .kawaii-loader {
+        width: 140px;
+        height: 140px;
+    }
+
+    .pixel-heart {
+        transform: scale(1.4);
+    }
+
+    @keyframes heartbeat {
+
+        0%,
+        100% {
+            transform: scale(1.4);
+        }
+
+        15% {
+            transform: scale(1.6);
+        }
+
+        30% {
+            transform: scale(1.4);
+        }
+
+        45% {
+            transform: scale(1.6);
+        }
+
+        60% {
+            transform: scale(1.4);
+        }
+    }
+
+    .kawaii-loader-text {
+        font-size: 1.25rem;
+        text-shadow:
+            2px 2px 0px #8B0000,
+            4px 4px 0px #212529;
+    }
+
+    .kawaii-progress-track {
+        min-width: 100%;
+        height: 36px;
+        border-width: 4px;
+    }
+}
