@@ -44,68 +44,6 @@ export class LeaderboardService {
     return `topics/${slug}/leaderboardRolling`;
   }
 
-  // Global totals leaderboard (sum of scores across all topics)
-  private globalTotalsCollection() {
-    return `leaderboardGlobal`;
-  }
-
-  /** Add to global totals (sum of best daily submissions across topics). */
-  async addToGlobalTotals(entry: LeaderboardEntryInput): Promise<void> {
-    try {
-      const coll = this.globalTotalsCollection();
-      const docPath = `${coll}/${entry.userKey}`;
-      const url = `${this.baseUrl}/${docPath}`;
-      // Read existing
-      let existing: { totalScore: number; nickname: string } | null = null;
-      try {
-        const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-        if (res.ok) {
-          const data: any = await res.json(); // eslint-disable-line @typescript-eslint/no-explicit-any
-          const f: FirestoreDocFields = data?.fields || {};
-          existing = {
-            totalScore: f.totalScore?.integerValue ? parseInt(f.totalScore.integerValue, 10) : 0,
-            nickname: f.nickname?.stringValue || entry.nickname,
-          };
-        }
-      } catch {/* none */ }
-      const newTotal = (existing?.totalScore || 0) + entry.score;
-      const body = {
-        fields: {
-          userKey: { stringValue: entry.userKey },
-          nickname: { stringValue: entry.nickname },
-          totalScore: { integerValue: String(newTotal) },
-          updatedAt: { stringValue: new Date().toISOString() },
-        },
-      };
-      await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    } catch (e) {
-      Logger.error('[LeaderboardService.addToGlobalTotals] error', e);
-    }
-  }
-
-  /** List global totals leaderboard (top users by totalScore). */
-  async listGlobalTotals(limit = 50): Promise<Array<{ userKey: string; nickname: string; totalScore: number }>> {
-    try {
-      const url = `${this.baseUrl}/${this.globalTotalsCollection()}`;
-      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-      if (!res.ok) return [];
-      const data: any = await res.json(); // eslint-disable-line @typescript-eslint/no-explicit-any
-      const docs = data?.documents || [];
-      const out = docs.map((d: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        const f: FirestoreDocFields = d.fields || {};
-        return {
-          userKey: f.userKey?.stringValue || '',
-          nickname: f.nickname?.stringValue || '',
-          totalScore: f.totalScore?.integerValue ? parseInt(f.totalScore.integerValue, 10) : 0,
-        };
-      });
-      out.sort((a: { totalScore: number }, b: { totalScore: number }) => b.totalScore - a.totalScore);
-      return out.slice(0, limit);
-    } catch (e) {
-      Logger.error('[LeaderboardService.listGlobalTotals] error', e);
-      return [];
-    }
-  }
 
   /** Submit to rolling leaderboard (upsert if better). Reuses same logic as daily without date partition */
   async submitRolling(slug: string, entry: LeaderboardEntryInput): Promise<{ ok: boolean; updated: boolean; previous?: LeaderboardEntry | null }> {

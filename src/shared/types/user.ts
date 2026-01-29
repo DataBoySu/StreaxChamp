@@ -4,6 +4,8 @@ export interface User {
   createdAt: string; // ISO timestamp
   interests?: string[]; // optional future expansion
   quizCount?: number; // number of quizzes played (denormalized)
+  totalScore?: number; // total points across all quizzes
+  streak?: number; // current daily streak
   lastActiveAt?: string; // ISO timestamp
 }
 

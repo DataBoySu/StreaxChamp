@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { FirestoreRestService } from '../services/FirestoreRestService';
+import { UserService } from '../services/UserService';
 import { Logger } from '../Logger';
 
 interface PlayHistoryEntry {
@@ -27,9 +28,15 @@ export class HistoryController {
             }
 
             const fs = new FirestoreRestService();
+            const us = new UserService();
+
+            const targetId = username; // User wants everything identified by username
+            const realUser = await us.getUser(targetId);
+            const effectiveNickname = realUser ? realUser.nickname : (nickname || username);
+
             const entry: PlayHistoryEntry = {
-                username,
-                nickname: nickname || username,
+                username: targetId,
+                nickname: effectiveNickname,
                 topicSlug,
                 topicTitle,
                 timestamp: Date.now(),
@@ -39,12 +46,12 @@ export class HistoryController {
             // Always save to play history
             await fs.savePlayHistory(entry);
 
-            // Fetch stats using proper username primary key
-            const stats = await fs.getUserTopicStats(username, topicSlug);
+            // Fetch current stats for the username doc
+            const stats = await fs.getUserTopicStats(targetId, topicSlug);
             const today = quizDate || new Date().toISOString().split('T')[0];
 
             // ALWAYS update user stats (lastAttemptDate, etc.)
-            await fs.updateUserTopicStats(username, topicSlug, {
+            await fs.updateUserTopicStats(targetId, topicSlug, {
                 lastAttemptDate: today,
                 isCompleted: true
             });
@@ -52,11 +59,17 @@ export class HistoryController {
             // ONLY increment score if not already played today
             if (!stats || stats.lastAttemptDate !== today) {
                 if (typeof score === 'number' && score > 0) {
-                    await fs.incrementUserTotalScore(username, score, nickname || username);
+                    await fs.incrementUserTotalScore(targetId, score, effectiveNickname);
                 }
             } else {
-                Logger.info(`[History] Score skipped for ${username} (already played today)`);
+                Logger.info(`[History] Score skipped for ${targetId} (already played today)`);
             }
+
+            // Invalidate landing summary cache so leaderboard updates immediately
+            try {
+                const cache = (await import('../services/CacheService')).CacheService.getInstance();
+                await cache.del('landing_summary');
+            } catch (e) { /* ignore */ }
 
             return res.json({ ok: true });
         } catch (e) {

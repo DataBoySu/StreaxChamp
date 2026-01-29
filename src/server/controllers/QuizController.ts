@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { FirestoreRestService } from '../services/FirestoreRestService';
+import { UserService } from '../services/UserService';
 import { Logger } from '../Logger';
 import { generateUnifiedContent, validateGeminiKey } from '../services/GeminiService';
 import { CacheService } from '../services/CacheService';
@@ -173,13 +174,15 @@ export class QuizController {
             const slug: string = rawSlug;
             const fs = new FirestoreRestService();
             const todayStr = new Date().toISOString().split('T')[0] || '';
-            const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
-
-            // USE USERNAME if provided (Primary Key as per User Request)
+            // USE USERNAME as the Primary Key (Devvit nickname)
             const queryUser = (req.query.username as string || '').trim();
-            const effectiveUserId = queryUser || userId;
+            const us = new UserService();
+            const realUser = queryUser ? await us.getUser(queryUser) : null;
 
-            Logger.info(`[TopicQuiz] Request received for slug="${slug}"`, { userId: effectiveUserId }, 'API');
+            const effectiveUserId = queryUser || (realUser ? realUser.userId : null);
+            const effectiveNickname = queryUser || (realUser ? realUser.nickname : 'Player');
+
+            Logger.info(`[TopicQuiz] Request received for slug="${slug}"`, { userId: effectiveUserId, nickname: effectiveNickname }, 'API');
 
             // 2. Simplified "Global Latest with Personal Trigger" Logic
             const latest = await fs.getLatestTopicQuiz(slug);

@@ -85,6 +85,7 @@ export class FirestoreRestService {
       const data = await response.json();
       return this.parseFirestoreDocument(data);
     } catch (error) {
+      Logger.error('[FirestoreRest.getTodaysQuiz] error', error);
       return null;
     }
   }
@@ -145,6 +146,7 @@ export class FirestoreRestService {
 
       return response.ok;
     } catch (error) {
+      Logger.error('[FirestoreRest.saveTodaysQuiz] error', error);
       return false;
     }
   }
@@ -210,6 +212,7 @@ export class FirestoreRestService {
 
       return response.ok;
     } catch (error) {
+      Logger.error('[FirestoreRest.saveSubredditConfig] error', error);
       return false;
     }
   }
@@ -266,6 +269,7 @@ export class FirestoreRestService {
 
       return response.ok;
     } catch (error) {
+      Logger.error('[FirestoreRest.saveTopic] error', error);
       return false;
     }
   }
@@ -288,6 +292,7 @@ export class FirestoreRestService {
         return { title, slug, sources };
       });
     } catch (error) {
+      Logger.error('[FirestoreRest.listTopics] error', error);
       return [];
     }
   }

@@ -58,8 +58,7 @@ export class LeaderboardController {
                 await fs.updateUserTopicStats(userKey, slug, { isCompleted: true });
             }
 
-            await svc.addToGlobalTotals(entry);
-
+            // Removed addToGlobalTotals – we now query 'users' directly for total scores
             res.json({ ok: true, topic: topicRes });
         } catch (e) {
             Logger.error('[Leaderboard] Submit Error', e);

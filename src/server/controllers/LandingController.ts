@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { LeaderboardService } from '../services/LeaderboardService';
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { Logger } from '../Logger';
 import { CacheService } from '../services/CacheService';
@@ -18,34 +17,20 @@ export class LandingController {
             const cached = await cache.get('landing_summary');
             if (cached) return res.json({ ok: true, ...cached });
 
-            const lb = new LeaderboardService();
             const fs = new FirestoreRestService();
 
-            // Fetch data in parallel
-            const [globalTotalsRaw, topics] = await Promise.all([
-                lb.listGlobalTotals(50),
+            // Fetch data: use fs.getTopUsers (from users collection) for canonical global leaderboard
+            const [globalTopRaw, topics] = await Promise.all([
+                fs.getTopUsers(50),
                 fs.listTopics()
             ]);
 
-            // Map totalScore to score and deduplicate by nickname (taking highest score)
-            const uniqueMap = new Map<string, typeof globalTotalsRaw[0]>();
-
-            globalTotalsRaw.forEach(entry => {
-                const existing = uniqueMap.get(entry.nickname);
-                if (!existing || entry.totalScore > existing.totalScore) {
-                    uniqueMap.set(entry.nickname, entry);
-                }
-            });
-
-            // Convert map back to array and sort
-            const globalTop = Array.from(uniqueMap.values())
-                .sort((a, b) => b.totalScore - a.totalScore)
-                .map(entry => ({
-                    userKey: entry.userKey,
-                    nickname: entry.nickname,
-                    score: entry.totalScore
-                }));
-
+            // Map totalScore to the expected leaderboard fields
+            const globalTop = globalTopRaw.map(entry => ({
+                userKey: entry.userKey,
+                nickname: entry.nickname,
+                score: entry.totalScore
+            }));
 
             const summary = {
                 globalTop: globalTop.slice(0, 10),
@@ -55,10 +40,10 @@ export class LandingController {
                 top3: globalTop.slice(0, 3)
             };
 
-            // Cache for 5 minutes
+            // Cache for 5 minutes (invalidated manually on quiz completion)
             await cache.set('landing_summary', summary, 300);
 
-            res.json({ ok: true, ...summary });
+            return res.json({ ok: true, ...summary });
         } catch (e) {
             Logger.error('[Landing] Summary error', e);
             res.status(500).json({ ok: false, error: 'Failed to fetch summary' });

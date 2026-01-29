@@ -48,30 +48,6 @@ export class UserService {
         }
       }
 
-      // Fallback: If not found by ID (e.g. t2_ mismatch), try Query by Nickname
-      if (!userId.startsWith('t2_')) {
-        const qRes = await this.fs.runQuery({
-          structuredQuery: {
-            from: [{ collectionId: 'users' }],
-            where: {
-              fieldFilter: {
-                field: { fieldPath: 'nickname' },
-                op: 'EQUAL',
-                value: { stringValue: userId }
-              }
-            },
-            limit: 1
-          }
-        });
-
-        if (qRes && qRes.length > 0 && qRes[0].document) {
-          const doc = qRes[0].document;
-          const docId = doc.name.split('/').pop();
-          Logger.info(`[UserService] Resolved legacy ID for ${userId} -> ${docId}`);
-          return this.mapUserFields(doc.fields, docId);
-        }
-      }
-
       return null;
     } catch (e) {
       Logger.error('getUser failed', e);
