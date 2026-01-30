@@ -8,8 +8,9 @@
 /* ===== CSS CUSTOM PROPERTIES ===== */
 :root {
   /* Background Colors */
-  --color-bg-primary: 255 255 255;
-  --color-bg-secondary: 249 250 251;
+  /* Background Colors */
+  --color-bg-primary: 255 158 34; /* Japanese Kawaii Orange #ff9e22 */
+  --color-bg-secondary: 255 193 7; /* Gravy Yellow #ffc107 */
   --color-bg-tertiary: 243 244 246;
   --color-bg-card: 255 255 255;
   --color-bg-card-hover: 249 250 251;
@@ -429,7 +430,45 @@
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    overflow-x: hidden;
   }
+}
+
+/* ===== WIREMESH OVERLAY ===== */
+.wiremesh-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.15;
+  background-image: 
+    linear-gradient(rgba(0,0,0,1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,1) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ===== AESTHETIC GLASS BUTTONS ===== */
+.glass-button {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 10px rgba(255, 255, 255, 0.05);
+  color: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.glass-button:hover {
+  background: rgba(0, 0, 0, 0.6);
+  border-color: rgba(255, 158, 34, 0.5); /* Kawaii Orange Glow */
+  box-shadow: 
+    0 12px 40px 0 rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(255, 158, 34, 0.3);
+  transform: translateY(-2px) scale(1.05);
 }
 
 /* ===== COMPONENT STYLES ===== */

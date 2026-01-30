@@ -64,7 +64,7 @@ export const useLandingSummary = (enabled: boolean, pollingEnabled = true) => {
   // Use exponential backoff polling (gated by pollingEnabled)
   const { reset } = useBackoffPolling(fetchSummary, {
     enabled: enabled && pollingEnabled,
-    initialInterval: 3000,
+    initialInterval: 30000,
     maxInterval: 60000,
     backoffMultiplier: 1.5,
   });

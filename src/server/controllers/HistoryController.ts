@@ -65,10 +65,14 @@ export class HistoryController {
                 Logger.info(`[History] Score skipped for ${targetId} (already played today)`);
             }
 
-            // Invalidate landing summary cache so leaderboard updates immediately
+            // Increment topic play count
+            try { await fs.incrementTopicPlayCount(topicSlug); } catch (e) { /* ignore */ }
+
+            // Invalidate landing summary caches so leaderboard and topics update immediately
             try {
                 const cache = (await import('../services/CacheService')).CacheService.getInstance();
-                await cache.del('landing_summary');
+                await cache.del('landing_leaderboard');
+                await cache.del('hot_topics_data');
             } catch (e) { /* ignore */ }
 
             return res.json({ ok: true });

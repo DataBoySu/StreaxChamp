@@ -534,7 +534,7 @@ export class FirestoreRestService {
       const data: any = await getRes.json();
       const current = parseInt(data.fields?.playCount?.integerValue || '0', 10) || 0;
       const body = { fields: { playCount: { integerValue: String(current + 1) }, updatedAt: { stringValue: new Date().toISOString() } } };
-      await fetch(`${url} ? updateMask.fieldPaths = playCount & updateMask.fieldPaths=updatedAt`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      await fetch(`${url}?updateMask.fieldPaths=playCount&updateMask.fieldPaths=updatedAt`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     } catch { }
   }
 

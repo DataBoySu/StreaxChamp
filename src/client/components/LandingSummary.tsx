@@ -32,9 +32,10 @@ function useRandomPositions(count: number) {
 export const LandingSummary = ({ summary, loading, onSelectTopic }: Props) => {
   const hotTopics = useMemo(() => {
     const raw = summary?.hotTopics || [];
-    // Shuffle the items for a more organic feel
-    return [...raw].sort(() => Math.random() - 0.5);
-  }, [summary]);
+    // Shuffle the items for a more organic feel, but keep stable between renders
+    // Sort by slug first to ensure consistent input for the randomizer
+    return [...raw].sort((a, b) => a.slug.localeCompare(b.slug)).sort(() => Math.random() - 0.5);
+  }, [summary?.hotTopics]);
 
   const maxPlays = useMemo(() => {
     return Math.max(...(summary?.hotTopics || []).map(t => (t as any).playCount || 0), 1);
@@ -58,23 +59,22 @@ export const LandingSummary = ({ summary, loading, onSelectTopic }: Props) => {
       {hotTopics.map((item: any, idx) => {
         const pos = positions[idx] || { top: '50%', left: '50%', rotation: 0 };
         const playCount = item.playCount || 0;
-        const relativeSize = 1.0 + (playCount / maxPlays) * 0.6; // Scale 1.0 to 1.6
+        const scaleVal = 0.9 + (playCount / (maxPlays || 1)) * 0.7; // Scale 0.9x to 1.6x
 
         return (
           <motion.button
             key={item.slug}
-            className="absolute text-xs md:text-sm font-bold px-3 py-2 rounded-lg shadow-md backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-accent/60 bg-accent/25 border border-accent/40 hover:bg-accent/35"
+            className="absolute glass-button text-xs md:text-sm font-bold px-4 py-2 rounded-xl shadow-2xl focus:outline-none focus:ring-2 focus:ring-accent/60"
             style={{
               top: pos.top,
               left: pos.left,
-              transform: `translate(-50%, -50%) rotate(${pos.rotation}deg)`,
-              fontSize: `${relativeSize}rem`
+              transform: `translate(-50%, -50%) rotate(${pos.rotation}deg) scale(${scaleVal})`,
             }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: scaleVal * 1.1, zIndex: 50 }}
+            whileTap={{ scale: scaleVal * 0.95 }}
             onClick={() => onSelectTopic(item.slug, item.title)}
             initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
+            animate={{ opacity: 1, scale: scaleVal }}
             transition={{ type: 'spring', stiffness: 260, damping: 18, delay: idx * 0.05 }}
           >
             <span className="mr-1">🔥</span>{item.title}

@@ -20,6 +20,13 @@ export class LandingController {
             let popularTopics = await cache.get<any[]>('hot_topics_data');
             if (!popularTopics) {
                 popularTopics = await fs.getHotTopics(5);
+
+                // Fallback: if no topics have plays, show newest ones as a placeholder
+                if (popularTopics.length === 0) {
+                    const allTopics = await fs.listTopics();
+                    popularTopics = allTopics.slice(0, 5).map(t => ({ ...t, playCount: 0 }));
+                }
+
                 // Cache hot topics for 30 minutes (stable data)
                 await cache.set('hot_topics_data', popularTopics, 1800);
             }

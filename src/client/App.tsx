@@ -564,12 +564,6 @@ export const App = () => {
 
       // Step 3: Refresh local state
       void loadUserData();
-      // Refresh landing summary to show new scores on home
-      // We only delete the leaderboard part, topics stay cached for 30m
-      try {
-        const cache = (window as any).CacheService?.getInstance?.();
-        if (cache) await cache.del('landing_leaderboard');
-      } catch {/* ignore */ }
       try { void refreshLandingSummary?.(); } catch {/* ignore */ }
       setTimeout(() => { try { void refreshTopicLeaderboard?.(); } catch {/* ignore */ } }, 300);
     };
@@ -642,8 +636,9 @@ export const App = () => {
   // (moved showTopicMenu logic above)
 
   return (
-    <div className="min-h-screen bg-primary text-primary p-2 md:p-4 lg:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen relative overflow-x-hidden p-2 md:p-4 lg:p-6 transition-all duration-500">
+      <div className="wiremesh-overlay" />
+      <div className="max-w-7xl mx-auto relative z-10">
         <div className="flex justify-between items-center mb-4 min-h-10 gap-2">
           <div className="flex items-center gap-2">
             <button
