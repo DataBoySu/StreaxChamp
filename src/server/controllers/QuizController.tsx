@@ -1,9 +1,10 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { UserService } from '../services/UserService';
 import { Logger } from '../Logger';
 import { generateUnifiedContent, validateGeminiKey } from '../services/GeminiService';
 import { CacheService } from '../services/CacheService';
+import { reddit, redis } from '@devvit/web/server';
 
 /**
  * Controller for managing quizzes, including daily bonus questions and full daily/topic quizzes.
@@ -69,6 +70,22 @@ export class QuizController {
             const fs = new FirestoreRestService();
             const cache = CacheService.getInstance();
             const todayStr = new Date().toISOString().slice(0, 10);
+
+            // 0. Check for Context (Post ID specific quiz)
+            // @ts-ignore
+            const contextPostId = req.headers['x-devvit-post-id'] as string;
+            if (contextPostId) {
+                Logger.info(`[DailyQuiz] Context Mode detected: PostID=${contextPostId}`);
+                const mappedQuizId = await redis.get(`post_quiz:${contextPostId}`);
+                if (mappedQuizId) {
+                    Logger.info(`[DailyQuiz] Resolved Post Context -> QuizID=${mappedQuizId}`);
+                    // Fetch that user quiz directly
+                    const userQuiz = await fs.getUserQuiz(mappedQuizId);
+                    if (userQuiz) {
+                        return res.status(200).json(userQuiz);
+                    }
+                }
+            }
 
             // 1. Resolve User & Check Stickiness
             const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
@@ -273,6 +290,111 @@ export class QuizController {
         } catch (e) {
             Logger.error('[TopicQuizGen] error', e);
             res.status(500).json({ error: 'QUIZ_GEN_FAILED' });
+        }
+    }
+    /**
+     * Creates a new user-generated quiz.
+     */
+    static async createUserQuiz(req: Request, res: Response) {
+        try {
+            const { username, topic, quiz } = req.body;
+            Logger.info('[CreateUserQuiz] Request:', { username, topic, hasQuiz: !!quiz });
+
+            if (!username || !topic || !quiz) {
+                Logger.error('[CreateUserQuiz] Missing fields:', { username, topic, hasQuiz: !!quiz });
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            const fs = new FirestoreRestService();
+            const identifier = `${username}_${topic}`;
+            const success = await fs.saveUserQuiz(identifier, username, topic, quiz);
+
+            if (success) {
+                // Tracking: Increment global quizzes created for milestones
+                void fs.incrementUserQuizzesCreated(username);
+                return res.status(200).json({ success: true, id: identifier });
+            } else {
+                return res.status(500).json({ error: 'Failed to save quiz' });
+            }
+        } catch (e) {
+            Logger.error('[CreateUserQuiz] Error', e);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    }
+    /**
+     * Retrieves created quizzes for a specific user.
+     */
+    static async getUserCreatedQuizzes(req: Request, res: Response) {
+        try {
+            const username = String(req.params.username || '');
+            if (!username) return res.status(400).json({ error: 'Username required' });
+
+            const fs = new FirestoreRestService();
+            const quizzes = await fs.getUserCreatedQuizzes(username);
+            res.json(quizzes);
+        } catch (e) {
+            Logger.error('[GetUserCreatedQuizzes] Error', e);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    }
+    /**
+ * Get a specific user-created quiz by ID
+ */
+    static async getQuiz(req: Request, res: Response) {
+        try {
+            const quizId = req.params.quizId as string;
+            if (!quizId) {
+                return res.status(400).json({ error: 'Quiz ID is required' });
+            }
+
+            const fs = new FirestoreRestService();
+            const quiz = await fs.getUserQuiz(quizId);
+            if (!quiz) {
+                return res.status(404).json({ error: 'Quiz not found' });
+            }
+
+            res.json(quiz);
+        } catch (e) {
+            Logger.error('[QuizController.getQuiz] error', e);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    }
+
+    /**
+     * Posts a user-created quiz to the subreddit.
+     */
+    static async postUserQuiz(req: Request, res: Response) {
+        try {
+            const { title, quizId, username } = req.body;
+            Logger.info(`[PostUserQuiz] Received Request: Title="${title}", QuizID=${quizId}, User=${username}`);
+
+            if (!title || !quizId) {
+                Logger.error('[PostUserQuiz] Missing required fields', { title, quizId });
+                return res.status(400).json({ error: 'Title and Quiz ID are required' });
+            }
+
+            const subreddit = await reddit.getCurrentSubreddit();
+            Logger.info(`[PostUserQuiz] Targeting Subreddit: ${subreddit.name}`);
+
+            // Submit a CUSTOM post that launches the app directly on click
+            Logger.info('[PostUserQuiz] Submitting Custom Post to Reddit...');
+            const post = await reddit.submitCustomPost({
+                title: `🧠 Streax Quiz: ${title}`,
+                subredditName: subreddit.name,
+                entry: 'default'
+            });
+            Logger.info(`[PostUserQuiz] Post Created Successfully! ID=${post.id}, URL=${post.url}`);
+
+            if (quizId) {
+                Logger.info(`[PostUserQuiz] Linking PostID=${post.id} to QuizID=${quizId} in Redis`);
+                await redis.set(`post_quiz:${post.id}`, quizId);
+            }
+
+            res.json({ success: true, url: post.url });
+        } catch (e: any) {
+            Logger.error('[PostUserQuiz] CRITICAL FAILURE', e);
+            if (e?.message) Logger.error('[PostUserQuiz] Error Message:', e.message);
+            res.status(500).json({ error: e.message || 'Post failed' });
         }
     }
 }

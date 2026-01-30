@@ -8,6 +8,7 @@ interface LandingHeroProps {
     selectedTopic: { title: string; slug: string } | null;
     topicQuizStatus: 'idle' | 'loading' | 'ready' | 'error';
     onOpenTopicMenu: () => void;
+    // onStartCreate removed
     onStartQuiz: () => void;
     totalQuestions: number;
     showTimeoutMessage?: boolean;
@@ -90,7 +91,9 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                     <div className="relative">
                         <InteractiveRobot username={username} errorMessage={errorMessage} hasPlayed={hasPlayed} totalPoints={totalPoints} />
                     </div>
+                    {/* Create Quiz Button (Small, under robot) */}
                 </div>
+
 
                 {/* Playful Timeout Message - REMOVED (Robot handles this now) */}
 
@@ -224,6 +227,6 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                     />
                 </motion.button>
             </motion.div>
-        </motion.div>
+        </motion.div >
     );
 };

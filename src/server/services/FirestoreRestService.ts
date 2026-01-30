@@ -851,6 +851,66 @@ export class FirestoreRestService {
   }
 
   /**
+   * Increment user's total quizzes created (Atomic Commit)
+   */
+  async incrementUserQuizzesCreated(userId: string): Promise<boolean> {
+    try {
+      const dbPath = `projects/${this.projectId}/databases/(default)/documents`;
+      const docPath = `${dbPath}/users/${userId}`;
+
+      const writes: any[] = [
+        {
+          transform: {
+            document: docPath,
+            fieldTransforms: [
+              {
+                fieldPath: 'totalQuizzesCreated',
+                increment: { integerValue: '1' }
+              },
+              {
+                fieldPath: 'updatedAt',
+                setToServerValue: 'REQUEST_TIME'
+              }
+            ]
+          }
+        }
+      ];
+
+      const body = { writes };
+      const url = `${this.baseUrl}:commit`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      return res.ok;
+    } catch (e) {
+      Logger.error('[FirestoreRest.incrementUserQuizzesCreated] error', e);
+      return false;
+    }
+  }
+
+  /**
+   * Get global user stats (score, quizzes created)
+   */
+  async getUserStats(userId: string): Promise<{ totalScore: number; totalQuizzesCreated: number } | null> {
+    try {
+      const url = `${this.baseUrl}/users/${userId}`;
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (!res.ok) return null;
+      const data: any = await res.json();
+      const f = data.fields || {};
+      return {
+        totalScore: Number(f.totalScore?.integerValue || 0),
+        totalQuizzesCreated: Number(f.totalQuizzesCreated?.integerValue || 0)
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get top users by totalScore from 'users' collection
    */
   async getTopUsers(limit = 50): Promise<Array<{ userKey: string; nickname: string; totalScore: number }>> {
@@ -938,6 +998,258 @@ export class FirestoreRestService {
       }).filter((t: any): t is { title: string; slug: string; playCount: number } => t !== null);
     } catch (error) {
       Logger.error('[FirestoreRest.getHotTopics] error', error);
+      return [];
+    }
+  }
+  // --- User Created Quiz (UGC) Support ---
+
+  /**
+   * Run a transaction (commit)
+   * Helper for atomic operations
+   */
+  async commitTransaction(writes: any[]): Promise<boolean> {
+    try {
+      const url = `${this.baseUrl}:commit`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ writes: writes }),
+      });
+      return res.ok;
+    } catch (e) {
+      Logger.error('[FirestoreRest.commitTransaction] error', e);
+      return false;
+    }
+  }
+
+  /**
+   * Save a user-created quiz.
+   * Stores the quiz with a composite ID: `username_topicSlug`
+   * ALSO increments the creator's `totalQuizzesCreated` count.
+   */
+  async saveUserQuiz(
+    identifier: string, // username_topic
+    username: string,
+    topicSlug: string,
+    quiz: { questions: any[]; metadata: Record<string, any> }
+  ): Promise<boolean> {
+    try {
+      const url = `${this.baseUrl}/user_quizzes/${identifier}`;
+      const nowIso = new Date().toISOString();
+
+      const questionsValues = quiz.questions.map((q, idx) => ({
+        mapValue: {
+          fields: {
+            id: { stringValue: q.id || `q${idx + 1}` },
+            question: { stringValue: q.question },
+            options: { arrayValue: { values: (q.answers || q.options).map((o: string) => ({ stringValue: String(o) })) } },
+            correctAnswer: { integerValue: String(Number(q.correctAnswer) || 0) },
+            createdAt: { stringValue: nowIso },
+          },
+        },
+      }));
+
+      const body = {
+        fields: {
+          id: { stringValue: identifier },
+          creator: { stringValue: username },
+          topic: { stringValue: topicSlug },
+          questions: { arrayValue: { values: questionsValues } },
+          createdAt: { stringValue: nowIso },
+          updatedAt: { stringValue: nowIso },
+          metadata: {
+            mapValue: {
+              fields: {
+                title: { stringValue: quiz.metadata?.title || topicSlug },
+                description: { stringValue: quiz.metadata?.description || 'User created quiz' },
+                version: { stringValue: 'v1' },
+              }
+            }
+          }
+        },
+      };
+
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        await this.incrementUserCreatedQuizCount(username);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      Logger.error('[FirestoreRest.saveUserQuiz] error', e);
+      return false;
+    }
+  }
+
+  /**
+   * Retrieves a single user-created quiz by ID.
+   */
+  async getUserQuiz(identifier: string): Promise<any | null> {
+    try {
+      const url = `${this.baseUrl}/user_quizzes/${identifier}`;
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+
+      if (!res.ok) return null;
+
+      const data: any = await res.json();
+      const f = data.fields || {};
+
+      // Deserialization logic
+      const questions = (f.questions?.arrayValue?.values || []).map((q: any) => {
+        const qf = q.mapValue?.fields || {};
+        const opts = (qf.options?.arrayValue?.values || []).map((v: any) => v.stringValue || '');
+        return {
+          id: qf.id?.stringValue,
+          question: qf.question?.stringValue,
+          options: opts,
+          correctAnswer: Number(qf.correctAnswer?.integerValue || 0),
+          explanation: qf.explanation?.stringValue,
+          category: qf.category?.stringValue,
+          difficulty: qf.difficulty?.stringValue
+        };
+      });
+
+      return {
+        id: identifier,
+        title: f.metadata?.mapValue?.fields?.title?.stringValue || f.topic?.stringValue,
+        questions: questions,
+        metadata: {
+          title: f.metadata?.mapValue?.fields?.title?.stringValue,
+          description: f.metadata?.mapValue?.fields?.description?.stringValue,
+          creator: f.creator?.stringValue,
+          createdAt: f.createdAt?.stringValue,
+          difficulty: 'user-generated',
+          topic: f.topic?.stringValue
+        }
+      };
+
+    } catch (e) {
+      Logger.error('[FirestoreRest.getUserQuiz] error', e);
+      return null;
+    }
+  }
+
+  /**
+   * Get all quizzes created by a specific user.
+   */
+  async getUserQuizzes(username: string): Promise<any[]> {
+    try {
+      const body = {
+        structuredQuery: {
+          from: [{ collectionId: 'user_quizzes' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'creator' },
+              op: 'EQUAL',
+              value: { stringValue: username }
+            }
+          }
+        }
+      };
+
+      const url = `${this.baseUrl}:runQuery`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) return [];
+
+      const data: any = await res.json();
+      if (!Array.isArray(data)) return [];
+
+      return data.map((item: any) => {
+        if (!item.document) return null;
+        const f = item.document.fields || {};
+        const pathParts = item.document.name.split('/');
+        const id = pathParts[pathParts.length - 1];
+
+        return {
+          id: id,
+          topic: f.topic?.stringValue,
+          creator: f.creator?.stringValue,
+          createdAt: f.createdAt?.stringValue,
+          title: f.metadata?.mapValue?.fields?.title?.stringValue || f.topic?.stringValue,
+        };
+      }).filter((q: any) => q !== null) as any[];
+
+    } catch (e) {
+      Logger.error('[FirestoreRest.getUserQuizzes] error', e);
+      return [];
+    }
+  }
+
+  /**
+   * Increment the user's `totalQuizzesCreated` count.
+   */
+  async incrementUserCreatedQuizCount(userId: string): Promise<number | null> {
+    try {
+      const dbPath = `projects/${this.projectId}/databases/(default)/documents`;
+      const docPath = `${dbPath}/users/${userId}`;
+
+      const writes: any[] = [
+        {
+          transform: {
+            document: docPath,
+            fieldTransforms: [{
+              fieldPath: 'totalQuizzesCreated',
+              increment: { integerValue: '1' }
+            }]
+          }
+        }
+      ];
+
+      const res = await this.commitTransaction(writes);
+      return res ? 1 : null;
+    } catch (e) {
+      Logger.error('[FirestoreRest.incrementUserCreatedQuizCount] error', e);
+      return null;
+    }
+  }
+  async getUserCreatedQuizzes(username: string): Promise<Array<{ id: string; topic: string; title: string; createdAt: string; questionCount: number }>> {
+    try {
+      const query = {
+        structuredQuery: {
+          from: [{ collectionId: 'user_quizzes' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'creator' },
+              op: 'EQUAL',
+              value: { stringValue: username },
+            },
+          },
+        },
+      };
+
+      const results = await this.runQuery(query);
+      if (!results || !results.length) return [];
+
+      const quizzes = results.map((r: any) => {
+        const doc = r.document;
+        if (!doc) return null;
+        const f = doc.fields || {};
+        const meta = f.metadata?.mapValue?.fields || {};
+        return {
+          id: f.id?.stringValue || '',
+          topic: f.topic?.stringValue || '',
+          title: meta.title?.stringValue || f.topic?.stringValue || 'Untitled',
+          createdAt: f.createdAt?.stringValue || '',
+          questionCount: f.questions?.arrayValue?.values?.length || 0
+        };
+      }).filter((q: any) => q !== null) as any[];
+
+      // Sort desc
+      quizzes.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      return quizzes;
+    } catch (e) {
+      Logger.error('[FirestoreRest.getUserCreatedQuizzes] error', e);
       return [];
     }
   }

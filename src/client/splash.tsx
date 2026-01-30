@@ -8,10 +8,20 @@ const Splash = () => {
     // Logic to handle expansion using the proper Devvit API
     const handleGenerate = async (event: React.MouseEvent<HTMLButtonElement>) => {
         try {
+            localStorage.removeItem('start_mode'); // Clear creation mode
             // Use the official Devvit API to request expanded mode
             await requestExpandedMode(event.nativeEvent, 'game');
         } catch (error) {
             console.error('[Splash] Failed to request expanded mode:', error);
+        }
+    };
+
+    const handleCreate = async (event: React.MouseEvent<HTMLButtonElement>) => {
+        try {
+            localStorage.setItem('start_mode', 'create'); // Set creation mode
+            await requestExpandedMode(event.nativeEvent, 'game');
+        } catch (error) {
+            console.error('[Splash] Failed to request expanded mode (create):', error);
         }
     };
 
@@ -77,7 +87,7 @@ const Splash = () => {
                                 margin: '0',
                                 width: '100%'
                             }}
-                            onClick={() => alert('Coming Soon!')}
+                            onClick={handleCreate}
                         >
                             Create
                         </button>

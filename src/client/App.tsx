@@ -13,6 +13,7 @@ import { useUserActivity } from './hooks/useUserActivity';
 import { useRobotError } from './hooks/useRobotError';
 import { CONFIG } from '../shared/constants';
 import { LandingHero } from './components/landing/LandingHero';
+import { CreatorDashboard } from './components/create/CreatorDashboard';
 import { QuizActiveView } from './components/quiz/QuizActiveView';
 import { QuizResult } from './components/quiz/QuizResult';
 import { GapView } from './components/quiz/GapView';
@@ -30,8 +31,6 @@ const NUM_QUESTIONS = CONFIG.GAME.DEFAULT_QUESTIONS_COUNT;
 
 /**
  * Main Application Component for StreaxChamp.
- * Orchestrates the quiz game loop, theme management, user authentication, and landing experience.
- * Features a dynamic mascot, progressive difficulty, and integrated leaderboards.
  */
 export const App = () => {
   const theme = useTheme();
@@ -58,16 +57,15 @@ export const App = () => {
   const [bonusAnswered, setBonusAnswered] = useState(false);
   // User session state (deprecated)
   const [userInfo, setUserInfo] = useState<{ userId: string | null; username: string | null; displayName: string | null } | null>(null);
-  // Remove showTimeoutMessage state as it's now internal to Robot (derived from time)
-  // But we still need to track user activity/idleness if needed, but Robot does it.
+
   const [showTopicMenu, setShowTopicMenu] = useState(false);
-  const [userTotalScore, setUserTotalScore] = useState(0); // New state for aggregated score
+  const [userTotalScore, setUserTotalScore] = useState(0);
   const [selectedTopic, setSelectedTopic] = useState<{ title: string; slug: string } | null>(null);
   interface SelectedTopicQuiz { id?: string | undefined; questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[]; bonus?: { question: string; options: string[]; correctIndex: number } | null }
   const [selectedTopicQuiz, setSelectedTopicQuiz] = useState<SelectedTopicQuiz | null>(null);
   const [topicQuizStatus, setTopicQuizStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [showNoTopicPrompt, setShowNoTopicPrompt] = useState(false);
-  const [hasCompletedQuizSession, setHasCompletedQuizSession] = useState(false); // Track if user has finished a quiz
+  const [hasCompletedQuizSession, setHasCompletedQuizSession] = useState(false);
   const [authUser, setAuthUser] = useState<{ redditUsername: string; nickname: string } | null>(() => {
     try {
       const raw = localStorage.getItem(CONFIG.STORAGE_KEYS.AUTH);
@@ -78,6 +76,10 @@ export const App = () => {
     } catch {/* ignore */ }
     return null;
   });
+
+  // Updated Creation Mode state
+  const [isCreating, setIsCreating] = useState(false);
+  const [isSavingQuiz, setIsSavingQuiz] = useState(false);
 
   // Background music system
   const { isMuted, toggleMute, setMode } = useBackgroundMusic();
@@ -91,8 +93,111 @@ export const App = () => {
     }
   }, [quizStarted, setMode]);
 
-  // Handle volume toggle (replace setMusicOn with toggleMute)
-  // ... (UI binding happens in the render block)
+  // Handler for saving a user-created quiz
+  const handleSaveQuiz = async (topicTitle: string, userQuestions: any[], shouldClose = true) => {
+    if (!authUser || !authUser.nickname) {
+      addError('auth_required', "You need to be logged in to create a quiz!");
+      return;
+    }
+
+    setIsSavingQuiz(true);
+    try {
+      // Create a slug from title
+      const slug = topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+      // Construct quiz data object
+      const quizData = {
+        questions: userQuestions,
+        metadata: {
+          title: topicTitle,
+          description: `Created by ${authUser.nickname}`,
+          creator: authUser.nickname,
+          createdAt: new Date().toISOString()
+        }
+      };
+
+      console.log('[handleSaveQuiz] Saving payload:', {
+        username: authUser.nickname,
+        topic: slug,
+        quiz: quizData
+      });
+
+      const res = await fetch('/api/quizzes/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: authUser.nickname,
+          topic: slug,
+          topicTitle: topicTitle,
+          quiz: quizData
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        console.log('[handleSaveQuiz] Success:', data);
+        setMessage({ text: 'Quiz Created Successfully! 🎉', type: 'success', timesUp: false });
+        setTimeout(() => {
+          setIsSavingQuiz(false);
+          if (shouldClose) setIsCreating(false);
+        }, 2000);
+        return data.id;
+      } else {
+        const errText = await res.text();
+        console.error('[handleSaveQuiz] Server Error:', res.status, errText);
+        throw new Error('Failed to save quiz');
+      }
+
+    } catch (e) {
+      console.error('[handleSaveQuiz] Exception:', e);
+      addError('save_failed', "Oops! I couldn't save your quiz. Try again?");
+      setIsSavingQuiz(false);
+      return null;
+    }
+  };
+
+  const handlePostQuiz = async (topic: string, questions: any[]) => {
+    // 1. Save first (don't close editor yet)
+    const quizId = await handleSaveQuiz(topic, questions, false);
+    if (!quizId) return;
+
+    // 2. Post to Reddit
+    setIsSavingQuiz(true);
+    try {
+      console.log('Sending request to /api/quizzes/post', {
+        title: topic,
+        quizId: quizId,
+        username: authUser?.nickname
+      });
+      const res = await fetch('/api/quizzes/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: topic,
+          quizId: quizId,
+          username: authUser?.nickname
+        })
+      });
+
+      if (res.ok) {
+        setMessage({ text: 'Posted to Reddit! 🚀', type: 'success', timesUp: false });
+        setTimeout(() => {
+          setIsSavingQuiz(false);
+          // Do NOT setIsCreating(false) here - let CreatorDashboard handle state
+        }, 2000);
+      } else {
+        throw new Error('Post request failed');
+      }
+    } catch (e) {
+      console.error(e);
+      // Fallback: show in MessageDisplay since Robot might not be visible
+      setMessage({ text: "Could not post to Reddit. Try again.", type: 'error', timesUp: false });
+      addError('post_failed', "Could not post to Reddit. Try again.");
+      setIsSavingQuiz(false);
+    }
+  };
+
+
 
   // Activity detection for smart polling (60s timeout)
   const isUserActive = useUserActivity(60000);
@@ -100,17 +205,32 @@ export const App = () => {
 
   // Leaderboard hook (per selected topic)
   // Enable leaderboard as soon as quiz ends (showScore) or while viewing start screen for previously selected topic
-  const { entries: topicLeaderboard, loading: topicLbLoading, submitScore: submitLeaderboardScore, refresh: refreshTopicLeaderboard } = useLeaderboard({ slug: selectedTopic?.slug || null, enabled: !!selectedTopic && (showScore || !quizStarted) });
-  const { data: landingSummary, loading: landingSummaryLoading, refresh: refreshLandingSummary } = useLandingSummary(!quizStarted && !showScore, pollingEnabled);
-  const { username: hookUsername } = useUsername();
+  const { entries: topicLeaderboard, loading: topicLbLoading, submitScore: submitLeaderboardScore, refresh: refreshTopicLeaderboard } = useLeaderboard({ slug: selectedTopic?.slug || null, enabled: !!selectedTopic && (showScore || !quizStarted) && !isCreating });
+  const { data: landingSummary, loading: landingSummaryLoading, refresh: refreshLandingSummary } = useLandingSummary(!quizStarted && !showScore && !isCreating, pollingEnabled && !isCreating);
+  const { username: hookUsername, postId: currentPostId } = useUsername();
 
-  // No manual sign-in logic needed
+  // Load quiz data (Daily or specific to Post)
+  const { quiz, loading: quizLoading, error: quizError, connectionStatus: quizConnStatus, lastUpdated: quizLastUpdated } = useQuizData(currentPostId);
 
   // Use new global play history hook
-  const { history: globalHistory, loading: globalHistoryLoading, savePlay, hasPlayed } = useHistory(!quizStarted, pollingEnabled);
+  const { history: globalHistory, loading: globalHistoryLoading, savePlay, hasPlayed } = useHistory(!quizStarted && !isCreating, pollingEnabled && !isCreating);
 
   // Robot error message queue (for user-friendly error feedback)
   const { currentError, addError } = useRobotError();
+
+  // Check for start_mode from Splash (passed via localStorage)
+  useEffect(() => {
+    try {
+      const startMode = localStorage.getItem('start_mode');
+      if (startMode === 'create') {
+        console.log('[App] Detected start_mode=create from Splash');
+        setIsCreating(true);
+        localStorage.removeItem('start_mode');
+      }
+    } catch (e) {
+      console.warn('[App] Failed to read start_mode', e);
+    }
+  }, []);
 
   // Transform global history to match UI expectations
   const history = useMemo(() => {
@@ -635,6 +755,27 @@ export const App = () => {
 
   // (moved showTopicMenu logic above)
 
+  // Separate View for Creator Mode
+  if (isCreating) {
+    return (
+      <div className="min-h-screen relative overflow-x-hidden p-2 md:p-4 lg:p-6 transition-all duration-500">
+        <div className="wiremesh-overlay" />
+        <div className="max-w-7xl mx-auto relative z-10 w-full flex justify-center">
+          <MessageDisplay message={message} />
+          <div className="w-full">
+            <CreatorDashboard
+              username={authUser?.nickname || 'Creator'}
+              onSave={(t: string, q: any[]) => handleSaveQuiz(t, q, false)}
+              onPost={handlePostQuiz}
+              isSaving={isSavingQuiz}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Standard Player View
   return (
     <div className="min-h-screen relative overflow-x-hidden p-2 md:p-4 lg:p-6 transition-all duration-500">
       <div className="wiremesh-overlay" />
@@ -817,7 +958,7 @@ export const App = () => {
           </div>
 
           {/* Side Panel: History (idle) OR Topic Leaderboard (score screen) */}
-          {(!quizStarted || showScore) && (
+          {(!quizStarted || showScore) && !isCreating && (
             <GameSidebar
               showScore={showScore}
               selectedTopicTitle={selectedTopic?.title}
@@ -830,7 +971,7 @@ export const App = () => {
         </div>
       </div>
       {/* Leaderboard + Hot Topics */}
-      {!quizStarted && (
+      {!quizStarted && !isCreating && (
         <GlobalDashboard
           landingSummaryLoading={landingSummaryLoading}
           landingSummary={landingSummary}

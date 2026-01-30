@@ -32,7 +32,7 @@ export interface UseQuizDataResult {
   refetch: () => Promise<void>;
 }
 
-export const useQuizData = (): UseQuizDataResult => {
+export const useQuizData = (contextPostId?: string | null): UseQuizDataResult => {
   const [questions, setQuestions] = useState<AppQuestion[]>([]);
   const [quiz, setQuiz] = useState<DailyQuiz | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +48,13 @@ export const useQuizData = (): UseQuizDataResult => {
       setError(null);
       setConnectionStatus('connecting');
       // Fetch via internal API (avoids CSP blocked external Firestore origin)
-      const apiRes = await fetch('/api/quiz', { headers: { 'Content-Type': 'application/json' } });
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (contextPostId) {
+        headers['x-devvit-post-id'] = contextPostId;
+        console.log('[useQuizData] Fetching with context PostID:', contextPostId);
+      }
+
+      const apiRes = await fetch('/api/quiz', { headers });
       if (!apiRes.ok) throw new Error('Quiz API failed');
       const raw = await apiRes.json();
       if (!raw || !Array.isArray(raw.questions)) throw new Error('Malformed quiz payload');
@@ -112,8 +118,9 @@ export const useQuizData = (): UseQuizDataResult => {
   };
 
   useEffect(() => {
+    console.log('[useQuizData] Effect triggered. PostID:', contextPostId);
     void fetchQuizData();
-  }, []);
+  }, [contextPostId]);
 
   return {
     questions,

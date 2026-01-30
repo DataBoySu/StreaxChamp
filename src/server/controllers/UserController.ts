@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Logger } from '../Logger';
+import { FirestoreRestService } from '../services/FirestoreRestService';
 import { getDevvitUserId } from '../context/userContext';
 import { UserService } from '../services/UserService';
 import { reddit } from '@devvit/web/server';
@@ -120,6 +121,25 @@ export class UserController {
         } catch (e) {
             Logger.error('[getCurrentUser] failure', e);
             return res.status(200).json({ userId: null, username: null, displayName: null, isLoggedIn: false });
+        }
+    }
+
+    /**
+     * Retrieves global user stats (score, quizzes created).
+     */
+    static async getUserStats(req: Request, res: Response) {
+        try {
+            const userId = String(req.params.userId || '');
+            if (!userId) return res.status(400).json({ error: 'userId required' });
+
+            const fs = new FirestoreRestService();
+            const stats = await fs.getUserStats(userId);
+
+            if (!stats) return res.status(404).json({ error: 'User not found' });
+            res.json(stats);
+        } catch (e) {
+            Logger.error('[GetUserStats] Error', e);
+            res.status(500).json({ error: 'Internal Server Error' });
         }
     }
 }

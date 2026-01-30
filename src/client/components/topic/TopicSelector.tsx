@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import TopicButtonNew from './TopicButton';
 import './animations.css';
-import { RefreshCw, X } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import FirebaseTopics, { TopicDoc } from '../../services/FirebaseTopics';
 import { firebaseQuizService } from '../../services/FirebaseQuizService';
 import { useBackoffPolling } from '../../hooks/useBackoffPolling';
@@ -47,7 +47,6 @@ export const TopicSelector: React.FC<{
   const [loading] = useState(false);
   const [popularSlugs] = useState<string[]>(['science', 'technology', 'history', 'movies', 'sports']);
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const optimisticRef = useRef<Record<string, TopicDoc>>({});
 
   // Fetch topics from REST API with client-side caching
   const CACHE_KEY = 'streax:topics_selector';

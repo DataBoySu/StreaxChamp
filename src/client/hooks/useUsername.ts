@@ -3,6 +3,7 @@ import type { InitResponse } from '../../shared/types/api';
 
 export const useUsername = () => {
   const [username, setUsername] = useState<string | null>(null);
+  const [postId, setPostId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -13,6 +14,7 @@ export const useUsername = () => {
         const data: InitResponse = await res.json();
         if (data.type !== 'init') throw new Error('Unexpected response');
         setUsername(data.username);
+        setPostId(data.postId || null);
       } catch (err) {
         console.error('Failed to fetch username', err);
       } finally {
@@ -22,5 +24,5 @@ export const useUsername = () => {
     void fetchUsername();
   }, []);
 
-  return { username, loading };
+  return { username, postId, loading };
 };

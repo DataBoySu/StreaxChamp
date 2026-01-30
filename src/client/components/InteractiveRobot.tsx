@@ -6,9 +6,10 @@ interface InteractiveRobotProps {
   errorMessage?: string | undefined;
   hasPlayed?: boolean;
   totalPoints?: number; // New prop for aggregated score
+  forceState?: 'neutral' | 'happy' | 'angry' | 'dead' | 'surprised';
 }
 
-export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, errorMessage, hasPlayed, totalPoints = 0 }) => {
+export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, errorMessage, hasPlayed, totalPoints = 0, forceState }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
@@ -234,11 +235,12 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
   type FaceState = 'neutral' | 'happy' | 'angry' | 'dead' | 'surprised';
 
   const currentFace: FaceState = useMemo(() => {
+    if (forceState) return forceState;
     if (errorMessage) return 'dead'; // Dead/Error takes priority
     if (isVisorHovered) return 'happy'; // Direct interaction = Happy
     if (isHovered) return 'surprised'; // General attention = Alert/Surprised
     return 'neutral';
-  }, [errorMessage, isVisorHovered, isHovered]);
+  }, [errorMessage, isVisorHovered, isHovered, forceState]);
 
   // Eye Variants for Morphing
   const leftEyeVariant = {

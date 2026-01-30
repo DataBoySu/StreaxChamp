@@ -22,6 +22,10 @@ router.get('/quiz', QuizController.getDailyQuiz);
 router.get('/quiz/bonus', QuizController.getDailyBonus); // New
 // This was POST in index.ts for "Generate or Get" logic
 router.post('/topics/:slug/quiz', QuizController.getTopicQuiz);
+router.post('/quizzes/create', QuizController.createUserQuiz);
+router.post('/quizzes/post', QuizController.postUserQuiz);
+router.get('/quizzes/user/:username', QuizController.getUserCreatedQuizzes);
+router.get('/quizzes/:quizId', QuizController.getQuiz);
 
 // --- Leaderboard ---
 router.get('/leaderboard/global', LeaderboardController.listGlobal);
@@ -43,6 +47,7 @@ router.get('/landing/summary', LandingController.getSummary);
 // --- Users ---
 router.get('/context/user', UserController.resolveContextUser);
 router.get('/users/resolve', UserController.resolveUser);
+router.get('/users/:userId/stats', UserController.getUserStats);
 router.post('/users/signup', UserController.signup);
 router.get('/user', UserController.getCurrentUser); // Legacy/Simple
 
