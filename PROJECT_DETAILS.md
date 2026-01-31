@@ -1,66 +1,73 @@
-MODE: INLINE SINGLE-CANVAS QUIZ – PHASE 2 (CUSTOM POSTS ONLY)
+MODE: STABILIZATION – SEPARATE SPLASH SCREENS (POST-BUG FIX)
 
 Context:
-Inline single-canvas quiz rendering has been verified with a hardcoded question.
-This must now be extended to render REAL quiz questions,
-but ONLY for custom quiz posts.
+The black screen issue has been identified and fixed.
+Root cause was a schema mismatch:
+UI used question.answers but Firestore uses question.options.
+Inline architecture is correct and must NOT be redesigned.
+
+Your task:
+Stabilize the app and restore clear separation between
+normal-post splash and custom-quiz splash,
+without breaking the working inline quiz.
 
 ABSOLUTE RULES:
 
-1. DO NOT change behavior for normal (non-custom) posts.
-   - Normal posts must continue to show the legacy Create / Generate splash.
-   - No experiments, no quiz rendering on normal posts.
+1. DO NOT change the single-canvas inline model.
+   Everything stays inside splash.tsx.
 
-2. Gate ALL quiz logic behind:
-   initData.customQuiz === true
+2. DO NOT reintroduce expanded-mode logic for custom quizzes.
 
-3. Inside splash.tsx, maintain a single-canvas state machine:
-   modes:
-   - MENU
-   - CUSTOM_SPLASH
-   - QUIZ
+3. DO NOT refactor rendering architecture.
 
-4. Data loading:
-   - When initData.customQuiz is true:
-     - Fetch quiz data ONCE from:
-       /api/quizzes/{quizId}
-     - Store it in state: quizData
-   - Do NOT fetch on button clicks repeatedly
+REQUIRED ACTIONS:
 
-5. Rendering logic:
+A. Lock the data contract
+   - Ensure quiz rendering ALWAYS uses:
+     question.options
+   - Add a defensive guard:
+     If options is missing or not an array, render a visible error message
+     instead of crashing.
 
-   CUSTOM_SPLASH:
-   - Show topic
-   - Show creator name
-   - Show Play button
+B. Restore clear splash separation:
 
-   QUIZ:
-   - Render quizData.questions[currentIndex]
-   - Display:
-     - question text
-     - options as NES-style buttons
-   - Clicking an option:
-     - store selected answer
-     - log selection
+   - Normal posts (initData.customQuiz !== true):
+     mode = 'MENU'
+     Render ONLY:
+       - Streax Quiz title
+       - Create / Generate buttons
+     Quiz code must NOT execute.
 
-6. Progression:
-   - Add a “Next” button
-   - Increment currentIndex
-   - Do NOT implement results yet
+   - Custom quiz posts (initData.customQuiz === true):
+     Initial mode = 'CUSTOM_SPLASH'
+     Render:
+       - Topic
+       - Creator
+       - Play button
+     Quiz data is preloaded in background.
 
-7. Constraints:
-   - Everything stays inside splash.tsx
-   - No expanded mode
-   - No animations
-   - No conditional mounting of roots
+C. Mode transitions (must be explicit):
+
+   MENU → (Create / Generate) → expanded mode (unchanged)
+   CUSTOM_SPLASH → Play → QUIZ
+
+D. Rendering safety:
+   - No mode may render nothing
    - No return null
+   - All async states must show visible UI
 
 MANDATORY LOGS:
-- [InlineQuiz] Custom post detected
-- [InlineQuiz] Quiz loaded with N questions
-- [InlineQuiz] Rendering question X
-- [InlineQuiz] Option selected: ...
+- [Splash] Normal post → MENU mode
+- [Splash] Custom post detected → CUSTOM_SPLASH mode
+- [InlineQuiz] Quiz data loaded (N questions)
+- [InlineQuiz] Entering QUIZ mode
+
+FORBIDDEN:
+- Merging normal and custom splashes into one UI
+- Conditional mounting of root containers
+- Changing quiz flow logic
 
 GOAL:
-Custom quiz posts render real Firestore-backed questions inline,
-while normal posts remain completely unchanged.
+Have two clearly distinct splash experiences,
+with a stable inline quiz for custom posts
+and zero regressions for normal posts.
