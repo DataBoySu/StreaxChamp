@@ -1,10 +1,43 @@
 import './index.css';
 import 'nes.css/css/nes.min.css';
-import { StrictMode } from 'react';
+import { StrictMode, useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { requestExpandedMode } from '@devvit/web/client';
 
 const Splash = () => {
+    const [loading, setLoading] = useState(true);
+    const [customQuiz, setCustomQuiz] = useState<{ title: string; creator?: string } | null>(null);
+
+    // SATISFIES STEP 4: Splash Detection Logic
+    useEffect(() => {
+        const checkContext = async () => {
+            try {
+                // 1. Get Post Context + Linkage
+                const initRes = await fetch('/api/init');
+                const initData = await initRes.json();
+
+                if (initData.customQuiz) {
+                    // FAST PATH: Init returned the mapping directly
+                    console.log('[Splash] Custom Quiz Detected via Init:', initData.customQuiz);
+                    setCustomQuiz({
+                        title: initData.customQuiz.topic || 'Custom Quiz',
+                        creator: initData.customQuiz.creatorId || initData.customQuiz.username
+                    });
+                }
+
+                // SATISFIES STEP 3: REMOVE ALL FALLBACK INFERENCE
+                // Fallback logic "else if (initData.postId)" has been removed.
+                // Splash now strictly relies on initData.customQuiz (which is controlled by server-side allowlist).
+            } catch (e) {
+                console.error('[Splash] Context Check Failed', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        checkContext();
+    }, []);
+
     // Logic to handle expansion using the proper Devvit API
     const handleGenerate = async (event: React.MouseEvent<HTMLButtonElement>) => {
         try {
@@ -24,6 +57,15 @@ const Splash = () => {
             console.error('[Splash] Failed to request expanded mode (create):', error);
         }
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen font-['Press_Start_2P']"
+                style={{ backgroundColor: '#fff0f3', color: '#d63384' }}>
+                <p>Loading...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col items-center min-h-screen p-4 font-['Press_Start_2P'] relative overflow-hidden"
@@ -64,51 +106,73 @@ const Splash = () => {
                             whiteSpace: 'nowrap',
                             zIndex: 20
                         }}>
-                        Streax Quiz
+                        {customQuiz ? 'Challenger Approaching!' : 'Streax Quiz'}
                     </p>
 
-                    {/* Buttons Container - FORCED 24px gap via inline style */}
-                    <div className="flex flex-col md:flex-row w-full mt-6 mb-2 md:justify-center"
-                        style={{
-                            gap: '24px',
-                            display: 'flex',
-                            flexDirection: 'column'
-                        }}>
-                        {/* Create Button */}
-                        <button
-                            type="button"
-                            className="nes-btn is-warning"
-                            style={{
-                                height: 'auto',
-                                minHeight: '60px',
-                                fontSize: '1.1rem',
-                                padding: '10px',
-                                color: '#212529',
-                                margin: '0',
-                                width: '100%'
-                            }}
-                            onClick={handleCreate}
-                        >
-                            Create
-                        </button>
+                    {/* Custom Quiz UI */}
+                    {customQuiz ? (
+                        <div className="flex flex-col items-center w-full space-y-4">
+                            <div className="mb-4">
+                                <p className="mb-2" style={{ fontSize: '0.8rem', color: '#6c757d' }}>TOPIC:</p>
+                                <p className="text-xl text-primary" style={{ color: '#d63384' }}>{customQuiz.title}</p>
+                                {customQuiz.creator && (
+                                    <p className="mt-2 text-xs" style={{ color: '#adb5bd' }}>Created by {customQuiz.creator}</p>
+                                )}
+                            </div>
 
-                        {/* Generate Button */}
-                        <button
-                            type="button"
-                            className="nes-btn is-error"
+                            <button
+                                type="button"
+                                className="nes-btn is-primary"
+                                style={{ width: '100%', minHeight: '60px' }}
+                                onClick={handleGenerate} // Reuses expand logic (defaults to game view)
+                            >
+                                Play Now!
+                            </button>
+                        </div>
+                    ) : (
+                        /* Default UI */
+                        <div className="flex flex-col md:flex-row w-full mt-6 mb-2 md:justify-center"
                             style={{
-                                height: 'auto',
-                                minHeight: '60px',
-                                fontSize: '1.1rem',
-                                padding: '10px',
-                                margin: '0',
-                                width: '100%'
-                            }}
-                            onClick={handleGenerate}
-                        >
-                            Generate
-                        </button>
-                    </div>
+                                gap: '24px',
+                                display: 'flex',
+                                flexDirection: 'column'
+                            }}>
+                            {/* Create Button */}
+                            <button
+                                type="button"
+                                className="nes-btn is-warning"
+                                style={{
+                                    height: 'auto',
+                                    minHeight: '60px',
+                                    fontSize: '1.1rem',
+                                    padding: '10px',
+                                    color: '#212529',
+                                    margin: '0',
+                                    width: '100%'
+                                }}
+                                onClick={handleCreate}
+                            >
+                                Create
+                            </button>
+
+                            {/* Generate Button */}
+                            <button
+                                type="button"
+                                className="nes-btn is-error"
+                                style={{
+                                    height: 'auto',
+                                    minHeight: '60px',
+                                    fontSize: '1.1rem',
+                                    padding: '10px',
+                                    margin: '0',
+                                    width: '100%'
+                                }}
+                                onClick={handleGenerate}
+                            >
+                                Generate
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 

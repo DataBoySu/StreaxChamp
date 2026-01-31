@@ -76,7 +76,21 @@ export class QuizController {
             const contextPostId = req.headers['x-devvit-post-id'] as string;
             if (contextPostId) {
                 Logger.info(`[DailyQuiz] Context Mode detected: PostID=${contextPostId}`);
-                const mappedQuizId = await redis.get(`post_quiz:${contextPostId}`);
+                const rawMapping = await redis.get(`post_quiz:${contextPostId}`);
+                let mappedQuizId: string | null = null;
+
+                if (rawMapping) {
+                    try {
+                        const mapping = JSON.parse(rawMapping);
+                        if (mapping && mapping.quizId) {
+                            mappedQuizId = mapping.quizId;
+                        }
+                    } catch {
+                        // Legacy fallback
+                        mappedQuizId = rawMapping;
+                    }
+                }
+
                 if (mappedQuizId) {
                     Logger.info(`[DailyQuiz] Resolved Post Context -> QuizID=${mappedQuizId}`);
                     // Fetch that user quiz directly
@@ -387,7 +401,22 @@ export class QuizController {
 
             if (quizId) {
                 Logger.info(`[PostUserQuiz] Linking PostID=${post.id} to QuizID=${quizId} in Redis`);
-                await redis.set(`post_quiz:${post.id}`, quizId);
+
+                // SATISFIES STEP 3: Store detailed mapping
+                // SATISFIES STEP 3: Store detailed mapping
+                const mappingPayload = {
+                    postId: post.id,
+                    quizId: quizId,
+                    creatorId: username, // 'username' from request body is the creator
+                    topic: title, // Using title as topic name
+                    createdAt: new Date().toISOString()
+                };
+
+                // SATISFIES STEP 1: Explicit Creation Marker (Option B: Redis Allowlist)
+                await redis.set(`custom_post_allowlist:${post.id}`, 'true');
+                Logger.info(`[PostUserQuiz] ✅ Set Allowlist Gate for PostID=${post.id}`);
+
+                await redis.set(`post_quiz:${post.id}`, JSON.stringify(mappingPayload));
             }
 
             res.json({ success: true, url: post.url });

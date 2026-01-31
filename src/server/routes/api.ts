@@ -7,7 +7,7 @@ import { LeaderboardController } from '../controllers/LeaderboardController';
 import { LandingController } from '../controllers/LandingController';
 import { HistoryController } from '../controllers/HistoryController'; // Added import
 import { context } from '@devvit/web/server';
-import { reddit } from '@devvit/web/server';
+import { reddit, redis } from '@devvit/web/server';
 
 const router = Router();
 
@@ -71,10 +71,42 @@ router.get('/init', async (_req, res) => {
         });
         username = currentName || null;
 
+        // Check for Custom Quiz Mapping (Step 4 of Prompt)
+        let customQuiz = null;
+        try {
+            // SATISFIES STEP 2: Splash Must Enforce a Negative Gate
+            // Check Redis Allowlist FIRST
+            const isCustomPost = await redis.get(`custom_post_allowlist:${postId}`);
+            console.log(`[Init] Checking Allowlist for ${postId}: ${isCustomPost === 'true' ? 'ALLOWED' : 'DENIED (Normal Post)'}`);
+
+            if (isCustomPost === 'true') {
+                const rawMapping = await redis.get(`post_quiz:${postId}`);
+                if (rawMapping) {
+                    // Parse JSON if possible, handle legacy string if needed
+                    try {
+                        const parsed = JSON.parse(rawMapping);
+                        if (parsed && parsed.quizId) {
+                            customQuiz = parsed;
+                            console.log(`[Init] 🎯 Found custom quiz mapping for post ${postId}:`, parsed);
+                        }
+                    } catch {
+                        // Legacy: It's just a quizId string
+                        customQuiz = { quizId: rawMapping, topic: 'Custom Quiz' };
+                        console.log(`[Init] Found legacy quiz mapping for post ${postId}: ${rawMapping}`);
+                    }
+                }
+            } else {
+                console.log(`[Init] Post ${postId} is NOT a custom quiz origin. Serving default splash.`);
+            }
+        } catch (e) {
+            console.error(`[Init] Failed to lookup quiz mapping for ${postId}`, e);
+        }
+
         res.json({
             type: 'init',
             postId: postId,
             username: username,
+            customQuiz: customQuiz
         });
     } catch (error: any) {
         console.error(`API Init Error for post ${postId}:`, error);
