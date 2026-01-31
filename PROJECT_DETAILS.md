@@ -1,43 +1,66 @@
-🚦 OVERALL STRATEGY (LOCK THIS IN)
+MODE: INLINE SINGLE-CANVAS QUIZ – PHASE 2 (CUSTOM POSTS ONLY)
 
-We are implementing INLINE PLAY for Custom Quiz Posts with a horizontal flow, without touching:
+Context:
+Inline single-canvas quiz rendering has been verified with a hardcoded question.
+This must now be extended to render REAL quiz questions,
+but ONLY for custom quiz posts.
 
-splash detection logic
+ABSOLUTE RULES:
 
-generate flow
+1. DO NOT change behavior for normal (non-custom) posts.
+   - Normal posts must continue to show the legacy Create / Generate splash.
+   - No experiments, no quiz rendering on normal posts.
 
-create flow
+2. Gate ALL quiz logic behind:
+   initData.customQuiz === true
 
-expanded mode (for now)
+3. Inside splash.tsx, maintain a single-canvas state machine:
+   modes:
+   - MENU
+   - CUSTOM_SPLASH
+   - QUIZ
 
-We will reuse existing quiz rendering components wherever possible.
+4. Data loading:
+   - When initData.customQuiz is true:
+     - Fetch quiz data ONCE from:
+       /api/quizzes/{quizId}
+     - Store it in state: quizData
+   - Do NOT fetch on button clicks repeatedly
 
-PHASE 0 — SAFETY LOCK (MANDATORY)
+5. Rendering logic:
 
-Before implementing gameplay, we must explicitly forbid the IDE from touching things it keeps breaking.
+   CUSTOM_SPLASH:
+   - Show topic
+   - Show creator name
+   - Show Play button
 
-🧠 PROMPT 0 — Scope Lock
-MODE: SCOPE LOCK / NO FEATURE WORK
+   QUIZ:
+   - Render quizData.questions[currentIndex]
+   - Display:
+     - question text
+     - options as NES-style buttons
+   - Clicking an option:
+     - store selected answer
+     - log selection
 
-You are about to implement INLINE PLAY for Custom Quiz posts.
+6. Progression:
+   - Add a “Next” button
+   - Increment currentIndex
+   - Do NOT implement results yet
 
-Before doing so, acknowledge and follow these constraints:
+7. Constraints:
+   - Everything stays inside splash.tsx
+   - No expanded mode
+   - No animations
+   - No conditional mounting of roots
+   - No return null
 
-1. Do NOT modify splash detection logic.
-2. Do NOT modify Create flow.
-3. Do NOT modify Generate flow.
-4. Do NOT modify expanded mode routing.
-5. Do NOT introduce localStorage.
-6. Do NOT infer quiz identity.
-7. Do NOT redesign UI styles.
+MANDATORY LOGS:
+- [InlineQuiz] Custom post detected
+- [InlineQuiz] Quiz loaded with N questions
+- [InlineQuiz] Rendering question X
+- [InlineQuiz] Option selected: ...
 
-Your work will be limited strictly to:
-- Inline rendering logic
-- Quiz question rendering
-- Horizontal progression state
-
-Confirm understanding before proceeding.
-
-
-Wait for confirmation.
-Only then continue.
+GOAL:
+Custom quiz posts render real Firestore-backed questions inline,
+while normal posts remain completely unchanged.

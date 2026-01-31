@@ -1,71 +1,20 @@
 import './index.css';
 import 'nes.css/css/nes.min.css';
-import { StrictMode, useState, useEffect } from 'react';
+import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { requestExpandedMode } from '@devvit/web/client';
 
 const Splash = () => {
-    const [loading, setLoading] = useState(true);
-    const [customQuiz, setCustomQuiz] = useState<{ title: string; creator?: string } | null>(null);
+    // 1. Introduce mode state (Single Canvas State)
+    const [mode, setMode] = useState<'MENU' | 'QUIZ'>('MENU');
 
-    // SATISFIES STEP 4: Splash Detection Logic
-    useEffect(() => {
-        const checkContext = async () => {
-            try {
-                // 1. Get Post Context + Linkage
-                const initRes = await fetch('/api/init');
-                const initData = await initRes.json();
-
-                if (initData.customQuiz) {
-                    // FAST PATH: Init returned the mapping directly
-                    console.log('[Splash] Custom Quiz Detected via Init:', initData.customQuiz);
-                    setCustomQuiz({
-                        title: initData.customQuiz.topic || 'Custom Quiz',
-                        creator: initData.customQuiz.creatorId || initData.customQuiz.username
-                    });
-                }
-
-                // SATISFIES STEP 3: REMOVE ALL FALLBACK INFERENCE
-                // Fallback logic "else if (initData.postId)" has been removed.
-                // Splash now strictly relies on initData.customQuiz (which is controlled by server-side allowlist).
-            } catch (e) {
-                console.error('[Splash] Context Check Failed', e);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        checkContext();
-    }, []);
-
-    // Logic to handle expansion using the proper Devvit API
-    const handleGenerate = async (event: React.MouseEvent<HTMLButtonElement>) => {
-        try {
-            localStorage.removeItem('start_mode'); // Clear creation mode
-            // Use the official Devvit API to request expanded mode
-            await requestExpandedMode(event.nativeEvent, 'game');
-        } catch (error) {
-            console.error('[Splash] Failed to request expanded mode:', error);
-        }
+    const handleStartQuiz = () => {
+        console.log('[Splash] Starting hardcoded quiz...');
+        setMode('QUIZ');
     };
 
-    const handleCreate = async (event: React.MouseEvent<HTMLButtonElement>) => {
-        try {
-            localStorage.setItem('start_mode', 'create'); // Set creation mode
-            await requestExpandedMode(event.nativeEvent, 'game');
-        } catch (error) {
-            console.error('[Splash] Failed to request expanded mode (create):', error);
-        }
+    const handleOptionClick = (option: string) => {
+        console.log(`[Splash] Option clicked: ${option}`);
     };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen font-['Press_Start_2P']"
-                style={{ backgroundColor: '#fff0f3', color: '#d63384' }}>
-                <p>Loading...</p>
-            </div>
-        );
-    }
 
     return (
         <div className="flex flex-col items-center min-h-screen p-4 font-['Press_Start_2P'] relative overflow-hidden"
@@ -81,7 +30,6 @@ const Splash = () => {
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center w-full z-10">
-                {/* Main Container - Responsive Width and MaxWidth */}
                 <div className="nes-container is-rounded with-title p-8 text-center relative mt-12 shadow-xl flex flex-col items-center"
                     style={{
                         backgroundColor: 'white',
@@ -92,7 +40,7 @@ const Splash = () => {
                         maxWidth: '800px',
                     }}>
 
-                    {/* Title with larger size and effect */}
+                    {/* Title */}
                     <p className="title text-base sm:text-3xl mb-8"
                         style={{
                             color: '#d63384',
@@ -106,38 +54,19 @@ const Splash = () => {
                             whiteSpace: 'nowrap',
                             zIndex: 20
                         }}>
-                        {customQuiz ? 'Challenger Approaching!' : 'Streax Quiz'}
+                        {mode === 'MENU' ? 'Streax Quiz' : 'Quiz Time!'}
                     </p>
 
-                    {/* Custom Quiz UI */}
-                    {customQuiz ? (
-                        <div className="flex flex-col items-center w-full space-y-4">
-                            <div className="mb-4">
-                                <p className="mb-2" style={{ fontSize: '0.8rem', color: '#6c757d' }}>TOPIC:</p>
-                                <p className="text-xl text-primary" style={{ color: '#d63384' }}>{customQuiz.title}</p>
-                                {customQuiz.creator && (
-                                    <p className="mt-2 text-xs" style={{ color: '#adb5bd' }}>Created by {customQuiz.creator}</p>
-                                )}
-                            </div>
-
-                            <button
-                                type="button"
-                                className="nes-btn is-primary"
-                                style={{ width: '100%', minHeight: '60px' }}
-                                onClick={handleGenerate} // Reuses expand logic (defaults to game view)
-                            >
-                                Play Now!
-                            </button>
-                        </div>
-                    ) : (
-                        /* Default UI */
+                    {/* SINGLE CANVAS LOGIC SWITCH */}
+                    {mode === 'MENU' ? (
+                        /* MENU MODE UI */
                         <div className="flex flex-col md:flex-row w-full mt-6 mb-2 md:justify-center"
                             style={{
                                 gap: '24px',
                                 display: 'flex',
                                 flexDirection: 'column'
                             }}>
-                            {/* Create Button */}
+                            {/* Create Button - TRANSITION TO QUIZ */}
                             <button
                                 type="button"
                                 className="nes-btn is-warning"
@@ -150,12 +79,12 @@ const Splash = () => {
                                     margin: '0',
                                     width: '100%'
                                 }}
-                                onClick={handleCreate}
+                                onClick={handleStartQuiz}
                             >
-                                Create
+                                Play Demo
                             </button>
 
-                            {/* Generate Button */}
+                            {/* Generate Button - TRANSITION TO QUIZ */}
                             <button
                                 type="button"
                                 className="nes-btn is-error"
@@ -167,10 +96,37 @@ const Splash = () => {
                                     margin: '0',
                                     width: '100%'
                                 }}
-                                onClick={handleGenerate}
+                                onClick={handleStartQuiz}
                             >
                                 Generate
                             </button>
+                        </div>
+                    ) : (
+                        /* QUIZ MODE UI (Hardcoded) */
+                        <div className="w-full text-left">
+                            <div className="mb-6">
+                                <p style={{ fontSize: '1.2rem', marginBottom: '1rem', lineHeight: '1.5' }}>
+                                    What is 2 + 2?
+                                </p>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {['3', '4', '5', '6'].map((opt) => (
+                                    <button
+                                        key={opt}
+                                        type="button"
+                                        className="nes-btn"
+                                        style={{ width: '100%', textAlign: 'left' }}
+                                        onClick={() => handleOptionClick(opt)}
+                                    >
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '10px', color: '#aaa' }}>
+                                INLINE SINGLE CANVAS TEST
+                            </div>
                         </div>
                     )}
                 </div>
