@@ -1,154 +1,96 @@
-🎨 DESIGN INTENT (SO IDE DOESN’T GO ROGUE)
+🚨 Creator Studio Visual Regression Fix (Hard Reset)
 
-Before the prompt, here’s the design intent you want to enforce:
+This is a correction task, not a redesign.
+Do NOT introduce new visuals.
+Only REMOVE and SCOPE styles correctly.
 
-Creator Studio should feel like:
+1️⃣ REMOVE Rounded Corners (Mandatory)
 
-📒 A cozy desk / notebook
+Remove all borderRadius applied to:
 
-🧸 Friendly, calm, non-competitive
+Creator Studio root container
 
-✏️ “I’m making something”, not “I’m playing”
+Any wrapping “dashboard” or “canvas” div
 
-Visual hierarchy > decoration
+Creator Studio must be fully rectangular
 
-Which means:
+No clipped corners
 
-Background = supporting actor
+No “device frame” metaphor
 
-Cards = physical objects
+This is a hard revert. Rounded corners are explicitly unwanted.
 
-Borders = thick but breathable
+2️⃣ STOP Styling the Global App Background
 
-Colors = warm neutrals, not loud primaries
+Undo any changes that modify:
 
-🎯 TARGETED AI IDE PROMPT (COPY–PASTE)
+Global app background
 
-This prompt only touches spacing + background, nothing else.
+FlowShell background
 
-🎨 Creator Studio Visual Polish – Spacing & Background Only
+App-level container background
 
-Objective
-Refine Creator Studio visuals by:
+Specifically:
 
-Improving spacing between borders and content
+Remove orange background
 
-Replacing the orange grid background with a calmer, cohesive pattern
+Remove grid background
 
-⚠️ This is a visual-only polish pass.
-Do NOT modify logic, state, layout structure, or text.
+Remove background styles that affect non-Creator screens
 
-1️⃣ Fix Border-to-Content Spacing (Breathing Room)
-Problem
+Creator Studio must NOT own the app shell.
 
-Content sits too close to thick borders
+3️⃣ Apply Background ONLY Inside Creator Studio Surface
 
-NES-style “depth” feels flattened
+Inside Creator Studio root component only:
 
-Cards lack internal air
+Apply a warm paper background (e.g. cream / parchment)
 
-Required Changes
+This background must:
 
-Apply consistent internal padding tokens:
+Not affect generator / quiz screens
 
-Global panel/card rule
+Not leak outside Creator Studio
 
-Minimum internal padding: p-4 (16px)
+Add padding from edges (24–32px) so NES borders breathe
 
-For hero cards / primary sections: p-6 (24px)
+4️⃣ Fix Dark Theme: NO PURE BLACK
 
-Specific fixes
+For dark mode inside Creator Studio only:
 
-Creator header container: add padding-bottom
+Replace black / zinc-950 / pure dark backgrounds with:
 
-“Create New Quiz” card: ensure text does NOT touch border
+Warm charcoal
 
-Library items: increase left/right padding so text does not sit on border
+Dark brown
 
-🚫 Do NOT change border thickness
-🚫 Do NOT reduce font sizes
-🚫 Do NOT change spacing between sections — only inside them
+Muted graphite
 
-2️⃣ Replace Background Grid + Orange Theme
-Problem
+NES borders and shadows must remain visible
 
-Orange grid dominates attention
+❌ No bg-black
+❌ No zinc-950
 
-Grid conflicts with NES pixel borders
+5️⃣ Do NOT Touch Buttons (Out of Scope)
 
-Background should frame, not shout
+Do not change:
 
-New Background Rules (Creator Studio ONLY)
-A. Color
+Button press logic
 
-Replace orange background with warm neutral paper tone:
+Shadows
 
-Light mode base: #FFF7ED (warm cream)
+Hover behavior
 
-Dark mode base: #1C1917 (warm charcoal, not pure black)
+This task is layout + background only.
 
-No bright orange backgrounds.
+6️⃣ Success Criteria (Must Verify)
 
-B. Pattern (Subtle, Optional)
+Creator Studio corners are rectangular
 
-If pattern is used, it must be:
+Orange grid background is gone
 
-Extremely low contrast
+Generator / Quiz screens are unaffected
 
-Large scale
+Dark theme still shows NES borders clearly
 
-Barely noticeable
-
-Allowed:
-
-Soft dot pattern (2–3% opacity)
-
-Very light paper grain
-
-No visible grid lines
-
-Forbidden:
-
-High-contrast grids
-
-Checkerboards
-
-Repeating sharp lines
-
-C. Contrast Rule
-
-Background must be at least 2 levels lighter/darker than cards
-
-Cards must always visually “float” above background
-
-3️⃣ Consistency Rule (Very Important)
-
-Creator Studio must look identical in light and dark mode, except for:
-
-Background base color
-
-Text color inversion
-
-Spacing, borders, card structure, and hierarchy must remain unchanged.
-
-4️⃣ Validation Checklist
-
-✅ Content never touches borders
-✅ Cards feel padded and physical
-✅ Background is calm and unobtrusive
-✅ Orange is used only for accents (titles, highlights)
-✅ Switching themes does not change layout or hierarchy
-
-5️⃣ Explicit Non-Goals
-
-Do not redesign UI
-
-Do not introduce new components
-
-Do not adjust logic or data
-
-Do not restyle quiz gameplay screens
-
-Deliverable
-
-Creator Studio feels calm, breathable, and intentional — ready for kawaii polish later.
+Creator Studio looks identical in structure, just cleaner
