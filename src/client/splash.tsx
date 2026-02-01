@@ -4,22 +4,27 @@ import { StrictMode, useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { requestExpandedMode } from '@devvit/web/client';
 import { DailyQuiz } from './hooks/useQuizData';
+import { useInlineQuiz } from './hooks/useInlineQuiz';
+import { InlineQuiz } from './components/InlineQuiz';
 
 const Splash = () => {
-    // 1. Single Canvas State
-    const [mode, setMode] = useState<'MENU' | 'CUSTOM_SPLASH' | 'QUIZ'>('MENU');
+    const [mode, setMode] = useState<'MENU' | 'CUSTOM_SPLASH' | 'QUIZ' | 'RESULTS'>('MENU');
     const [customQuizMeta, setCustomQuizMeta] = useState<{ title: string; creator?: string; quizId: string } | null>(null);
     const [quizData, setQuizData] = useState<DailyQuiz | null>(null);
-    const [quizLoading, setQuizLoading] = useState(false); // Explicit quiz loading state
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+    const [quizLoading, setQuizLoading] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Initial check for custom quiz context
+    const {
+        currentIndex,
+        selectedAnswerIndex,
+        score,
+        handleOptionSelect,
+        handleNext
+    } = useInlineQuiz(quizData, () => setMode('RESULTS'));
+
     useEffect(() => {
         const checkContext = async () => {
             try {
-                // Ensure Splash UI is visible immediately while we check status
                 setLoading(false);
                 console.log('[Splash] Base splash rendered. Checking init...');
 
@@ -35,9 +40,8 @@ const Splash = () => {
                         quizId: initData.customQuiz.quizId
                     });
                     setMode('CUSTOM_SPLASH');
-                    setQuizLoading(true); // START LOADING
+                    setQuizLoading(true);
 
-                    // PRE-FETCH DATA
                     console.log('[InlineQuiz] Loading quiz...');
                     const res = await fetch(`/api/quizzes/${initData.customQuiz.quizId}`);
                     if (res.ok) {
@@ -47,7 +51,7 @@ const Splash = () => {
                     } else {
                         console.error('[InlineQuiz] Quiz load failed');
                     }
-                    setQuizLoading(false); // FINISH LOADING
+                    setQuizLoading(false);
                 }
             } catch (e) {
                 console.error('[Splash] Context check failed', e);
@@ -70,30 +74,9 @@ const Splash = () => {
         }
     };
 
-    const handleOptionSelect = (option: string) => {
-        console.log(`[InlineQuiz] Option selected: ${option}`);
-        setSelectedAnswer(option);
-    };
-
-    const handleNext = () => {
-        if (!quizData) return;
-
-        const nextIdx = currentIndex + 1;
-        if (nextIdx < quizData.questions.length) {
-            console.log(`[InlineQuiz] Rendering question ${nextIdx}`);
-            setCurrentIndex(nextIdx);
-            setSelectedAnswer(null);
-        } else {
-            console.log('[InlineQuiz] End of quiz reached (results pending)');
-            // TODO: Results screen
-        }
-    };
-
-    // logic to handle expansion using the proper Devvit API
     const handleGenerate = async (event: React.MouseEvent<HTMLButtonElement>) => {
         try {
-            localStorage.removeItem('start_mode'); // Clear creation mode
-            // Use the official Devvit API to request expanded mode
+            localStorage.removeItem('start_mode');
             await requestExpandedMode(event.nativeEvent, 'game');
         } catch (error) {
             console.error('[Splash] Failed to request expanded mode:', error);
@@ -102,188 +85,167 @@ const Splash = () => {
 
     const handleCreate = async (event: React.MouseEvent<HTMLButtonElement>) => {
         try {
-            localStorage.setItem('start_mode', 'create'); // Set creation mode
+            localStorage.setItem('start_mode', 'create');
             await requestExpandedMode(event.nativeEvent, 'game');
         } catch (error) {
             console.error('[Splash] Failed to request expanded mode (create):', error);
         }
     };
 
-    // --- RENDER HELPERS ---
-
     const renderMenu = () => (
-        <div className="flex flex-col md:flex-row w-full mt-6 mb-2 md:justify-center"
-            style={{ gap: '24px', display: 'flex', flexDirection: 'column' }}>
-            {/* Standard "Create" and "Generate" buttons for normal posts */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
             <button type="button" className="nes-btn is-warning" style={{ width: '100%' }} onClick={handleCreate}>Create</button>
             <button type="button" className="nes-btn is-error" style={{ width: '100%' }} onClick={handleGenerate}>Generate</button>
         </div>
     );
 
     const renderCustomSplash = () => (
-        <div className="flex flex-col items-center w-full space-y-4">
-            <div className="mb-4">
-                <p className="mb-2" style={{ fontSize: '0.8rem', color: '#6c757d' }}>TOPIC:</p>
-                <p className="text-xl text-primary" style={{ color: '#d63384' }}>{customQuizMeta?.title}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', alignItems: 'center' }}>
+            <div style={{ textAlign: 'center' }}>
+                <p style={{ marginBottom: '8px', fontSize: '0.75rem', color: '#6c757d' }}>TOPIC:</p>
+                <p style={{ fontSize: '1.125rem', color: '#d63384' }}>{customQuizMeta?.title}</p>
                 {customQuizMeta?.creator && (
-                    <p className="mt-2 text-xs" style={{ color: '#adb5bd' }}>Created by {customQuizMeta.creator}</p>
+                    <p style={{ marginTop: '8px', fontSize: '0.75rem', color: '#adb5bd' }}>Created by {customQuizMeta.creator}</p>
                 )}
             </div>
 
-            {/* SAFE LOADING UI */}
             {quizLoading ? (
-                <button
-                    type="button"
-                    className="nes-btn is-disabled"
-                    style={{ width: '100%', minHeight: '60px' }}
-                    disabled
-                >
+                <button type="button" className="nes-btn is-disabled" style={{ width: '100%' }} disabled>
                     Loading Quiz Data...
                 </button>
             ) : !quizData ? (
-                <button
-                    type="button"
-                    className="nes-btn is-error"
-                    style={{ width: '100%', minHeight: '60px' }}
-                    disabled
-                >
+                <button type="button" className="nes-btn is-error" style={{ width: '100%' }} disabled>
                     Error: Quiz Unavailable
                 </button>
             ) : (
-                <button
-                    type="button"
-                    className="nes-btn is-primary"
-                    style={{ width: '100%', minHeight: '60px' }}
-                    onClick={handleStartQuiz}
-                >
+                <button type="button" className="nes-btn is-primary" style={{ width: '100%' }} onClick={handleStartQuiz}>
                     Play Now!
                 </button>
             )}
         </div>
     );
 
-    const renderQuiz = () => {
-        if (!quizData) {
-            return <p>Loading quiz…</p>;
-        }
+    const renderResults = () => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', alignItems: 'center' }}>
+            <h2 style={{ color: '#d63384', fontSize: '1.25rem' }}>Quiz Complete!</h2>
 
-        const question = quizData.questions[currentIndex];
-
-        if (!question || !question.options) {
-            return <p>Invalid quiz data</p>;
-        }
-
-        return (
-            <div className="w-full text-left">
-                <div style={{ marginBottom: '1rem', color: '#6c757d', fontSize: '0.8rem' }}>
-                    Question {currentIndex + 1} of {quizData.questions.length}
-                </div>
-
-                <h3 style={{ marginBottom: '1.5rem', lineHeight: '1.4' }}>
-                    {question.question}
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.5rem' }}>
-                    {question.options.map((ans: string, idx: number) => {
-                        const isSelected = selectedAnswer === ans;
-                        return (
-                            <button
-                                key={idx}
-                                className={`nes-btn ${isSelected ? 'is-primary' : ''}`}
-                                style={{ width: '100%', textAlign: 'left' }}
-                                onClick={() => handleOptionSelect(ans)}
-                            >
-                                {ans}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                <button
-                    className={`nes-btn ${selectedAnswer ? 'is-success' : 'is-disabled'}`}
-                    disabled={!selectedAnswer}
-                    onClick={handleNext}
-                    style={{ width: '100%' }}
-                >
-                    {currentIndex === quizData.questions.length - 1 ? 'Finish' : 'Next >'}
-                </button>
+            <div className="nes-container is-rounded" style={{ padding: '1rem', width: '100%', backgroundColor: '#fff' }}>
+                <p style={{ marginBottom: '8px' }}>Your Score:</p>
+                <p style={{ fontSize: '1.875rem' }}>{score} / {quizData?.questions.length}</p>
             </div>
-        );
-    };
 
+            <button type="button" className="nes-btn is-primary" style={{ width: '100%' }} onClick={(e) => requestExpandedMode(e.nativeEvent, 'game')}>
+                Play More
+            </button>
+        </div>
+    );
 
     return (
-        <div className="flex flex-col items-center min-h-screen p-4 font-['Press_Start_2P'] relative overflow-hidden"
-            style={{ backgroundColor: '#fff0f3', color: '#212529' }}>
-
+        <div style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: '#fff0f3',
+            color: '#212529',
+            padding: '16px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            fontFamily: 'Press Start 2P, Arial',
+            overflow: 'hidden'
+        }}>
             {/* Background Pattern */}
-            <div className="absolute inset-0 pointer-events-none"
-                style={{
-                    opacity: 0.2,
-                    backgroundImage: 'radial-gradient(#ff4d6d 2px, transparent 2px)',
-                    backgroundSize: '24px 24px'
+            <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                opacity: 0.2,
+                backgroundImage: 'radial-gradient(#ff4d6d 2px, transparent 2px)',
+                backgroundSize: '24px 24px',
+                pointerEvents: 'none',
+                zIndex: 1
+            }} />
+
+            {/* Main Content Area */}
+            <div style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                minHeight: 0,
+                position: 'relative',
+                zIndex: 10
+            }}>
+                <div className="nes-container is-rounded" style={{
+                    backgroundColor: 'white',
+                    borderColor: '#212529',
+                    borderWidth: '4px',
+                    color: '#212529',
+                    width: '100%',
+                    padding: '24px 16px 16px 16px',
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: 0
                 }}>
-            </div>
-
-            <div className="flex-1 flex flex-col items-center justify-center w-full z-10">
-                <div className="nes-container is-rounded with-title p-8 text-center relative mt-12 shadow-xl flex flex-col items-center"
-                    style={{
+                    <div style={{
+                        color: '#d63384',
                         backgroundColor: 'white',
-                        borderColor: '#212529',
-                        borderWidth: '4px',
-                        color: '#212529',
-                        width: '90%',
-                        maxWidth: '800px',
+                        position: 'absolute',
+                        top: '-12px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        padding: '0 12px',
+                        textShadow: '2px 2px 0px #ffb3c1',
+                        whiteSpace: 'nowrap',
+                        zIndex: 20,
+                        fontSize: '0.875rem'
                     }}>
-
-                    <p className="title text-base sm:text-3xl mb-8"
-                        style={{
-                            color: '#d63384',
-                            backgroundColor: 'white',
-                            position: 'absolute',
-                            top: '-1.2rem',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            padding: '0 15px',
-                            textShadow: '2px 2px 0px #ffb3c1',
-                            whiteSpace: 'nowrap',
-                            zIndex: 20
-                        }}>
                         {mode === 'QUIZ' ? 'Streax Game' : (customQuizMeta ? 'Challenger!' : 'Streax Quiz')}
-                    </p>
+                    </div>
 
-                    {/* SINGLE CANVAS ROUTING */}
-                    {loading ? (
-                        <p>Loading...</p>
-                    ) : (
-                        <>
-                            {mode === 'MENU' && renderMenu()}
-                            {mode === 'CUSTOM_SPLASH' && renderCustomSplash()}
-                            {mode === 'QUIZ' && renderQuiz()}
-                        </>
-                    )}
+                    {/* Content Router */}
+                    <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 0 }}>
+                        {loading ? (
+                            <p>Loading...</p>
+                        ) : (
+                            <>
+                                {mode === 'MENU' && renderMenu()}
+                                {mode === 'CUSTOM_SPLASH' && renderCustomSplash()}
+                                {mode === 'QUIZ' && (
+                                    <InlineQuiz
+                                        quizData={quizData}
+                                        currentIndex={currentIndex}
+                                        selectedAnswerIndex={selectedAnswerIndex}
+                                        onOptionSelect={handleOptionSelect}
+                                        onNext={handleNext}
+                                    />
+                                )}
+                                {mode === 'RESULTS' && renderResults()}
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
-            <footer className="text-xs text-center mt-auto py-6 z-10" style={{ color: '#d63384' }}>
-                <span className="nes-text">Powered by Gemini & Reddit</span>
+
+            {/* Footer */}
+            <footer style={{
+                textAlign: 'center',
+                marginTop: '12px',
+                color: '#d63384',
+                fontSize: '0.75rem',
+                flexShrink: 0,
+                zIndex: 10,
+                position: 'relative'
+            }}>
+                <span>Powered by Gemini & Reddit</span>
             </footer>
         </div>
     );
 };
-
-// Add media query styles directly in a style tag for desktop layout
-const styleElement = document.createElement('style');
-styleElement.textContent = `
-    @media (min-width: 768px) {
-        .splash-btn-container {
-            flex-direction: row !important;
-        }
-        .splash-btn {
-            width: 200px !important;
-        }
-    }
-`;
-document.head.appendChild(styleElement);
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
