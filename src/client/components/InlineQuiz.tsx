@@ -1,4 +1,6 @@
 import { DailyQuiz } from '../hooks/useQuizData';
+import { OptionGrid } from './quiz/OptionGrid';
+import { OptionButton } from './quiz/OptionButton';
 
 interface InlineQuizProps {
     quizData: DailyQuiz | null;
@@ -9,117 +11,61 @@ interface InlineQuizProps {
 }
 
 export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOptionSelect, onNext }: InlineQuizProps) => {
-    // Safe derivation for layout logic
-    const questionRaw = quizData?.questions?.[currentIndex];
-    const answersRaw = questionRaw ? ((questionRaw as any).options || (questionRaw as any).answers) : [];
-    const answerCount = Array.isArray(answersRaw) ? answersRaw.length : 0;
-
-    // STABLE LAYOUT POLICY: Grid if 4 options and all are short (<= 18 chars)
-    // This is computed pre-render to avoid layout shifts.
-    const isGrid = (() => {
-        if (answerCount !== 4) return false;
-        // Check character length of all options
-        return answersRaw.every((ans: string) => ans.length <= 18);
-    })();
-
-    // --- Early Returns (Logic unchanged) ---
-
-    // Fallback or demo mode if no data
-    if (!quizData) {
-        return <p>Loading quiz…</p>;
-    }
+    // --- Early Returns ---
+    if (!quizData) return <p>Loading quiz…</p>;
 
     const question = quizData.questions[currentIndex];
+    if (!question) return <p>Error: Question missing</p>;
 
-    if (!question) {
-        return <p>Error: Question missing</p>;
+    // Ensure proper options array
+    const answers = (question as any).options || (question as any).answers;
+    if (!Array.isArray(answers)) {
+        console.error('[InlineQuiz] Invalid question data:', question);
+        return <p className="text-red-500">Error: Options missing.</p>;
     }
 
-    // Ensure we handle both 'options' and 'answers' for compatibility
-    const answers = (question as any).options || (question as any).answers;
+    // --- State Derivation ---
+    const isAnswered = selectedAnswerIndex !== null;
 
-    if (!question || !Array.isArray(answers)) {
-        console.error('[InlineQuiz] Invalid question data:', question);
-        return (
-            <div className="text-center text-red-500">
-                <p>Error: Invalid quiz data.</p>
-                <p className="text-xs mt-2">Question or options missing.</p>
-            </div>
-        );
+    // Determine Correct Index safely
+    let correctIdx = -1;
+    if (typeof question.correctAnswer === 'number') {
+        correctIdx = question.correctAnswer;
+    } else if (typeof question.correctAnswer === 'string') {
+        correctIdx = answers.indexOf(question.correctAnswer);
     }
 
     return (
         <div className="w-full text-left flex flex-col" style={{ height: '100%' }}>
+            {/* Header / Meta */}
             <div style={{ marginBottom: '1rem', color: '#6c757d', fontSize: '0.8rem', flexShrink: 0 }}>
                 Question {currentIndex + 1} of {quizData.questions.length}
             </div>
 
-            <h3 style={{ marginBottom: '1.5rem', lineHeight: '1.4', flexShrink: 0 }}>{question.question}</h3>
+            <h3 style={{ marginBottom: '1.5rem', lineHeight: '1.4', flexShrink: 0 }}>
+                {question.question}
+            </h3>
 
-            {/* Options grid with proper spacing. gap-4 (16px) ensures complete separation. */}
-            <div
-                className={`flex-1 grid ${isGrid ? 'grid-cols-2 gap-4' : 'grid-cols-1 gap-y-4'}`}
-                style={{ marginBottom: '1.5rem', minHeight: 0 }}
-            >
-                {answers.map((ans: string, idx: number) => {
-                    const isSelected = selectedAnswerIndex === idx;
+            {/* Layout & Options */}
+            <OptionGrid options={answers}>
+                {answers.map((ans: string, idx: number) => (
+                    <OptionButton
+                        key={idx}
+                        index={idx}
+                        label={ans}
+                        isSelected={selectedAnswerIndex === idx}
+                        isCorrect={idx === correctIdx}
+                        isAnswered={isAnswered}
+                        onSelect={onOptionSelect}
+                    />
+                ))}
+            </OptionGrid>
 
-                    // Determine Correct Index for Feedback
-                    let correctIdx = -1;
-                    if (typeof question.correctAnswer === 'number') {
-                        correctIdx = question.correctAnswer;
-                    } else if (typeof question.correctAnswer === 'string') {
-                        correctIdx = answers.indexOf(question.correctAnswer);
-                    }
-
-                    const isAnswered = selectedAnswerIndex !== null;
-                    const isCorrect = idx === correctIdx;
-
-                    let btnClass = 'nes-btn';
-                    if (isAnswered) {
-                        if (isCorrect) btnClass += ' is-success';
-                        else if (isSelected) btnClass += ' is-error';
-                        else btnClass += ' is-disabled';
-                    } else {
-                        if (isSelected) btnClass += ' is-primary'; // should not happen if we guard click
-                    }
-
-                    return (
-                        <button
-                            key={idx}
-                            className={btnClass}
-                            style={{
-                                width: '100%',
-                                textAlign: 'left',
-                                fontSize: '0.8rem',
-                                minHeight: '44px',
-                                height: 'auto', // Allow growth
-                                padding: '8px 12px', // Comfortable padding
-                                // overflow: 'hidden', <--- REMOVED to prevent clipping 3D borders
-                                display: 'flex',
-                                alignItems: 'center'
-                            }}
-                            disabled={isAnswered}
-                            onClick={() => !isAnswered && onOptionSelect(idx)}
-                        >
-                            {/* Inner span handles text wrapping naturally */}
-                            <span style={{
-                                display: 'block',
-                                width: '100%',
-                                lineHeight: '1.2',
-                                wordBreak: 'break-word' // Ensure long words wrap
-                            }}>
-                                {ans}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
-
+            {/* Footer / CTA */}
             <div style={{ textAlign: 'center', flexShrink: 0 }}>
                 <button
-                    className={`nes-btn ${selectedAnswerIndex !== null ? 'is-success' : 'is-disabled'}`}
-                    disabled={selectedAnswerIndex === null}
+                    className={`nes-btn ${isAnswered ? 'is-success' : 'is-disabled'}`}
+                    disabled={!isAnswered}
                     onClick={onNext}
                     style={{ width: '100%' }}
                 >
