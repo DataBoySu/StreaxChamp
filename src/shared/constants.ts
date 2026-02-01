@@ -21,6 +21,15 @@ export const CONFIG = {
     SERVER: {
         DEFAULT_SUBREDDIT: 'streax_champ_dev',
     },
+    COMMUNITY: {
+        SUBREDDIT_NAME: 'streax_champ_dev',
+        URL: 'https://www.reddit.com/r/streax_champ_dev',
+        CTA: {
+            JOIN: 'Join the Community',
+            EXPLORE: 'Explore More Quizzes'
+        }
+    },
+
     ROBOT: {
         FALLBACK_BANTER: {
             // AI generation fallback lines
@@ -79,7 +88,11 @@ export const CONFIG = {
         VERSION: '0.1.0',
         BUILD_ENV: process.env.NODE_ENV || 'development',
     },
+    FEATURES: {
+        NATIVE_SUBSCRIBE_ENABLED: true
+    },
     GEMINI: {
+
         /** Prioritized list for simple tasks like robot banter & health checks */
         BACKUP_LITE_MODELS: ['gemini-2.5-flash-lite'],
         /** Prioritized list for complex reasoning and quiz generation */

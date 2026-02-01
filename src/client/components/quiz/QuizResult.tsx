@@ -157,18 +157,19 @@ export const QuizResult: React.FC<QuizResultProps> = ({
             </div>
             <div className="flex gap-4 justify-center relative z-20">
                 <button
-                    onClick={onPlayAgain}
+                    onClick={onReset}
                     className="modern-button modern-button-primary px-6 py-3"
+                >
+                    Explore More Quizzes
+                </button>
+                <button
+                    onClick={onPlayAgain}
+                    className="modern-button modern-button-secondary px-6 py-3"
                 >
                     Play Again
                 </button>
-                <button
-                    onClick={onReset}
-                    className="modern-button modern-button-secondary px-6 py-3"
-                >
-                    Back to Start
-                </button>
             </div>
+
         </motion.div>
     );
 };

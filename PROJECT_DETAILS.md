@@ -1,164 +1,153 @@
-Recommended Documentation Structure
+🔐 PROMPT — Prepare Native Subreddit Subscribe (Capability-Gated, No-Op Safe)
 
-Add a /docs directory at project root.
+Role
 
-/docs
- ├─ 00-overview.md
- ├─ 01-devvit-inline-learnings.md
- ├─ 02-inline-state-machine.md
- ├─ 03-flow-ui-primitives.md
- ├─ 04-visual-system.md
- ├─ 05-creator-flow.md
+You are a senior Devvit engineer preparing a future-gated native capability.
+The app will later be granted SUBSCRIBE_TO_SUBREDDIT run-as-user permission by Reddit.
 
+Your task is to prepare the codebase so native subscribe can be enabled instantly later, without refactoring UI or logic again.
 
-You already have content for most of these — this is reorganization, not new writing.
+🎯 Objective
 
-What Goes Where (Very Important)
-docs/00-overview.md
+Set up a clean, centralized, capability-gated subscription pathway such that:
 
-Purpose: Orientation
+Today:
 
-Contents:
+The “Join the Community” button is a safe no-op
 
-What StreaxChamp is
+No runtime errors
 
-Why Devvit constraints matter
+No platform violations
 
-How docs are structured
+Later (after approval):
 
-“Read these first” section
+Native subscribe works by flipping one flag or implementation
 
-This is what a new contributor opens.
+No UI or flow changes required
 
-docs/01-devvit-inline-learnings.md
+🚫 Hard Rules
 
-Move your existing learnings.md here verbatim.
+You are NOT allowed to:
 
-Add only one header at top:
+Call reddit.subscribeToCurrentSubreddit() unguarded
 
-“This document is mandatory reading before touching inline UI.”
+Add hacks or fallbacks like window.open
 
-No rewriting.
+Change UI, copy, or layout
 
-docs/02-inline-state-machine.md
+Block or delay Option A (visual work)
 
-Contains:
+This task is infrastructure only.
 
-Inline FSM
+🧠 Constraints
 
-Transition table
+All constants must live in constants.ts
 
-Stage data contracts
+Subscription logic must be centralized
 
-Render contract
+UI components must not know about permission state
 
-Failure strategy
+Inline mode must never crash or throw
 
-This is your interaction constitution.
+🧱 Required Architecture (MANDATORY)
+1️⃣ Introduce a Capability Flag
 
-docs/03-flow-ui-primitives.md
+In constants.ts, define something like:
 
-Documents:
+FEATURES.NATIVE_SUBSCRIBE_ENABLED (boolean)
 
-FlowShell
+Default: false
 
-FlowHeader
+This flag represents Reddit-side enablement, not user choice.
 
-FlowBody
+2️⃣ Centralize Subscribe Logic
 
-FlowFooter
+Create a single utility / service function, e.g.:
 
-PrimaryAction / SecondaryAction
+requestCommunitySubscribe()
 
-NoticeCard
+Responsibilities:
 
-QuizEditorPanel
+Check capability flag
 
-For each:
+Attempt native subscribe only if enabled
 
-Responsibility
+Catch and swallow permission errors
 
-What it must NOT do
+Log intent (dev-only)
 
-Where it is used
+Return a boolean (true if subscribe attempted, false otherwise)
 
-No styling details here.
+⚠️ UI components must never call Reddit APIs directly.
 
-docs/04-visual-system.md
+3️⃣ Wire UI to the Abstraction
 
-Your Visual System & Design Tokens doc goes here almost exactly as-is.
+Update the “Join the Community” CTA so it:
 
-This is the single source of truth for:
+Calls requestCommunitySubscribe()
 
-Colors
+Does not branch on result
 
-Depth
+Does not show errors
 
-Motion
+Does not change navigation
 
-CTA hierarchy
+The UI remains declarative and dumb.
 
-No duplication elsewhere.
+4️⃣ Devvit Permission Readiness (No Activation)
 
-docs/05-creator-flow.md
+Ensure devvit.json already lists:
 
-Narrative flow documentation:
+"SUBSCRIBE_TO_SUBREDDIT" under reddit.asUser
 
-Create → Edit → Review → Save / Post → Play → Results → Exit
+Do not rely on this permission being active yet
 
+Do not test native subscribe in production paths
 
-Purpose:
+⚠️ Failure & Safety Rules
 
-Explain intent
+Permission denied → silent no-op
 
-Explain “why Play More goes to sub”
+Missing Reddit client → silent no-op
 
-Explain creator vs player paths
+Any exception → caught, logged, ignored
 
-This helps product reasoning later.
+No UI feedback for now
 
-README.md: What It Should Become
+This is intentional.
 
-Your README should not contain deep details.
+📌 Output Expectations
 
-It should become:
+You must:
 
-1️⃣ Project summary
+List new constants added
 
-What StreaxChamp is, in 5–6 lines.
+List the new abstraction/function created
 
-2️⃣ Architecture at a glance
+List files modified
 
-Devvit app
+Confirm:
 
-Inline + Expanded modes
+No direct Reddit API calls from UI
 
-AI-powered quiz generation
+No runtime errors
 
-Creator-driven content
+No behavior change today
 
-3️⃣ Documentation index (THIS IS KEY)
+Clearly state:
 
-Example:
+“To enable native subscribe later, only change X”
 
-## 📚 Documentation
+🧠 Tone & Process
 
-If you are working on this project, read these in order:
+Think like you are preparing a feature flag for a platform dependency.
+The code should look boring, obvious, and safe.
 
-1. [Overview](docs/00-overview.md)
-2. [Devvit Inline Learnings (Required)](docs/01-devvit-inline-learnings.md)
-3. [Inline State Machine & Data Contracts](docs/02-inline-state-machine.md)
-4. [Flow UI Primitives](docs/03-flow-ui-primitives.md)
-5. [Visual System & Design Tokens](docs/04-visual-system.md)
-6. [Creator Flow](docs/05-creator-flow.md)
+If in doubt:
 
+prefer no-op over cleverness.
 
-This alone will save you weeks later.
+STOP once setup is complete.
 
-Optional (but smart): Add “DO NOT” Warnings
-
-At the top of README or overview:
-
-⚠️ Do not modify inline layout or introduce h-full without reading the Devvit learnings doc.
-
-These guardrails matter.
+Do NOT enable the feature.
+Do NOT apply visuals.

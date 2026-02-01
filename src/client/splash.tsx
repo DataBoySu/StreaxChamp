@@ -6,6 +6,10 @@ import { requestExpandedMode } from '@devvit/web/client';
 import { DailyQuiz } from './hooks/useQuizData';
 import { useInlineQuiz } from './hooks/useInlineQuiz';
 import { InlineQuiz } from './components/InlineQuiz';
+import { CONFIG } from '../shared/constants';
+import { requestCommunitySubscribe } from './services/SubscriptionService';
+
+
 
 const Splash = () => {
     const [mode, setMode] = useState<'MENU' | 'CUSTOM_SPLASH' | 'QUIZ' | 'RESULTS'>('MENU');
@@ -126,7 +130,7 @@ const Splash = () => {
     );
 
     const renderResults = () => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', alignItems: 'center' }}>
             <h2 style={{ color: '#d63384', fontSize: '1.25rem' }}>Quiz Complete!</h2>
 
             <div className="nes-container is-rounded" style={{ padding: '1rem', width: '100%', backgroundColor: '#fff' }}>
@@ -134,11 +138,23 @@ const Splash = () => {
                 <p style={{ fontSize: '1.875rem' }}>{score} / {quizData?.questions.length}</p>
             </div>
 
-            <button type="button" className="nes-btn is-primary" style={{ width: '100%' }} onClick={(e) => requestExpandedMode(e.nativeEvent, 'game')}>
-                Play More
+            {/* Primary Action: Join Community (Native) */}
+            <button
+                type="button"
+                className="nes-btn is-primary"
+                style={{ width: '100%' }}
+                onClick={() => {
+                    void requestCommunitySubscribe();
+                }}
+            >
+                {CONFIG.COMMUNITY.CTA.JOIN}
             </button>
+
+
         </div>
     );
+
+
 
     return (
         <div style={{
