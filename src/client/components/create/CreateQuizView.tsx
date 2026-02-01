@@ -11,7 +11,7 @@ import { NoticeCard } from './primitives/NoticeCard';
 // 🎨 LOCAL THEME DEFINITION - LOCKED (Ignores Global Dark Mode)
 const CREATE_THEME = {
     bg: '#F3EFE6',       // Warm Parchment / Stationery Beige
-    canvasBg: '#EDE7DC', // Inner Canvas (Slightly darker)
+    canvasBg: '#e4c386ff', // Inner Canvas (Slightly darker)
     panelBg: '#FFF8F0',  // Input Background
     text: '#1f1f1f',     // Near Black
     border: '#1f1f1f',   // Strict Black Border
@@ -174,7 +174,7 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                             >
                                 {/* INNER CANVAS - THEME LOCKED & BOUNDED */}
                                 <div
-                                    className="flex flex-col items-center relative mb-8 w-full"
+                                    className="flex flex-col items-center relative mb-16 w-full"
                                     style={{
                                         backgroundColor: CREATE_THEME.canvasBg,
                                         border: `3px solid ${CREATE_THEME.border}`,
@@ -184,9 +184,13 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                                         // "Float" effect
                                     }}
                                 >
-                                    {/* 1. Mascot Zone (Fixed Height, Overflow Visible) */}
-                                    <div className="w-full relative flex justify-center items-end" style={{ height: '220px', marginBottom: '0px', overflow: 'visible' }}>
-                                        <div className="transform scale-90 origin-bottom">
+                                    {/* 1. Mascot Anchor Wrapper (Dialogue Safety Zone) */}
+                                    {/* Padding top is RESERVED for dialogue bubbles so they don't clip. */}
+                                    <div
+                                        className="w-full relative flex flex-col items-center justify-end pt-[48px] md:pt-[64px]"
+                                        style={{ overflow: 'visible' }}
+                                    >
+                                        <div className="transform scale-90 origin-bottom relative">
                                             <InteractiveRobot username={username} forceState="happy" />
                                         </div>
                                     </div>
