@@ -10,13 +10,14 @@ import { NoticeCard } from './primitives/NoticeCard';
 
 // 🎨 LOCAL THEME DEFINITION - LOCKED (Ignores Global Dark Mode)
 const CREATE_THEME = {
-    bg: '#FDFCF8',      // Warm Cream / Off-White
-    panelBg: '#FFFFFF', // Pure White for cards
-    text: '#2D2D2D',    // Soft Black (Charcoal)
+    bg: '#FDFCF8',      // Global Background (Cream)
+    canvasBg: '#FFF4E6', // Inner Canvas (Warm Paper) - DISTINCT
+    panelBg: '#FFFFFF', // Pure White for inputs
+    text: '#2D2D2D',    // Soft Black
     border: '#111111',  // NES Black Border
     accent: '#FF8FAB',  // Soft Coral/Pink Accent
     accentHover: '#FF7495',
-    inputBg: '#FAFAFA',
+    inputBg: '#FAFAFA', // This will be replaced by panelBg for the input field
     shadow: '#E5E0D8'   // Warm shadow
 };
 
@@ -101,7 +102,7 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
 
     return (
         // ROOT CONTAINER - THEME LOCKED
-        // Uses relative positioning to Ensure it takes up space (Fixes Black Screen)
+        // Uses relative positioning to Ensure it takes up space
         <div
             style={{
                 minHeight: '100vh',
@@ -125,12 +126,47 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
             className="font-sans"
         >
             <FlowShell className="z-50">
-                <FlowHeader
-                    title="Create Quiz"
-                    onBack={handleBackStep}
-                    currentStep={step}
-                    totalSteps={6}
-                />
+                {/* CUSTOM HEADER FOR SCENE 1 (TOPIC) */}
+                {isTopic ? (
+                    <div className="flex items-center justify-between mb-8 pt-4 px-2">
+                        {/* Physical Back Button */}
+                        <button
+                            onClick={handleBackStep}
+                            className="px-6 py-2 text-sm font-black uppercase tracking-wider transition-none"
+                            style={{
+                                backgroundColor: CREATE_THEME.panelBg,
+                                border: `3px solid ${CREATE_THEME.border}`,
+                                boxShadow: `4px 4px 0 0 ${CREATE_THEME.border}`,
+                                color: CREATE_THEME.text,
+                                transform: 'translate(0,0)'
+                            }}
+                            onMouseDown={(e) => {
+                                e.currentTarget.style.transform = "translate(2px, 2px)";
+                                e.currentTarget.style.boxShadow = `2px 2px 0 0 ${CREATE_THEME.border}`;
+                            }}
+                            onMouseUp={(e) => {
+                                e.currentTarget.style.transform = "translate(0, 0)";
+                                e.currentTarget.style.boxShadow = `4px 4px 0 0 ${CREATE_THEME.border}`;
+                            }}
+                        >
+                            ← Back
+                        </button>
+
+                        {/* Centered Title */}
+                        <h1 className="text-xl font-black uppercase tracking-widest text-center" style={{ color: CREATE_THEME.text }}>
+                            Create Quiz
+                        </h1>
+
+                        <div className="w-24"></div> {/* Spacer for alignment */}
+                    </div>
+                ) : (
+                    <FlowHeader
+                        title="Create Quiz"
+                        onBack={handleBackStep}
+                        currentStep={step}
+                        totalSteps={6}
+                    />
+                )}
 
                 <FlowBody className={isEditor ? '' : 'flex flex-col justify-center'}>
                     <AnimatePresence mode="wait">
@@ -142,85 +178,88 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                                 initial={{ opacity: 0, scale: 0.98 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.98 }}
-                                className="flex-1 flex flex-col justify-center items-center text-center w-full max-w-lg mx-auto py-8"
+                                className="flex-1 flex flex-col items-center w-full max-w-lg mx-auto pb-8"
                             >
-                                {/* MASCOT CARD - Reduced Dominance */}
+                                {/* MASCOT CARD / INNER CANVAS - Themed & Bounded */}
                                 <div
-                                    className="p-8 w-full flex flex-col items-center gap-6 mb-12 relative"
+                                    className="p-8 w-full flex flex-col items-center relative mb-8"
                                     style={{
-                                        backgroundColor: CREATE_THEME.panelBg,
+                                        backgroundColor: CREATE_THEME.canvasBg, // Warm Paper
                                         border: `3px solid ${CREATE_THEME.border}`,
-                                        boxShadow: `8px 8px 0 0 ${CREATE_THEME.text}`, // Hard shadow
-                                        maxWidth: '420px', // Smaller container
+                                        boxShadow: `8px 8px 0 0 ${CREATE_THEME.text}`,
+                                        maxWidth: '480px',
                                     }}
                                 >
-                                    {/* Mascot - Friendly & Contained */}
-                                    <div className="transform scale-90 -mb-4">
-                                        <InteractiveRobot username={username} forceState="happy" />
+                                    {/* Mascot Safe Zone - Reserved Space */}
+                                    <div className="w-full relative flex justify-center items-end" style={{ height: '240px', marginBottom: '24px' }}>
+                                        <div className="absolute bottom-0 transform scale-90 origin-bottom">
+                                            <InteractiveRobot username={username} forceState="happy" />
+                                        </div>
                                     </div>
 
-                                    <div className="w-full flex flex-col gap-6">
+                                    <div className="w-full flex flex-col gap-6 relative z-10">
                                         <label
-                                            className="block text-2xl font-black uppercase tracking-wide"
+                                            className="block text-xl font-black uppercase tracking-wide text-center"
                                             style={{ color: CREATE_THEME.text }}
                                         >
                                             What is your quiz about?
                                         </label>
 
-                                        {/* TOPIC INPUT - Calm & Central */}
+                                        {/* TOPIC INPUT - Clean White on Warm Canvas */}
                                         <input
                                             type="text"
                                             value={topic}
                                             onChange={(e) => setTopic(e.target.value)}
                                             placeholder="e.g., Space Exploration"
                                             style={{
-                                                backgroundColor: CREATE_THEME.inputBg,
-                                                border: `3px solid ${CREATE_THEME.border}`, // NES width
+                                                backgroundColor: CREATE_THEME.panelBg, // White
+                                                border: `3px solid ${CREATE_THEME.border}`,
                                                 color: CREATE_THEME.text,
                                                 outline: 'none',
-                                                boxShadow: 'inset 4px 4px 0 rgba(0,0,0,0.05)'
+                                                boxShadow: 'inset 3px 3px 0 rgba(0,0,0,0.05)'
                                             }}
-                                            className="w-full rounded-none p-6 text-xl text-center font-bold tracking-tight transition-all focus:border-black placeholder:opacity-40"
+                                            className="w-full rounded-none p-4 text-xl text-center font-bold tracking-tight transition-all focus:border-black placeholder:opacity-40"
                                             autoFocus
                                         />
-
-                                        <p className="text-sm font-medium opacity-60" style={{ color: CREATE_THEME.text }}>
-                                            Enter a topic to start building.
-                                        </p>
                                     </div>
-                                </div>
 
-                                {/* CUSTOM FOOTER / CTA - PHYSICAL BUTTON */}
-                                <div className="w-full max-w-xs mx-auto">
-                                    <button
-                                        onClick={handleNext}
-                                        className="w-full text-lg font-black uppercase tracking-widest py-5 px-8 transition-transform"
-                                        style={{
-                                            backgroundColor: CREATE_THEME.panelBg, // White button
-                                            color: CREATE_THEME.text,
-                                            border: `3px solid ${CREATE_THEME.border}`,
-                                            boxShadow: `6px 6px 0 0 ${CREATE_THEME.border}`,
-                                            transform: 'translate(0, 0)'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.transform = "translate(2px, 2px)";
-                                            e.currentTarget.style.boxShadow = `4px 4px 0 0 ${CREATE_THEME.border}`;
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.transform = "translate(0, 0)";
-                                            e.currentTarget.style.boxShadow = `6px 6px 0 0 ${CREATE_THEME.border}`;
-                                        }}
-                                        onMouseDown={(e) => {
-                                            e.currentTarget.style.transform = "translate(4px, 4px)";
-                                            e.currentTarget.style.boxShadow = `2px 2px 0 0 ${CREATE_THEME.border}`;
-                                        }}
-                                        onMouseUp={(e) => {
-                                            e.currentTarget.style.transform = "translate(2px, 2px)";
-                                            e.currentTarget.style.boxShadow = `4px 4px 0 0 ${CREATE_THEME.border}`;
-                                        }}
-                                    >
-                                        Start Building &gt;
-                                    </button>
+                                    {/* CTA - START BUILDING (Inside Canvas or Just Below? Layout says inside or bottom) */}
+                                    {/* Prompt says: Canvas wraps mascot+inputs. CTA is last item in structure list. */}
+                                    <div className="w-full mt-8">
+                                        <button
+                                            onClick={handleNext}
+                                            className="w-full text-lg font-black uppercase tracking-widest py-4 px-6 transition-none"
+                                            style={{
+                                                backgroundColor: CREATE_THEME.accent, // Soft Pink Accent for CTA
+                                                color: '#FFFFFF', // Contrast text
+                                                textShadow: '2px 2px 0px rgba(0,0,0,0.2)',
+                                                border: `3px solid ${CREATE_THEME.border}`,
+                                                boxShadow: `5px 5px 0 0 ${CREATE_THEME.border}`,
+                                                transform: 'translate(0, 0)'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = "translate(2px, 2px)";
+                                                e.currentTarget.style.boxShadow = `3px 3px 0 0 ${CREATE_THEME.border}`;
+                                                // Optional: Hover color shift
+                                                e.currentTarget.style.backgroundColor = CREATE_THEME.accentHover;
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = "translate(0, 0)";
+                                                e.currentTarget.style.boxShadow = `5px 5px 0 0 ${CREATE_THEME.border}`;
+                                                e.currentTarget.style.backgroundColor = CREATE_THEME.accent;
+                                            }}
+                                            onMouseDown={(e) => {
+                                                e.currentTarget.style.transform = "translate(5px, 5px)";
+                                                e.currentTarget.style.boxShadow = `0px 0px 0 0 ${CREATE_THEME.border}`;
+                                            }}
+                                            onMouseUp={(e) => {
+                                                e.currentTarget.style.transform = "translate(2px, 2px)";
+                                                e.currentTarget.style.boxShadow = `3px 3px 0 0 ${CREATE_THEME.border}`;
+                                            }}
+                                        >
+                                            Start Building &gt;
+                                        </button>
+                                    </div>
                                 </div>
 
                             </motion.div>

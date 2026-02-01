@@ -1,146 +1,163 @@
-🎯 TARGETED IDE PROMPT — Create Quiz Screen (Scene 1)
+🎯 TARGETED IDE PROMPT — Create Quiz Screen (Scene 1) FIX
 
 Context
-This screen reuses the interactive Robot Mascot component from the Landing Page.
-Do NOT refactor or rewrite the mascot logic.
-Only reposition and contain it visually.
+This prompt applies ONLY to the Create Quiz screen (Creator flow, Scene 1).
+Do NOT modify global theme, landing page, mascot logic, or shared components unless explicitly stated.
 
-1️⃣ Fix Layout Hierarchy (Do NOT touch mascot internals)
+1️⃣ ABSOLUTE RULES (DO NOT VIOLATE)
 
-Goal:
-The robot must be visible, unobstructed, and allowed to animate freely (eye tracking, dialog bubbles).
+❌ NO white backgrounds (#fff, bg-white, zinc-50, etc.)
 
-Required structure (top → bottom):
+❌ NO rounded corners (everything must be rectangular)
 
-Header (Back + Create Quiz)
-↓
-Inner Canvas (bounded card)
-  ├─ Robot Mascot (top-center, absolute-safe zone)
-  ├─ Optional timed dialog bubble (allowed here)
-  ├─ Quiz Topic Input
-  └─ CTA Button (Start Building)
+❌ DO NOT change mascot logic or animations
 
+❌ DO NOT depend on dark/light theme
 
-Rules
+✅ This screen must look IDENTICAL in light & dark modes
 
-Robot mascot must live inside the inner canvas, not the page background.
+✅ All colors must be explicitly hard-coded for this screen only
 
-No text, input, or button may overlap the robot or its dialog bubble.
+2️⃣ BACKGROUND & CANVAS (CORE FIX)
 
-Reserve minimum 220–260px vertical space for mascot + dialog area.
+Outer Page Background
 
-The mascot may follow cursor, but must be clipped only by the inner canvas, not the viewport.
+Replace current background with a soft, peaceful neutral:
 
-2️⃣ Add a Proper Inner Canvas (Critical)
+Use: #F3EFE6 (warm parchment / stationery beige)
 
-Problem: Inner canvas blends into background → zero contrast.
+Remove orange and grid entirely for this screen
 
-Fix:
+Do NOT reference global CSS variables
 
-Create a single inner canvas card that wraps mascot + inputs.
+Inner Canvas (Main Content Box)
 
-Canvas must:
+Background: #EDE7DC (slightly darker than page bg)
 
-Be rectangular (NO rounded corners).
+Border: 3px solid #1f1f1f
 
-Have visible border (2–3px solid).
+Shadow: 6px 6px 0px #1f1f1f
 
-Have non-white, non-black background.
+Padding: 24px
 
-Approved background direction (pick ONE):
+Margin from viewport edges (mobile): 16px
 
-Warm paper (#FFF4E6 / #FAF3E0)
+Margin from viewport edges (desktop): centered, max-width 720px
 
-Soft stone (#F1F2F4)
+👉 This canvas must visually “float” with strong 3D depth.
 
-Muted sage (#EEF4F1)
+3️⃣ LAYOUT STRUCTURE (FIX OVERFLOW & ALIGNMENT)
 
-⚠️ Do NOT use pure white or pure black.
+Order inside canvas (top → bottom):
 
-3️⃣ Fix Theme Independence (Very Important)
+Mascot Zone
 
-Requirement
-This screen must look IDENTICAL in light & dark theme.
+Fixed height: 220px
 
-Action
+Centered horizontally
 
-Explicitly opt out of global theme colors.
+overflow: visible
 
-Hard-set:
+Mascot must NEVER overlap input or button
 
-Inner canvas background
+Dialogue bubble (if shown) must stay inside this zone
 
-Border color
+Title
 
-Text color
+Text: WHAT IS YOUR QUIZ ABOUT?
 
-Ignore dark: Tailwind variants here.
+Margin-top: 12px
 
-This screen is self-themed, like Creator Studio.
+Margin-bottom: 8px
 
-4️⃣ Reposition & Restyle Header Controls
+Color: #1f1f1f
 
-Back Button
+Input Field
 
-Convert to a real NES-style button (depth + press).
+Full width
 
-No pill, no flat text.
+Height: 44px
 
-Left-aligned, consistent size with CTA buttons elsewhere.
+Background: #FFF8F0
 
-Create Quiz Title
+Border: 2px solid #1f1f1f
 
-Centered
+NO rounded corners
 
-High contrast
+Inner padding: 8px 12px
 
-Do not overlap robot safe zone.
+Primary CTA — “START BUILDING >”
 
-5️⃣ Fix CTA Button (Start Building)
+Full width
 
-Rules
+Height: 48px
 
-Must visually match Creator Studio button physics:
+Background: #FF9DB5 (soft pink, not white, not orange)
 
-Shadow present
+Border: 3px solid #1f1f1f
 
-Press = translate + shadow collapse
+Shadow: 4px 4px 0px #1f1f1f
 
-Width: full or near-full
+Active press:
 
-Must never touch the bottom canvas border (≥16px padding).
+transform: translate(2px, 2px)
 
-6️⃣ Spacing & Padding Rules (Non-negotiable)
+shadow collapses to 2px 2px 0px
 
-Inner canvas padding: 24–32px
+4️⃣ BACK BUTTON (FIX LOOK & CONSISTENCY)
 
-Distance from canvas edge to content: never < 16px
+Style as NES-style button, NOT text
 
-Inputs must not touch borders
+Background: #E0D8CC
 
-No content hugging edges
+Border: 2px solid #1f1f1f
 
-7️⃣ Explicitly Do NOT Do These
+Shadow: 3px 3px 0px #1f1f1f
 
-❌ Do NOT refactor the robot component
-❌ Do NOT remove dialog bubble logic
-❌ Do NOT introduce rounded corners
-❌ Do NOT use black backgrounds
-❌ Do NOT reintroduce global grid / wiremesh
-❌ Do NOT change mascot animations or state logic
+Position:
 
-8️⃣ Success Criteria Checklist
+Mobile: top-left, inside page padding
 
-After changes:
+Desktop: same row as title, left-aligned
 
-Robot is fully visible on mobile & desktop
+5️⃣ RESPONSIVENESS (MANDATORY)
 
-Dialog bubble never clips
+Mobile
 
-Inner canvas clearly separated from background
+Single column
 
-Screen looks the same in light & dark theme
+No overflow
 
-Back & Start buttons have real physical press feedback
+Canvas must scroll if height exceeds viewport
 
-No overlap, no hidden elements, no theme bleed
+Desktop
+
+Canvas centered
+
+No elements touching edges
+
+Use box-sizing: border-box everywhere
+
+Explicitly remove overflow-hidden if present
+
+6️⃣ WHAT TO REMOVE (IMPORTANT)
+
+❌ Any bg-white or theme-derived backgrounds
+
+❌ Any rounded corner utilities
+
+❌ Any leftover grid / wiremesh overlays
+
+❌ Any “helper” wrapper that forces clipping
+
+7️⃣ VERIFICATION CHECKLIST (YOU MUST SELF-CHECK)
+
+ Light mode and dark mode look identical
+
+ No white background anywhere
+
+ Mascot never overlaps input or button
+
+ Strong visible 3D depth on canvas & buttons
+
+ Mobile view has no clipping or overflow
