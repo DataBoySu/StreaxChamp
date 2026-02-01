@@ -1,199 +1,164 @@
-🔧 PROMPT — Inline State Machine & Stage Data Contract (Devvit-Safe)
+Recommended Documentation Structure
 
-Role
+Add a /docs directory at project root.
 
-You are a senior frontend systems engineer designing the inline interaction architecture for a Reddit Devvit app.
-The inline UI runs inside a fixed-height host frame with no global scrolling and strict layout constraints.
+/docs
+ ├─ 00-overview.md
+ ├─ 01-devvit-inline-learnings.md
+ ├─ 02-inline-state-machine.md
+ ├─ 03-flow-ui-primitives.md
+ ├─ 04-visual-system.md
+ ├─ 05-creator-flow.md
 
-Your task is to design a deterministic, minimal inline state machine and a stage data contract that cleanly separates:
 
-UI rendering
+You already have content for most of these — this is reorganization, not new writing.
 
-State transitions
+What Goes Where (Very Important)
+docs/00-overview.md
 
-Data ownership
+Purpose: Orientation
 
-This design must be stable, debuggable, and safe under Devvit’s constraints.
+Contents:
 
-🎯 Objective
+What StreaxChamp is
 
-Design:
+Why Devvit constraints matter
 
-A finite inline state machine (FSM)
+How docs are structured
 
-A data contract defining exactly what data each stage:
+“Read these first” section
 
-Requires
+This is what a new contributor opens.
 
-Owns
+docs/01-devvit-inline-learnings.md
 
-Mutates
+Move your existing learnings.md here verbatim.
 
-A transition policy that prevents accidental layout or data regressions
+Add only one header at top:
 
-You are not allowed to:
+“This document is mandatory reading before touching inline UI.”
 
-Redesign UI visuals
+No rewriting.
 
-Add new features
+docs/02-inline-state-machine.md
 
-Introduce routing
+Contains:
 
-Assume scroll or swipe gestures
+Inline FSM
 
-Modify business logic
+Transition table
 
-🧠 Core Assumptions (Non-Negotiable)
+Stage data contracts
 
-Inline UI is state-driven, not route-driven
+Render contract
 
-Only one stage is active at a time
+Failure strategy
 
-Stage transitions are linear and intentional
+This is your interaction constitution.
 
-All stages render within the same fixed container
+docs/03-flow-ui-primitives.md
 
-Data fetching must be predictable and bounded
+Documents:
 
-🧱 Part 1 — State Machine Design
+FlowShell
 
-You must define:
+FlowHeader
 
-A closed set of inline stages
+FlowBody
 
-Allowed transitions
+FlowFooter
 
-Terminal vs non-terminal states
+PrimaryAction / SecondaryAction
 
-Guidance:
+NoticeCard
 
-Keep the number of stages minimal
+QuizEditorPanel
 
-Avoid micro-states
+For each:
 
-Prefer “stage + local flags” over many states
+Responsibility
 
-You should express:
+What it must NOT do
 
-The state enum
+Where it is used
 
-A transition table (or diagram in text)
+No styling details here.
 
-Which transitions are user-driven vs system-driven
+docs/04-visual-system.md
 
-🧾 Part 2 — Stage Data Contract (Critical)
+Your Visual System & Design Tokens doc goes here almost exactly as-is.
 
-For each stage, define:
+This is the single source of truth for:
 
-Required Inputs
+Colors
 
-Data that must already exist for the stage to render
+Depth
 
-Owned State
+Motion
 
-Data created or mutated in this stage
+CTA hierarchy
 
-Side Effects
+No duplication elsewhere.
 
-Network calls (if any)
+docs/05-creator-flow.md
 
-Cache writes
+Narrative flow documentation:
 
-Exit Conditions
+Create → Edit → Review → Save / Post → Play → Results → Exit
 
-What must be true to move to the next stage
 
-This contract must make it impossible for:
+Purpose:
 
-A stage to access data it doesn’t own
+Explain intent
 
-A later stage to depend on transient UI state
+Explain “why Play More goes to sub”
 
-🔄 Part 3 — Data Lifetime & Ownership Rules
+Explain creator vs player paths
 
-You must define:
+This helps product reasoning later.
 
-What data lives for the entire inline session
+README.md: What It Should Become
 
-What data is stage-local
+Your README should not contain deep details.
 
-What data must survive a refresh (if any)
+It should become:
 
-What data must never be persisted
+1️⃣ Project summary
 
-Explicitly call out:
+What StreaxChamp is, in 5–6 lines.
 
-What belongs in React state
+2️⃣ Architecture at a glance
 
-What belongs in context
+Devvit app
 
-What belongs nowhere (computed only)
+Inline + Expanded modes
 
-⚠️ Part 4 — Failure & Recovery Strategy
+AI-powered quiz generation
 
-Inline UIs fail silently if not handled well.
+Creator-driven content
 
-You must define:
+3️⃣ Documentation index (THIS IS KEY)
 
-What happens if required data is missing
+Example:
 
-What happens if a network call fails mid-stage
+## 📚 Documentation
 
-Whether stages can retry or must exit
+If you are working on this project, read these in order:
 
-A single, consistent failure recovery path
+1. [Overview](docs/00-overview.md)
+2. [Devvit Inline Learnings (Required)](docs/01-devvit-inline-learnings.md)
+3. [Inline State Machine & Data Contracts](docs/02-inline-state-machine.md)
+4. [Flow UI Primitives](docs/03-flow-ui-primitives.md)
+5. [Visual System & Design Tokens](docs/04-visual-system.md)
+6. [Creator Flow](docs/05-creator-flow.md)
 
-No ad-hoc error handling per stage.
 
-🧪 Part 5 — Devvit-Specific Safeguards
+This alone will save you weeks later.
 
-You must explicitly design for:
+Optional (but smart): Add “DO NOT” Warnings
 
-Fixed inline height
+At the top of README or overview:
 
-No global scroll
+⚠️ Do not modify inline layout or introduce h-full without reading the Devvit learnings doc.
 
-Re-render safety
-
-Build vs dev differences
-
-Host frame re-mounting
-
-State machine must remain valid under:
-
-Re-render
-
-Partial unmount
-
-Slow network
-
-📌 Output Expectations
-
-You must output, in order:
-
-Inline State Enum
-
-Transition Rules
-
-Stage-by-Stage Data Contract
-
-Data Ownership Diagram (textual)
-
-Failure & Recovery Strategy
-
-Explicit Non-Goals (what this system will not do)
-
-Use clear headings.
-Be explicit.
-Prefer clarity over cleverness.
-
-🧠 Tone & Process
-
-Think like you’re locking an architecture that others will build on.
-Assume future contributors will misuse it unless constrained.
-
-If tradeoffs exist, explain them and choose deliberately.
-
-Stop when complete.
-
-Do not implement code unless explicitly asked later.
+These guardrails matter.
