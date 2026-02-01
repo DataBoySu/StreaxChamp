@@ -103,28 +103,37 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                     {isTopic && (
                         <motion.div
                             key="step-topic"
-                            initial={{ opacity: 0, x: 50 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -50 }}
-                            className="flex-1 flex flex-col justify-center items-center text-center space-y-6"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="flex-1 flex flex-col justify-center items-center text-center space-y-6 w-full max-w-lg mx-auto"
                         >
-                            <InteractiveRobot username={username} forceState="happy" />
+                            {/* Z-2 Panel Container */}
+                            <div className="modern-card p-8 w-full flex flex-col items-center gap-6 bg-card border-2 border-border">
+                                <InteractiveRobot username={username} forceState="happy" />
 
-                            <div className="w-full max-w-md">
-                                <label className="block text-secondary mb-2 text-sm font-bold uppercase tracking-wider">
-                                    What is your quiz about?
-                                </label>
-                                <input
-                                    type="text"
-                                    value={topic}
-                                    onChange={(e) => setTopic(e.target.value)}
-                                    placeholder="e.g., Space Exploration"
-                                    className="w-full bg-black/40 border-2 border-primary/50 rounded-xl p-4 text-xl text-center text-white focus:border-primary focus:outline-none transition-all"
-                                    autoFocus
-                                />
+                                <div className="w-full">
+                                    <label className="block text-secondary mb-3 text-sm font-bold uppercase tracking-wider">
+                                        What is your quiz about?
+                                    </label>
+
+                                    {/* Z-1 Recessed Input */}
+                                    <input
+                                        type="text"
+                                        value={topic}
+                                        onChange={(e) => setTopic(e.target.value)}
+                                        placeholder="e.g., Space Exploration"
+                                        className="w-full bg-black/20 border-2 border-white/20 rounded-xl p-4 text-xl text-center text-primary focus:border-accent focus:outline-none transition-all placeholder:text-secondary/50"
+                                        autoFocus
+                                    />
+                                    <p className="text-xs text-secondary mt-2">
+                                        Enter a topic to generate questions.
+                                    </p>
+                                </div>
                             </div>
                         </motion.div>
                     )}
+
 
                     {/* STEPS 1-5: QUESTIONS */}
                     {isEditor && questions[step - 1] && (

@@ -19,11 +19,11 @@ export const CONFIG = {
         TOP_HOT_TOPICS_COUNT: 5,
     },
     SERVER: {
-        DEFAULT_SUBREDDIT: 'streax_champ_dev',
+        DEFAULT_SUBREDDIT: 'StreaxChamp',
     },
     COMMUNITY: {
-        SUBREDDIT_NAME: 'streax_champ_dev',
-        URL: 'https://www.reddit.com/r/streax_champ_dev',
+        SUBREDDIT_NAME: 'StreaxChamp',
+        URL: 'https://www.reddit.com/r/StreaxChamp/',
         CTA: {
             JOIN: 'Join the Community',
             EXPLORE: 'Explore More Quizzes'

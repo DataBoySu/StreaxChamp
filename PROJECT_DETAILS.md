@@ -1,153 +1,120 @@
-🔐 PROMPT — Prepare Native Subreddit Subscribe (Capability-Gated, No-Op Safe)
+🧠 PROMPT — Fix Scoring Correctly + Add Answer Feedback (Minimal Change)
 
 Role
 
-You are a senior Devvit engineer preparing a future-gated native capability.
-The app will later be granted SUBSCRIBE_TO_SUBREDDIT run-as-user permission by Reddit.
+You are a senior frontend/gameplay engineer working on StreaxChamp (React + Devvit).
+You are fixing a scoring logic bug and adding a small QoL feedback improvement.
 
-Your task is to prepare the codebase so native subscribe can be enabled instantly later, without refactoring UI or logic again.
+The goal is correctness and clarity, not refactoring or visual polish.
 
-🎯 Objective
+🎯 Task Objective
 
-Set up a clean, centralized, capability-gated subscription pathway such that:
+Fix custom quiz scoring, which currently always returns 5/5.
 
-Today:
-
-The “Join the Community” button is a safe no-op
-
-No runtime errors
-
-No platform violations
-
-Later (after approval):
-
-Native subscribe works by flipping one flag or implementation
-
-No UI or flow changes required
+Add per-question red/green feedback so users know which answers were right or wrong.
 
 🚫 Hard Rules
 
 You are NOT allowed to:
 
-Call reddit.subscribeToCurrentSubreddit() unguarded
+Redesign UI
 
-Add hacks or fallbacks like window.open
+Apply visual system tokens
 
-Change UI, copy, or layout
+Change navigation or FSM
 
-Block or delay Option A (visual work)
+Add animations
 
-This task is infrastructure only.
+Refactor unrelated logic
 
-🧠 Constraints
+Change Firestore schema
 
-All constants must live in constants.ts
+Minimal logic changes only.
 
-Subscription logic must be centralized
+🧠 Root Constraint (MANDATORY)
 
-UI components must not know about permission state
+Scoring must be based on answer index, not string comparison.
 
-Inline mode must never crash or throw
+selectedAnswerIndex === correctAnswerIndex
 
-🧱 Required Architecture (MANDATORY)
-1️⃣ Introduce a Capability Flag
+No exceptions.
 
-In constants.ts, define something like:
+🧱 Required Changes
+1️⃣ Normalize Quiz Data (ONCE, at load time)
 
-FEATURES.NATIVE_SUBSCRIBE_ENABLED (boolean)
+Ensure all quizzes expose:
 
-Default: false
+correctAnswerIndex: number
 
-This flag represents Reddit-side enablement, not user choice.
 
-2️⃣ Centralize Subscribe Logic
+Rules:
 
-Create a single utility / service function, e.g.:
+Custom quizzes: already have it → use directly
 
-requestCommunitySubscribe()
+Generated quizzes:
 
-Responsibilities:
+Convert correctAnswer (string) → index using options.indexOf
 
-Check capability flag
+Remove string-based answer comparison from scoring
 
-Attempt native subscribe only if enabled
+2️⃣ Fix Scoring Logic
 
-Catch and swallow permission errors
+In the gameplay engine:
 
-Log intent (dev-only)
+Compare indexes only
 
-Return a boolean (true if subscribe attempted, false otherwise)
+Increment score exactly once per question
 
-⚠️ UI components must never call Reddit APIs directly.
+Ensure score is NOT recomputed or overridden on results transition
 
-3️⃣ Wire UI to the Abstraction
+3️⃣ Add Minimal Feedback State
 
-Update the “Join the Community” CTA so it:
+For each question:
 
-Calls requestCommunitySubscribe()
+Track selectedAnswerIndex
 
-Does not branch on result
+Derive:
 
-Does not show errors
+isCorrect = selectedAnswerIndex === correctAnswerIndex
 
-Does not change navigation
+4️⃣ Apply Visual Feedback (Minimal)
 
-The UI remains declarative and dumb.
+In option rendering:
 
-4️⃣ Devvit Permission Readiness (No Activation)
+If selected and correct → add correct class
 
-Ensure devvit.json already lists:
+If selected and wrong → add incorrect class
 
-"SUBSCRIBE_TO_SUBREDDIT" under reddit.asUser
+Optionally highlight correct option when wrong
 
-Do not rely on this permission being active yet
+No animations required.
 
-Do not test native subscribe in production paths
+⚠️ Safety Checks
 
-⚠️ Failure & Safety Rules
+You must verify:
 
-Permission denied → silent no-op
+Generated quizzes still score correctly
 
-Missing Reddit client → silent no-op
+Custom quizzes score correctly (not always 0 or 5)
 
-Any exception → caught, logged, ignored
+User cannot change answer after selection
 
-No UI feedback for now
+Score increments only once per question
 
-This is intentional.
+📌 Output Format
 
-📌 Output Expectations
+You must output:
 
-You must:
+Exact Root Cause of the 5/5 bug
 
-List new constants added
+Scoring Fix Applied
 
-List the new abstraction/function created
+Feedback Logic Added
 
-List files modified
+Files Modified
 
-Confirm:
+Why This Is Correct and Stable
 
-No direct Reddit API calls from UI
+⛔ STOP after implementing this.
 
-No runtime errors
-
-No behavior change today
-
-Clearly state:
-
-“To enable native subscribe later, only change X”
-
-🧠 Tone & Process
-
-Think like you are preparing a feature flag for a platform dependency.
-The code should look boring, obvious, and safe.
-
-If in doubt:
-
-prefer no-op over cleverness.
-
-STOP once setup is complete.
-
-Do NOT enable the feature.
-Do NOT apply visuals.
+Do NOT touch visuals beyond red/green classes.

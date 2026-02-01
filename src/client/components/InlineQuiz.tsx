@@ -45,19 +45,41 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
             <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3" style={{ marginBottom: '1.5rem', minHeight: 0 }}>
                 {answers.map((ans: string, idx: number) => {
                     const isSelected = selectedAnswerIndex === idx;
+
+                    // Determine Correct Index for Feedback
+                    let correctIdx = -1;
+                    if (typeof question.correctAnswer === 'number') {
+                        correctIdx = question.correctAnswer;
+                    } else if (typeof question.correctAnswer === 'string') {
+                        correctIdx = answers.indexOf(question.correctAnswer);
+                    }
+
+                    const isAnswered = selectedAnswerIndex !== null;
+                    const isCorrect = idx === correctIdx;
+
+                    let btnClass = 'nes-btn';
+                    if (isAnswered) {
+                        if (isCorrect) btnClass += ' is-success';
+                        else if (isSelected) btnClass += ' is-error';
+                        else btnClass += ' is-disabled';
+                    } else {
+                        if (isSelected) btnClass += ' is-primary'; // should not happen if we guard click
+                    }
+
                     return (
                         <button
                             key={idx}
-                            className={`nes-btn ${isSelected ? 'is-primary' : ''}`}
-                            style={{ 
-                                width: '100%', 
-                                textAlign: 'left', 
-                                fontSize: '0.8rem', 
+                            className={btnClass}
+                            style={{
+                                width: '100%',
+                                textAlign: 'left',
+                                fontSize: '0.8rem',
                                 minHeight: '48px',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis'
                             }}
-                            onClick={() => onOptionSelect(idx)}
+                            disabled={isAnswered}
+                            onClick={() => !isAnswered && onOptionSelect(idx)}
                         >
                             {ans}
                         </button>

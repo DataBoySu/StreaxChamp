@@ -20,8 +20,16 @@ export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: () => void
         const ansList = currentQ.options || (currentQ as any).answers;
 
         if (currentQ && selectedAnswerIndex !== null && ansList) {
-            const selectedAnsText = ansList[selectedAnswerIndex];
-            if (selectedAnsText === currentQ.correctAnswer) {
+            let correctIdx = -1;
+            // Normalize correct answer to index
+            if (typeof currentQ.correctAnswer === 'number') {
+                correctIdx = currentQ.correctAnswer;
+            } else if (typeof currentQ.correctAnswer === 'string') {
+                correctIdx = ansList.indexOf(currentQ.correctAnswer);
+            }
+
+            // Strict index comparison
+            if (correctIdx !== -1 && selectedAnswerIndex === correctIdx) {
                 setScore(prev => prev + 1);
             }
         }

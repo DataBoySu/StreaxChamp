@@ -49,9 +49,30 @@ const Splash = () => {
                     console.log('[InlineQuiz] Loading quiz...');
                     const res = await fetch(`/api/quizzes/${initData.customQuiz.quizId}`);
                     if (res.ok) {
-                        const data: DailyQuiz = await res.json();
+                        const rawData = await res.json();
+
+                        // FIX: Normalize schema (String -> Index validation)
+                        // Ensure correctAnswer is always a numeric index for strict scoring
+                        const normalizedQuestions = (rawData.questions || []).map((q: any) => {
+                            const opts = q.options || q.answers || [];
+                            let val = q.correctAnswer;
+
+                            // If it's a string, convert to index logic (opposite of previous fix)
+                            // But usually custom quizzes are already numbers. We just ensure it.
+                            if (typeof val === 'string') {
+                                val = opts.indexOf(val);
+                            }
+
+                            return {
+                                ...q,
+                                options: opts,
+                                correctAnswer: val
+                            };
+                        });
+
+                        const data: DailyQuiz = { ...rawData, questions: normalizedQuestions };
                         setQuizData(data);
-                        console.log(`[InlineQuiz] Quiz loaded with ${data.questions.length} questions`);
+                        console.log(`[InlineQuiz] Quiz loaded and normalized: ${data.questions.length} Qs`);
                     } else {
                         console.error('[InlineQuiz] Quiz load failed');
                     }
