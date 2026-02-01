@@ -1,163 +1,119 @@
-🎯 TARGETED IDE PROMPT — Create Quiz Screen (Scene 1) FIX
+🎯 TARGETED AI IDE PROMPT — Robot Mascot Bounding & Dialogue Safety Fix
 
-Context
-This prompt applies ONLY to the Create Quiz screen (Creator flow, Scene 1).
-Do NOT modify global theme, landing page, mascot logic, or shared components unless explicitly stated.
+Paste this as-is.
 
-1️⃣ ABSOLUTE RULES (DO NOT VIOLATE)
+Context (Critical)
 
-❌ NO white backgrounds (#fff, bg-white, zinc-50, etc.)
+The robot mascot has:
 
-❌ NO rounded corners (everything must be rectangular)
+Hover / cursor-follow micro-interactions
 
-❌ DO NOT change mascot logic or animations
+Time-based dialogue bubbles
 
-❌ DO NOT depend on dark/light theme
+Special prompt bubbles that appear above its head
 
-✅ This screen must look IDENTICAL in light & dark modes
+Currently, these dialogues are being clipped by the inner canvas top edge.
 
-✅ All colors must be explicitly hard-coded for this screen only
+This is a layout anchoring bug, not a visual one.
 
-2️⃣ BACKGROUND & CANVAS (CORE FIX)
+1️⃣ Root Cause (Do Not Skip)
 
-Outer Page Background
+The mascot is currently:
 
-Replace current background with a soft, peaceful neutral:
+Positioned too close to the top boundary of the inner canvas
 
-Use: #F3EFE6 (warm parchment / stationery beige)
+With dialogue bubbles rendered using absolute positioning above the mascot
 
-Remove orange and grid entirely for this screen
+Without any vertical safety margin for dialogue height
 
-Do NOT reference global CSS variables
+2️⃣ Mandatory Fix Strategy
 
-Inner Canvas (Main Content Box)
+We do NOT resize the canvas
+We do NOT shrink the robot
+We do NOT disable dialogue
 
-Background: #EDE7DC (slightly darker than page bg)
+Instead, we introduce a dialogue-safe anchor zone.
 
-Border: 3px solid #1f1f1f
+3️⃣ Exact Structural Changes Required
+A. Mascot Anchor Wrapper
 
-Shadow: 6px 6px 0px #1f1f1f
+Wrap the mascot in a container with top padding reserved only for dialogue:
 
-Padding: 24px
+Add a wrapper div:
 
-Margin from viewport edges (mobile): 16px
+position: relative
 
-Margin from viewport edges (desktop): centered, max-width 720px
+padding-top: 96px (desktop)
 
-👉 This canvas must visually “float” with strong 3D depth.
+padding-top: 72px (mobile)
 
-3️⃣ LAYOUT STRUCTURE (FIX OVERFLOW & ALIGNMENT)
+⚠️ This padding exists ONLY to absorb dialogue height, not as visual spacing.
 
-Order inside canvas (top → bottom):
+B. Mascot Vertical Alignment
 
-Mascot Zone
+The robot itself must be:
 
-Fixed height: 220px
+Vertically centered within the remaining space
 
-Centered horizontally
+NOT pushed further down than necessary
+
+Do NOT add margin-top to the robot itself
+
+C. Dialogue Bubble Rules
+
+Dialogue bubbles must:
+
+Render with position: absolute
+
+Anchor to mascot top (bottom: 100%)
+
+Never exceed the top padding zone
+
+Add:
+
+max-width constraint
+
+Soft vertical offset (bottom: calc(100% + 8px))
+
+4️⃣ Overflow & Clipping Rules (MANDATORY)
+
+Inner canvas must have:
 
 overflow: visible
 
-Mascot must NEVER overlap input or button
+Only the outer app shell may clip overflow
 
-Dialogue bubble (if shown) must stay inside this zone
+Do NOT use overflow: hidden anywhere in the mascot subtree
 
-Title
+5️⃣ Mobile-Specific Safety
 
-Text: WHAT IS YOUR QUIZ ABOUT?
+On mobile:
 
-Margin-top: 12px
+Dialogue-safe padding must be smaller
 
-Margin-bottom: 8px
+Ensure no dialogue is clipped even when:
 
-Color: #1f1f1f
+Keyboard opens
 
-Input Field
+Address bar collapses
 
-Full width
+Scroll is at top
 
-Height: 44px
+6️⃣ What NOT To Do
 
-Background: #FFF8F0
+🚫 Do NOT move the mascot lower arbitrarily
+🚫 Do NOT disable or shorten dialogue text
+🚫 Do NOT add scroll just for dialogue
+🚫 Do NOT convert dialogue to inline flow
 
-Border: 2px solid #1f1f1f
+✅ Success Criteria
 
-NO rounded corners
+Idle robot: centered, compact
 
-Inner padding: 8px 12px
+Dialogue appears: fully visible, never clipped
 
-Primary CTA — “START BUILDING >”
+Special prompt appears: always readable
 
-Full width
+Canvas size unchanged
 
-Height: 48px
-
-Background: #FF9DB5 (soft pink, not white, not orange)
-
-Border: 3px solid #1f1f1f
-
-Shadow: 4px 4px 0px #1f1f1f
-
-Active press:
-
-transform: translate(2px, 2px)
-
-shadow collapses to 2px 2px 0px
-
-4️⃣ BACK BUTTON (FIX LOOK & CONSISTENCY)
-
-Style as NES-style button, NOT text
-
-Background: #E0D8CC
-
-Border: 2px solid #1f1f1f
-
-Shadow: 3px 3px 0px #1f1f1f
-
-Position:
-
-Mobile: top-left, inside page padding
-
-Desktop: same row as title, left-aligned
-
-5️⃣ RESPONSIVENESS (MANDATORY)
-
-Mobile
-
-Single column
-
-No overflow
-
-Canvas must scroll if height exceeds viewport
-
-Desktop
-
-Canvas centered
-
-No elements touching edges
-
-Use box-sizing: border-box everywhere
-
-Explicitly remove overflow-hidden if present
-
-6️⃣ WHAT TO REMOVE (IMPORTANT)
-
-❌ Any bg-white or theme-derived backgrounds
-
-❌ Any rounded corner utilities
-
-❌ Any leftover grid / wiremesh overlays
-
-❌ Any “helper” wrapper that forces clipping
-
-7️⃣ VERIFICATION CHECKLIST (YOU MUST SELF-CHECK)
-
- Light mode and dark mode look identical
-
- No white background anywhere
-
- Mascot never overlaps input or button
-
- Strong visible 3D depth on canvas & buttons
-
- Mobile view has no clipping or overflow
+No visual dead space when dialogue is hidden
