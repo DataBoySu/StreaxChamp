@@ -1,131 +1,146 @@
-TASK: Final Creator Studio Library Polish (Text Semantics + Spacing Only)
+🎯 TARGETED IDE PROMPT — Create Quiz Screen (Scene 1)
+
 Context
+This screen reuses the interactive Robot Mascot component from the Landing Page.
+Do NOT refactor or rewrite the mascot logic.
+Only reposition and contain it visually.
 
-The Creator Studio UI is visually stable.
-Only minor text semantics and spacing issues remain in the Library section.
+1️⃣ Fix Layout Hierarchy (Do NOT touch mascot internals)
 
-This task must not introduce new colors, backgrounds, layouts, or visual concepts.
+Goal:
+The robot must be visible, unobstructed, and allowed to animate freely (eye tracking, dialog bubbles).
 
-✅ Required Fixes
-1. Terminology Corrections (Semantic Only)
+Required structure (top → bottom):
 
-Replace incorrect or inconsistent wording:
-
-"PROJECTS" → "QUIZZES"
-
-Example:
-4 PROJECTS → 4 QUIZZES
-
-"EDIT PROJECT" → "EDIT QUIZ"
-
-Button label only
-
-These are string changes only.
-Do not change logic, counts, or state.
-
-2. Metadata Chip Formatting (Date & Questions)
-
-Current issue:
-
-Metadata text is visually cramped and touches borders.
-
-Fix:
-
-Wrap metadata (date + question count) in a horizontal chip container with:
-
-px-3 py-1.5
-
-gap-2
-
-Rounded rectangle (but NOT pill)
-
-Thin border consistent with NES style
-
-Example structure (conceptual):
-
-[ 2/1/2026 ]   [ 5 Questions ]
+Header (Back + Create Quiz)
+↓
+Inner Canvas (bounded card)
+  ├─ Robot Mascot (top-center, absolute-safe zone)
+  ├─ Optional timed dialog bubble (allowed here)
+  ├─ Quiz Topic Input
+  └─ CTA Button (Start Building)
 
 
-Rules:
+Rules
 
-Chips must not touch card edges
+Robot mascot must live inside the inner canvas, not the page background.
 
-Chips must align left, below quiz title
+No text, input, or button may overlap the robot or its dialog bubble.
 
-Font size slightly smaller than title
+Reserve minimum 220–260px vertical space for mascot + dialog area.
 
-No background color changes
+The mascot may follow cursor, but must be clipped only by the inner canvas, not the viewport.
 
-3. Card Inner Padding Adjustment
+2️⃣ Add a Proper Inner Canvas (Critical)
 
-Problem:
-
-Text elements (title, chips, buttons) sit too close to the card border.
+Problem: Inner canvas blends into background → zero contrast.
 
 Fix:
 
-Increase inner padding of each quiz card:
+Create a single inner canvas card that wraps mascot + inputs.
 
-Minimum: p-4
+Canvas must:
 
-Prefer: p-5 if space allows on mobile
+Be rectangular (NO rounded corners).
 
-Apply consistently to:
+Have visible border (2–3px solid).
 
-Title
+Have non-white, non-black background.
 
-Metadata chips
+Approved background direction (pick ONE):
 
-Edit button
+Warm paper (#FFF4E6 / #FAF3E0)
 
-Do not change card border thickness or elevation.
+Soft stone (#F1F2F4)
 
-4. Header Alignment Polish
+Muted sage (#EEF4F1)
 
-For the YOUR LIBRARY header row:
+⚠️ Do NOT use pure white or pure black.
 
-Left: YOUR LIBRARY
+3️⃣ Fix Theme Independence (Very Important)
 
-Right: X QUIZZES
+Requirement
+This screen must look IDENTICAL in light & dark theme.
 
-Ensure:
+Action
 
-Vertical alignment is centered
+Explicitly opt out of global theme colors.
 
-Right-side count has a little breathing room from the edge
+Hard-set:
 
-No overlap on small screens
+Inner canvas background
 
-❌ Explicit Non-Goals (Do NOT Touch)
+Border color
 
-Background
+Text color
 
-Shadows
+Ignore dark: Tailwind variants here.
 
-Color palette
+This screen is self-themed, like Creator Studio.
 
-Fonts
+4️⃣ Reposition & Restyle Header Controls
 
-Layout structure
+Back Button
 
-Button press effects
+Convert to a real NES-style button (depth + press).
 
-Creator logic
+No pill, no flat text.
 
-Fetching / state logic
+Left-aligned, consistent size with CTA buttons elsewhere.
 
-This is a pure polish pass.
+Create Quiz Title
 
-✅ Verification Checklist
+Centered
 
-After implementation:
+High contrast
 
-No text touches card borders
+Do not overlap robot safe zone.
 
-Metadata reads clearly at a glance
+5️⃣ Fix CTA Button (Start Building)
 
-Terminology uses Quiz / Quizzes everywhere
+Rules
 
-Mobile view does not feel cramped
+Must visually match Creator Studio button physics:
 
-Visual style remains unchanged otherwise
+Shadow present
+
+Press = translate + shadow collapse
+
+Width: full or near-full
+
+Must never touch the bottom canvas border (≥16px padding).
+
+6️⃣ Spacing & Padding Rules (Non-negotiable)
+
+Inner canvas padding: 24–32px
+
+Distance from canvas edge to content: never < 16px
+
+Inputs must not touch borders
+
+No content hugging edges
+
+7️⃣ Explicitly Do NOT Do These
+
+❌ Do NOT refactor the robot component
+❌ Do NOT remove dialog bubble logic
+❌ Do NOT introduce rounded corners
+❌ Do NOT use black backgrounds
+❌ Do NOT reintroduce global grid / wiremesh
+❌ Do NOT change mascot animations or state logic
+
+8️⃣ Success Criteria Checklist
+
+After changes:
+
+Robot is fully visible on mobile & desktop
+
+Dialog bubble never clips
+
+Inner canvas clearly separated from background
+
+Screen looks the same in light & dark theme
+
+Back & Start buttons have real physical press feedback
+
+No overlap, no hidden elements, no theme bleed
