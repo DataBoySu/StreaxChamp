@@ -162,6 +162,7 @@ const Splash = () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         postId: targetId,
+                        quizId: customQuizMeta.quizId,
                         text: text
                     })
                 });

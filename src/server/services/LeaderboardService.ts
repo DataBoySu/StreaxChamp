@@ -386,6 +386,7 @@ export class LeaderboardService {
       } else {
         const json = await writeRes.json();
         console.log("[STATS] Firestore write response body:", JSON.stringify(json));
+        console.log("[STATS] Partial stats PATCH successful (stats only)");
       }
 
     } catch (e) {

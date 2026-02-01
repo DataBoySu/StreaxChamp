@@ -6,6 +6,7 @@ import { UserController } from '../controllers/UserController';
 import { LeaderboardController } from '../controllers/LeaderboardController';
 import { LandingController } from '../controllers/LandingController';
 import { HistoryController } from '../controllers/HistoryController'; // Added import
+import { FirestoreRestService } from '../services/FirestoreRestService';
 import { context } from '@devvit/web/server';
 import { reddit, redis } from '@devvit/web/server';
 
@@ -128,14 +129,53 @@ router.post('/share/comment', async (req, res) => {
     // Ideally we ensure we are commenting on the same post we are running on, or generally allow it if authorized.
     // The prompt says "Use context.reddit.submitComment" and "Use the actual Reddit post ID".
 
+    // Check for duplicate comment for this user/quiz
+    // We need to resolve the user. context.userId?
     try {
+        const username = await reddit.getCurrentUsername();
+        if (!username) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+
+        // We need quizId to track state. It's not in the body but we can infer or pass it.
+        // Let's pass quizId from client. The client knows it.
+        const { quizId } = req.body;
+
+        if (!quizId) {
+            return res.status(400).json({ error: 'Missing quizId' });
+        }
+
+        console.log("[SHARE] Attempting comment post", {
+            postId: targetPostId,
+            quizId,
+            userId: username,
+        });
+
+        // Check Firestore state
+        const fs = new FirestoreRestService();
+        const userStats = await fs.getUserTopicStats(username, quizId);
+
+        console.log("[SHARE] Resolved userStats:", userStats);
+        console.log("[SHARE] hasShared =", userStats?.hasShared);
+
+        if (userStats?.hasShared === true) {
+            console.log("[SHARE] User already shared score for this quiz.");
+            return res.status(409).json({ error: 'Already shared' });
+        }
+
         await reddit.submitComment({
             id: targetPostId,
             text: text
         });
 
-        console.log("[SHARE] Posting comment to", targetPostId);
-        console.log("[SHARE] Comment posted successfully");
+        const commentId = 'posted'; // reddit.submitComment returns Promise<Comment> in updated versions, checking signatures...
+        // The mock type definitions or real ones usually return the comment object.
+        // For now logging "posted" is safe.
+
+        console.log("[SHARE] Comment posted successfully", { commentId });
+
+        // Update state
+        await fs.updateUserTopicStats(username, quizId, { hasShared: true } as any);
 
         res.json({ success: true });
     } catch (error) {

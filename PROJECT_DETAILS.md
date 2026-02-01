@@ -1,135 +1,80 @@
-🎯 AI IDE PROMPT — Firestore Partial Writes + Comment Correctness
-Role
+🎯 TARGETED FIX PROMPT — Comment Posting Guard + Firestore Confirmation
+Context
 
-You are a senior Devvit backend engineer fixing data correctness and side-effect hygiene in StreaxChamp.
+We have already fixed Firestore partial stats updates correctly using PATCH + updateMask.
+DO NOT touch Firestore stats logic again.
+Firestore returning the full document in the response is expected and must be ignored.
 
-This task has two fixes only:
+The remaining issue is comment posting returning HTTP 400, causing no comments to be created.
 
-Firestore stats overwrite
+🚨 ROOT PROBLEM (CONFIRMED)
 
-Comment posting correctness
+The /api/share/comment endpoint is blocking the FIRST comment due to incorrect guard logic.
 
-Do NOT touch UI, scoring, splash logic, or visual system.
+Specifically:
 
-🧱 PART A — FIX FIRESTORE OVERWRITE (CRITICAL)
-Problem
+getUserTopicStats(...) may return null / undefined
 
-Firestore REST updates currently rewrite the entire user_quizzes/{quizId} document when updating stats.
+The code incorrectly treats this as “already shared”
 
-This is incorrect.
+Server responds with 400
 
-REQUIRED CHANGE
+Reddit API is never called
 
-All stats updates MUST use:
-
-PATCH
-
-updateMask
-
-Only the stats field
-
-Correct REST request (MANDATORY)
-PATCH /v1/projects/{projectId}/databases/(default)/documents/user_quizzes/{quizId}
-?updateMask.fieldPaths=stats
-
-Request body MUST contain ONLY:
-{
-  "fields": {
-    "stats": {
-      "mapValue": {
-        "fields": {
-          "totalPlays": { "integerValue": "X" },
-          "perfectPlays": { "integerValue": "Y" },
-          "lastUpdatedAt": { "timestampValue": "ISO_STRING" }
-        }
-      }
-    }
-  }
+✅ REQUIRED FIX (MANDATORY)
+1️⃣ Fix the “already shared” guard (NULL-SAFE)
+❌ Current (broken logic)
+if (userStats.hasShared) {
+  return res.status(400).json({ error: "Already shared" });
 }
 
-HARD VALIDATION REQUIREMENT
-
-After this fix:
-
-Firestore response body MUST NOT include:
-
-questions
-
-metadata
-
-topic
-
-creator
-
-Only stats may change
-
-Add a log:
-
-console.log("[STATS] Partial stats PATCH successful (stats only)");
+✅ Correct logic (must implement exactly)
+if (userStats?.hasShared === true) {
+  return res.status(409).json({ error: "Already shared" });
+}
 
 
-If full document is still returned → FAIL the task.
+Rules:
 
-🧱 PART B — FIX COMMENT POSTING SEMANTICS
-Facts (do NOT fight them)
+null / undefined → user has NOT shared
 
-Comments are app-authored for now
+Only explicit true blocks posting
 
-This is expected
+Use HTTP 409 Conflict, NOT 400
 
-We must make the behavior clean, deterministic, and safe
+2️⃣ Ensure write order is correct
 
-REQUIRED CHANGES
-1️⃣ Store comment reference
+hasShared: true must be written ONLY AFTER the Reddit comment succeeds.
 
-When a comment is posted, store:
+Correct order:
 
-stats.lastCommentId
+Call context.reddit.submitComment(...)
 
+If success:
 
-This ensures:
+Persist hasShared: true
 
-No duplicate comments
+Persist lastSharedAt
 
-Future edit support
+Return 200 OK
 
-Idempotency
+❌ Never write hasShared before posting
+❌ Never write hasShared if posting fails
 
-2️⃣ Enforce one-comment-per-user-per-quiz
+3️⃣ Add REQUIRED diagnostic logs
 
-Before posting:
+Add these logs verbatim:
 
-Check Firestore:
-
-Has this user already shared?
-
-If yes:
-
-Disable posting
-
-Log and return
-
-No Redis.
-
-3️⃣ Correct Reddit API usage (server-side only)
-await context.reddit.submitComment({
-  postId: context.postId,
-  text: formattedText,
-});
-
-
-DO NOT:
-
-Use window.devvit
-
-Use browser globals
-
-4️⃣ Mandatory logs
+console.log("[SHARE] Resolved userStats:", userStats);
+console.log("[SHARE] hasShared =", userStats?.hasShared);
 console.log("[SHARE] Attempting comment post", {
-  postId: context.postId,
+  postId,
   quizId,
   userId,
 });
+
+
+On success:
 
 console.log("[SHARE] Comment posted successfully", { commentId });
 
@@ -138,38 +83,57 @@ On failure:
 
 console.error("[SHARE] Comment post failed", error);
 
-🧪 ACCEPTANCE TESTS (MUST PASS)
+⛔ DO NOT DO (STRICT)
+
+❌ Do NOT delete Firestore collections
+
+❌ Do NOT reset stats
+
+❌ Do NOT modify aggregation logic
+
+❌ Do NOT add Redis
+
+❌ Do NOT refactor unrelated code
+
+❌ Do NOT change UI
+
+🧪 ACCEPTANCE CRITERIA (MUST PASS)
 
 Finish a custom quiz
 
-Firestore:
+Click Share Score
 
-Only stats field changes
+Observe logs:
 
-Click “Share Score”
+hasShared = undefined or false
 
-One comment appears
+Reddit API is called
 
-Refresh → no second comment allowed
+Comment appears on the post
 
-Logs clearly show success path
+Click Share Score again
 
-⛔ STOP CONDITIONS
+Server returns 409 Already shared
 
-After completing:
+No second comment is created
 
-Do NOT refactor further
+🧠 IMPORTANT NOTE (DO NOT “FIX” THIS)
 
-Do NOT add features
+Firestore REST PATCH responses will still include the full document.
+This is expected and NOT a bug.
 
-Do NOT touch UI
+Only verify that:
 
-Do NOT add Redis
+Only stats fields change between updates
 
-Report:
+📌 Completion Report Required
 
-Firestore request used
+When done, report:
 
-Comment flow summary
+Final guard condition used
 
-Confirmation that overwrite is fixed
+HTTP code for duplicate share
+
+Log output from a successful share
+
+Confirmation that Firestore stats remain intact

@@ -564,7 +564,7 @@ export class FirestoreRestService {
   /**
    * Get user topic stats: last quiz attempted, completion status.
    */
-  async getUserTopicStats(userId: string, topicSlug: string): Promise<{ lastQuizId: string | null; lastAttemptDate: string | null; isCompleted: boolean } | null> {
+  async getUserTopicStats(userId: string, topicSlug: string): Promise<{ lastQuizId: string | null; lastAttemptDate: string | null; isCompleted: boolean; hasShared: boolean } | null> {
     try {
       const url = `${this.baseUrl}/user_stats/${userId}/topics/${topicSlug}`;
       const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
@@ -575,6 +575,7 @@ export class FirestoreRestService {
         lastQuizId: f.lastQuizId?.stringValue || null,
         lastAttemptDate: f.lastAttemptDate?.stringValue || null,
         isCompleted: f.isCompleted?.booleanValue || false,
+        hasShared: f.hasShared?.booleanValue || false,
       };
     } catch {
       return null;
@@ -586,7 +587,7 @@ export class FirestoreRestService {
    * Creates the document path if it doesn't exist (using nested map structures where needed if using deep patch, 
    * but here we use a flat subcollection pattern `user_stats/{uid}/topics/{slug}`).
    */
-  async updateUserTopicStats(userId: string, topicSlug: string, stats: { lastQuizId?: string; lastAttemptDate?: string; isCompleted?: boolean }): Promise<boolean> {
+  async updateUserTopicStats(userId: string, topicSlug: string, stats: { lastQuizId?: string; lastAttemptDate?: string; isCompleted?: boolean; hasShared?: boolean }): Promise<boolean> {
     try {
       const url = `${this.baseUrl}/user_stats/${userId}/topics/${topicSlug}`;
       const fields: Record<string, any> = {
@@ -605,6 +606,10 @@ export class FirestoreRestService {
       if (stats.isCompleted !== undefined) {
         fields.isCompleted = { booleanValue: stats.isCompleted };
         updateMask.push('isCompleted');
+      }
+      if (stats.hasShared !== undefined) {
+        fields.hasShared = { booleanValue: stats.hasShared };
+        updateMask.push('hasShared');
       }
 
       // If document doesn't exist, we likely need to create it. 
