@@ -336,8 +336,7 @@ export class QuizController {
             const success = await fs.saveUserQuiz(identifier, username, topic, quizWithStats);
 
             if (success) {
-                // Tracking: Increment global quizzes created for milestones
-                void fs.incrementUserQuizzesCreated(username);
+                // Stats handled by fs.saveUserQuiz internally now (Create vs Edit check)
                 return res.status(200).json({ success: true, id: identifier });
             } else {
                 return res.status(500).json({ error: 'Failed to save quiz' });

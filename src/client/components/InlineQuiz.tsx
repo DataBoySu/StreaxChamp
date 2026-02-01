@@ -9,6 +9,21 @@ interface InlineQuizProps {
 }
 
 export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOptionSelect, onNext }: InlineQuizProps) => {
+    // Safe derivation for layout logic
+    const questionRaw = quizData?.questions?.[currentIndex];
+    const answersRaw = questionRaw ? ((questionRaw as any).options || (questionRaw as any).answers) : [];
+    const answerCount = Array.isArray(answersRaw) ? answersRaw.length : 0;
+
+    // STABLE LAYOUT POLICY: Grid if 4 options and all are short (<= 18 chars)
+    // This is computed pre-render to avoid layout shifts.
+    const isGrid = (() => {
+        if (answerCount !== 4) return false;
+        // Check character length of all options
+        return answersRaw.every((ans: string) => ans.length <= 18);
+    })();
+
+    // --- Early Returns (Logic unchanged) ---
+
     // Fallback or demo mode if no data
     if (!quizData) {
         return <p>Loading quiz…</p>;
@@ -21,7 +36,7 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
     }
 
     // Ensure we handle both 'options' and 'answers' for compatibility
-    const answers = question.options || (question as any).answers;
+    const answers = (question as any).options || (question as any).answers;
 
     if (!question || !Array.isArray(answers)) {
         console.error('[InlineQuiz] Invalid question data:', question);
@@ -41,8 +56,11 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
 
             <h3 style={{ marginBottom: '1.5rem', lineHeight: '1.4', flexShrink: 0 }}>{question.question}</h3>
 
-            {/* Options grid with proper spacing */}
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3" style={{ marginBottom: '1.5rem', minHeight: 0 }}>
+            {/* Options grid with proper spacing. gap-4 (16px) ensures complete separation. */}
+            <div
+                className={`flex-1 grid ${isGrid ? 'grid-cols-2 gap-4' : 'grid-cols-1 gap-y-4'}`}
+                style={{ marginBottom: '1.5rem', minHeight: 0 }}
+            >
                 {answers.map((ans: string, idx: number) => {
                     const isSelected = selectedAnswerIndex === idx;
 
@@ -74,14 +92,25 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
                                 width: '100%',
                                 textAlign: 'left',
                                 fontSize: '0.8rem',
-                                minHeight: '48px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
+                                minHeight: '44px',
+                                height: 'auto', // Allow growth
+                                padding: '8px 12px', // Comfortable padding
+                                // overflow: 'hidden', <--- REMOVED to prevent clipping 3D borders
+                                display: 'flex',
+                                alignItems: 'center'
                             }}
                             disabled={isAnswered}
                             onClick={() => !isAnswered && onOptionSelect(idx)}
                         >
-                            {ans}
+                            {/* Inner span handles text wrapping naturally */}
+                            <span style={{
+                                display: 'block',
+                                width: '100%',
+                                lineHeight: '1.2',
+                                wordBreak: 'break-word' // Ensure long words wrap
+                            }}>
+                                {ans}
+                            </span>
                         </button>
                     );
                 })}

@@ -1040,6 +1040,11 @@ export class FirestoreRestService {
   ): Promise<boolean> {
     try {
       const url = `${this.baseUrl}/user_quizzes/${identifier}`;
+
+      // FIX: Check existence first to avoid double-counting creations on edit
+      const existing = await this.getUserQuiz(identifier);
+      const isNew = !existing;
+
       const nowIso = new Date().toISOString();
 
       const questionsValues = quiz.questions.map((q, idx) => ({
@@ -1047,7 +1052,7 @@ export class FirestoreRestService {
           fields: {
             id: { stringValue: q.id || `q${idx + 1}` },
             question: { stringValue: q.question },
-            options: { arrayValue: { values: (q.answers || q.options).map((o: string) => ({ stringValue: String(o) })) } },
+            options: { arrayValue: { values: (q.answers || q.options || []).map((o: string) => ({ stringValue: String(o) })) } },
             correctAnswer: { integerValue: String(Number(q.correctAnswer) || 0) },
             createdAt: { stringValue: nowIso },
           },
@@ -1060,7 +1065,8 @@ export class FirestoreRestService {
           creator: { stringValue: username },
           topic: { stringValue: topicSlug },
           questions: { arrayValue: { values: questionsValues } },
-          createdAt: { stringValue: nowIso },
+          // Only set createdAt if new (or if missing), technically upsert handles this but let's stick to standard fields
+          ...(isNew ? { createdAt: { stringValue: nowIso } } : {}),
           updatedAt: { stringValue: nowIso },
           metadata: {
             mapValue: {
@@ -1074,14 +1080,16 @@ export class FirestoreRestService {
         },
       };
 
-      const res = await fetch(url, {
+      const res = await fetch(url + (isNew ? '' : '?updateMask.fieldPaths=questions&updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=metadata'), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
 
       if (res.ok) {
-        await this.incrementUserCreatedQuizCount(username);
+        if (isNew) {
+          await this.incrementUserCreatedQuizCount(username);
+        }
         return true;
       }
       return false;

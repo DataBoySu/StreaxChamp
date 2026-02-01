@@ -36,11 +36,16 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
 
     const fetchQuizzes = async () => {
         try {
-            setLoading(true);
+            // Only show full loading state if we have no data
+            if (quizzes.length === 0) {
+                setLoading(true);
+            }
             const res = await fetch(`/api/quizzes/user/${username}`);
             if (res.ok) {
                 const data = await res.json();
-                setQuizzes(data);
+                if (Array.isArray(data)) {
+                    setQuizzes(data);
+                }
             }
         } catch (e) {
             console.error(e);
@@ -135,7 +140,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
 
                 <div className="space-y-4">
                     <h2 className="text-lg font-bold text-secondary uppercase tracking-wider text-xs mb-4">Quiz History</h2>
-                    {loading ? (
+                    {loading && quizzes.length === 0 ? (
                         <div className="text-center text-secondary py-12">
                             <span className="animate-pulse">Loading creation history...</span>
                         </div>
@@ -157,7 +162,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
                                 <div key={q.id} className="modern-card p-4 flex justify-between items-center bg-black/40 hover:bg-black/60 transition-colors border border-white/5 group">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-lg">
-                                            {q.title.charAt(0).toUpperCase()}
+                                            {(q.title || '?').charAt(0).toUpperCase()}
                                         </div>
                                         <div>
                                             <h3 className="font-bold text-white text-base">{q.title}</h3>
