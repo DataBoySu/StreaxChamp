@@ -187,7 +187,7 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                                     {/* 1. Mascot Anchor Wrapper (Dialogue Safety Zone) */}
                                     {/* Padding top is RESERVED for dialogue bubbles so they don't clip. */}
                                     <div
-                                        className="w-full relative flex flex-col items-center justify-end pt-[48px] md:pt-[64px]"
+                                        className="w-full relative flex flex-col items-center justify-end pt-[4px] md:pt-[6px]"
                                         style={{ overflow: 'visible' }}
                                     >
                                         <div className="transform scale-90 origin-bottom relative">

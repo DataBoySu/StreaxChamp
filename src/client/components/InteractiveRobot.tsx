@@ -334,8 +334,9 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
                 fontWeight: 'bold',
                 fontFamily: '"Share Tech Mono", monospace', // Tech font feel
                 zIndex: 30,
-                whiteSpace: 'nowrap',
-                maxWidth: 'unset',
+                whiteSpace: 'normal',
+                maxWidth: '260px',
+                width: 'max-content',
                 boxShadow: errorMessage
                   ? '0 10px 25px rgba(239, 68, 68, 0.4), inset 0 0 0 1px rgba(255,255,255,0.1)'
                   : '0 10px 25px rgba(124, 58, 237, 0.3), inset 0 0 0 1px rgba(255,255,255,0.1)',
