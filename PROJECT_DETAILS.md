@@ -1,96 +1,131 @@
-🚨 Creator Studio Visual Regression Fix (Hard Reset)
+TASK: Final Creator Studio Library Polish (Text Semantics + Spacing Only)
+Context
 
-This is a correction task, not a redesign.
-Do NOT introduce new visuals.
-Only REMOVE and SCOPE styles correctly.
+The Creator Studio UI is visually stable.
+Only minor text semantics and spacing issues remain in the Library section.
 
-1️⃣ REMOVE Rounded Corners (Mandatory)
+This task must not introduce new colors, backgrounds, layouts, or visual concepts.
 
-Remove all borderRadius applied to:
+✅ Required Fixes
+1. Terminology Corrections (Semantic Only)
 
-Creator Studio root container
+Replace incorrect or inconsistent wording:
 
-Any wrapping “dashboard” or “canvas” div
+"PROJECTS" → "QUIZZES"
 
-Creator Studio must be fully rectangular
+Example:
+4 PROJECTS → 4 QUIZZES
 
-No clipped corners
+"EDIT PROJECT" → "EDIT QUIZ"
 
-No “device frame” metaphor
+Button label only
 
-This is a hard revert. Rounded corners are explicitly unwanted.
+These are string changes only.
+Do not change logic, counts, or state.
 
-2️⃣ STOP Styling the Global App Background
+2. Metadata Chip Formatting (Date & Questions)
 
-Undo any changes that modify:
+Current issue:
 
-Global app background
+Metadata text is visually cramped and touches borders.
 
-FlowShell background
+Fix:
 
-App-level container background
+Wrap metadata (date + question count) in a horizontal chip container with:
 
-Specifically:
+px-3 py-1.5
 
-Remove orange background
+gap-2
 
-Remove grid background
+Rounded rectangle (but NOT pill)
 
-Remove background styles that affect non-Creator screens
+Thin border consistent with NES style
 
-Creator Studio must NOT own the app shell.
+Example structure (conceptual):
 
-3️⃣ Apply Background ONLY Inside Creator Studio Surface
+[ 2/1/2026 ]   [ 5 Questions ]
 
-Inside Creator Studio root component only:
 
-Apply a warm paper background (e.g. cream / parchment)
+Rules:
 
-This background must:
+Chips must not touch card edges
 
-Not affect generator / quiz screens
+Chips must align left, below quiz title
 
-Not leak outside Creator Studio
+Font size slightly smaller than title
 
-Add padding from edges (24–32px) so NES borders breathe
+No background color changes
 
-4️⃣ Fix Dark Theme: NO PURE BLACK
+3. Card Inner Padding Adjustment
 
-For dark mode inside Creator Studio only:
+Problem:
 
-Replace black / zinc-950 / pure dark backgrounds with:
+Text elements (title, chips, buttons) sit too close to the card border.
 
-Warm charcoal
+Fix:
 
-Dark brown
+Increase inner padding of each quiz card:
 
-Muted graphite
+Minimum: p-4
 
-NES borders and shadows must remain visible
+Prefer: p-5 if space allows on mobile
 
-❌ No bg-black
-❌ No zinc-950
+Apply consistently to:
 
-5️⃣ Do NOT Touch Buttons (Out of Scope)
+Title
 
-Do not change:
+Metadata chips
 
-Button press logic
+Edit button
+
+Do not change card border thickness or elevation.
+
+4. Header Alignment Polish
+
+For the YOUR LIBRARY header row:
+
+Left: YOUR LIBRARY
+
+Right: X QUIZZES
+
+Ensure:
+
+Vertical alignment is centered
+
+Right-side count has a little breathing room from the edge
+
+No overlap on small screens
+
+❌ Explicit Non-Goals (Do NOT Touch)
+
+Background
 
 Shadows
 
-Hover behavior
+Color palette
 
-This task is layout + background only.
+Fonts
 
-6️⃣ Success Criteria (Must Verify)
+Layout structure
 
-Creator Studio corners are rectangular
+Button press effects
 
-Orange grid background is gone
+Creator logic
 
-Generator / Quiz screens are unaffected
+Fetching / state logic
 
-Dark theme still shows NES borders clearly
+This is a pure polish pass.
 
-Creator Studio looks identical in structure, just cleaner
+✅ Verification Checklist
+
+After implementation:
+
+No text touches card borders
+
+Metadata reads clearly at a glance
+
+Terminology uses Quiz / Quizzes everywhere
+
+Mobile view does not feel cramped
+
+Visual style remains unchanged otherwise

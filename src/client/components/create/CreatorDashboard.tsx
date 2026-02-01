@@ -246,15 +246,15 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
 
                 {/* 3. Quiz Library Section */}
                 <div className="space-y-6">
-                    {/* Header with Project Count */}
+                    {/* Header with Quiz Count */}
                     <div className="flex flex-wrap items-center justify-between gap-4 border-b-4 pb-4 mb-8" style={{ borderColor: CREATOR_THEME.border }}>
                         <h2 className="text-xl font-black uppercase tracking-wider" style={{ color: CREATOR_THEME.accent }}>Your Library</h2>
                         {library.status === 'ready' && (
                             <span
-                                className="px-4 py-2 text-xs font-black bg-black text-white rounded-full uppercase tracking-wider whitespace-nowrap"
+                                className="px-4 py-2 text-xs font-black bg-black text-white rounded-md uppercase tracking-wider whitespace-nowrap"
                                 style={{ backgroundColor: CREATOR_THEME.textPrimary, color: CREATOR_THEME.panelBg }}
                             >
-                                {library.items.length} Projects
+                                {library.items.length} Quizzes
                             </span>
                         )}
                     </div>
@@ -294,7 +294,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
                                             y: 0
                                         }}
                                         transition={{ duration: 0.2 }}
-                                        className="relative px-6 py-6 md:px-8 md:py-8 flex flex-col md:flex-row md:items-center justify-between transition-none" // Disable CSS transition to let Framer handle it
+                                        className="relative p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between transition-none" // Disable CSS transition to let Framer handle it
                                         style={{
                                             backgroundColor: CREATOR_THEME.panelBg,
                                             border: `3px solid ${CREATOR_THEME.border}`,
@@ -311,25 +311,27 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
                                                     {q.title}
                                                 </h3>
 
-                                                {/* Metadata Chips - Restyled with Padding (Gap between text and border) */}
-                                                <div className="flex flex-wrap gap-3">
+                                                {/* Metadata Chips - Aggressive Spacing Fix */}
+                                                <div className="flex flex-wrap items-center gap-3">
                                                     <span
-                                                        className="px-3 py-2 text-xs font-bold border-2"
+                                                        className="inline-flex items-center px-4 py-2 text-xs font-bold border-2"
                                                         style={{
                                                             borderColor: CREATOR_THEME.textSecondary,
                                                             color: CREATOR_THEME.textSecondary,
-                                                            borderRadius: '6px'
+                                                            borderRadius: '8px',
+                                                            lineHeight: '1.4'
                                                         }}
                                                     >
                                                         {new Date(q.createdAt).toLocaleDateString()}
                                                     </span>
                                                     <span
-                                                        className="px-3 py-2 text-xs font-bold border-2"
+                                                        className="inline-flex items-center px-4 py-2 text-xs font-bold border-2"
                                                         style={{
                                                             borderColor: CREATOR_THEME.textSecondary,
                                                             backgroundColor: '#F3F4F6',
                                                             color: CREATOR_THEME.textPrimary,
-                                                            borderRadius: '6px'
+                                                            borderRadius: '8px',
+                                                            lineHeight: '1.4'
                                                         }}
                                                     >
                                                         {q.questionCount} Questions
@@ -339,7 +341,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
                                         </div>
 
                                         <div className="flex items-center gap-3 self-end md:self-auto">
-                                            {/* FINAL POLISH: Real NES Button (Depressable, high contrast) */}
+                                            {/* POLISH: "Edit Quiz" with proper semantics */}
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation(); // Prevent card hover interference
@@ -370,7 +372,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
                                                     e.currentTarget.style.boxShadow = `4px 4px 0 0 ${CREATOR_THEME.border}`;
                                                 }}
                                             >
-                                                Edit Project
+                                                Edit Quiz
                                             </button>
                                         </div>
                                     </motion.div>
