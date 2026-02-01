@@ -56,6 +56,9 @@ export class LeaderboardController {
                 // In Devvit, userKey IS the username. 
                 const fs = new FirestoreRestService();
                 await fs.updateUserTopicStats(userKey, slug, { isCompleted: true });
+
+                // TRIGGER STATS AGGREGATION (Background)
+                void svc.updateQuizStats_FORCE(slug, score, 5).catch(e => Logger.error('[Leaderboard] Stats trigger fail', e));
             }
 
             // Removed addToGlobalTotals – we now query 'users' directly for total scores
@@ -89,6 +92,25 @@ export class LeaderboardController {
             res.json(list);
         } catch (e) {
             Logger.error('[Leaderboard] List topic error', e);
+            res.status(500).json({ error: 'Failed' });
+        }
+    }
+
+    /**
+     * Retrieves aggregated stats for a specific quiz (Custom).
+     */
+    static async getQuizStats(req: Request, res: Response) {
+        try {
+            const quizId = String(req.params.quizId || '');
+            if (!quizId) return res.status(400).json({ error: 'Quiz ID required' });
+
+            const svc = new LeaderboardService();
+            const stats = await svc.getQuizStats(quizId);
+
+            // If missing, return null or empty (client handles)
+            res.json(stats || {});
+        } catch (e) {
+            Logger.error('[Leaderboard] Get Stats Error', e);
             res.status(500).json({ error: 'Failed' });
         }
     }

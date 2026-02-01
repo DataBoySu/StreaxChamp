@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DailyQuiz } from './useQuizData';
 
-export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: () => void) => {
+export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: (finalScore: number) => void) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [selectedAnswerIndex, setSelectedAnswerIndex] = useState<number | null>(null);
     const [score, setScore] = useState(0);
@@ -16,8 +16,13 @@ export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: () => void
 
         // Check answer using index
         const currentQ = quizData.questions[currentIndex];
+        if (!currentQ) return;
+
         // Ensure we find the normalized options list same as renderQuiz
-        const ansList = currentQ.options || (currentQ as any).answers;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ansList = (currentQ as any).options || (currentQ as any).answers;
+
+        let nextScore = score;
 
         if (currentQ && selectedAnswerIndex !== null && ansList) {
             let correctIdx = -1;
@@ -30,7 +35,8 @@ export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: () => void
 
             // Strict index comparison
             if (correctIdx !== -1 && selectedAnswerIndex === correctIdx) {
-                setScore(prev => prev + 1);
+                nextScore = score + 1;
+                setScore(nextScore);
             }
         }
 
@@ -40,8 +46,8 @@ export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: () => void
             setCurrentIndex(nextIdx);
             setSelectedAnswerIndex(null); // Reset for next question
         } else {
-            console.log('[InlineQuiz] End of quiz reached');
-            onComplete();
+            console.log('[InlineQuiz] End of quiz reached. Final Score:', nextScore);
+            onComplete(nextScore);
         }
     };
 

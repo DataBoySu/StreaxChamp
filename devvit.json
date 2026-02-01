@@ -10,7 +10,12 @@
         "generativelanguage.googleapis.com"
       ]
     },
-    "redis": true
+    "redis": true,
+    "reddit": {
+      "asUser": [
+        "SUBMIT_COMMENT"
+      ]
+    }
   },
   "post": {
     "dir": "dist/client",

@@ -91,6 +91,21 @@ export const CONFIG = {
     FEATURES: {
         NATIVE_SUBSCRIBE_ENABLED: true
     },
+    STATS: {
+        MIN_PLAYS: 1,
+        AGGREGATION_INTERVAL_MS: 3600000, // 1 hour
+    },
+    SHARE: {
+        TEMPLATE: 'I scored {score}/{total} on this quiz! {tag}',
+        TAGS_BY_SCORE: {
+            0: 'Better luck next time! 😅',
+            1: 'Getting there! 🌱',
+            2: 'Not bad! 👍',
+            3: 'Good job! 🔥',
+            4: 'So close! 🚀',
+            5: 'PERFECT! 🏆✨'
+        }
+    },
     GEMINI: {
 
         /** Prioritized list for simple tasks like robot banter & health checks */

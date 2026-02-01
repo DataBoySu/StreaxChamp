@@ -30,6 +30,7 @@ router.get('/quizzes/:quizId', QuizController.getQuiz);
 // --- Leaderboard ---
 router.get('/leaderboard/global', LeaderboardController.listGlobal);
 router.get('/leaderboard/:slug', LeaderboardController.listTopicLeaderboard); // Added alias to match frontend
+router.get('/stats/:quizId', LeaderboardController.getQuizStats); // NEW: Stats for custom splash
 router.post('/leaderboard/:slug/submit', LeaderboardController.submitScore);
 router.post('/leaderboard/submit', LeaderboardController.submitScore); // Fallback for any legacy calls
 router.get('/topics/:slug/leaderboard', LeaderboardController.listTopicLeaderboard);
@@ -111,6 +112,35 @@ router.get('/init', async (_req, res) => {
     } catch (error: any) {
         console.error(`API Init Error for post ${postId}:`, error);
         res.status(200).json({ type: 'init', postId, username: null, error: error.message });
+    }
+});
+
+router.post('/share/comment', async (req, res) => {
+    const { postId: targetPostId, text } = req.body;
+    // const { postId: contextPostId } = context;
+
+    console.log(`[SHARE] Request to post comment on ${targetPostId}`);
+
+    if (!targetPostId || !text) {
+        return res.status(400).json({ error: 'Missing postId or text' });
+    }
+
+    // Ideally we ensure we are commenting on the same post we are running on, or generally allow it if authorized.
+    // The prompt says "Use context.reddit.submitComment" and "Use the actual Reddit post ID".
+
+    try {
+        await reddit.submitComment({
+            id: targetPostId,
+            text: text
+        });
+
+        console.log("[SHARE] Posting comment to", targetPostId);
+        console.log("[SHARE] Comment posted successfully");
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error("[SHARE] Comment post failed", error);
+        res.status(500).json({ error: 'Failed to post comment' });
     }
 });
 

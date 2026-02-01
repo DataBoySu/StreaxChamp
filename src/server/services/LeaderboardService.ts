@@ -195,13 +195,113 @@ export class LeaderboardService {
     }
   }
 
+  /**
+   * Fetch aggregated stats from the Custom Quiz document itself.
+   */
+  async getQuizStats(quizId: string): Promise<{ totalPlays: number; perfectScores: number } | null> {
+    try {
+      // Path: user_quizzes/{quizId}
+      // Note: "Custom Quizzes" are user quizzes. Hardcoded Daily Quizzes are in 'daily-quizzes' but handled differently.
+      // We assume quizId passed here is a user-quiz identifier.
+      const url = `${this.baseUrl}/user_quizzes/${quizId}`;
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (!res.ok) return null;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json();
+      const f = data?.fields || {};
+      const s = f.stats?.mapValue?.fields || {};
+
+      const totalPlays = s.totalPlays?.integerValue ? parseInt(s.totalPlays.integerValue, 10) : 0;
+      const perfectScores = s.perfectPlays?.integerValue ? parseInt(s.perfectPlays.integerValue, 10) : 0;
+
+      return { totalPlays, perfectScores };
+    } catch (e) {
+      Logger.error('[LeaderboardService.getQuizStats] error', e);
+      return null;
+    }
+  }
+
+  /**
+   * Trigger an aggregation of quiz stats inside the Quiz Document.
+   * Respects the AGGREGATION_INTERVAL to prevent write hotspots.
+   */
+  async updateQuizStats(quizId: string): Promise<void> {
+    try {
+      const url = `${this.baseUrl}/user_quizzes/${quizId}`;
+
+      // 1. Read existing QUIZ doc to checking timestamp + stats
+      let lastLastUpdatedAt = 0;
+
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (res.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const existingDoc: any = await res.json();
+        const f = existingDoc?.fields || {};
+        const s = f.stats?.mapValue?.fields || {};
+
+        if (s.lastUpdatedAt?.stringValue) {
+          lastLastUpdatedAt = new Date(s.lastUpdatedAt.stringValue).getTime();
+        }
+      } else {
+        // If quiz doc fails to load, we can't update it
+        return;
+      }
+
+      const now = Date.now();
+      const interval = CONFIG.STATS.AGGREGATION_INTERVAL_MS;
+
+      // 2. Throttle Check
+      if (now - lastLastUpdatedAt < interval) {
+        return;
+      }
+
+      // 3. Source of Truth: Rolling Leaderboard
+      const entries = await this.listRolling(quizId);
+
+      const realTotalPlays = entries.length;
+
+      // Only write if we meet the minimum plays threshold
+      if (realTotalPlays < CONFIG.STATS.MIN_PLAYS) {
+        return;
+      }
+
+      const realPerfectPlays = entries.filter(e => e.score === 5).length;
+
+      // 4. Update the Quiz Document via Patch
+      const body = {
+        fields: {
+          stats: {
+            mapValue: {
+              fields: {
+                totalPlays: { integerValue: String(realTotalPlays) },
+                perfectPlays: { integerValue: String(realPerfectPlays) },
+                lastUpdatedAt: { stringValue: new Date(now).toISOString() }
+              }
+            }
+          }
+        }
+      };
+
+      await fetch(url + '?updateMask.fieldPaths=stats', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+    } catch (e) {
+      Logger.error('[LeaderboardService.updateQuizStats] error', e);
+    }
+  }
+
   /** Increment playsCompleted in stats doc */
   async incrementCompletion(slug: string, date = this.dateString()): Promise<void> {
     try {
       const path = this.statsDocPath(slug, date);
       const url = `${this.baseUrl}/${path}`;
       // Read existing
-      let existing: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let existing: any = null;
       try {
         const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
         if (res.ok) existing = await res.json();
@@ -224,6 +324,72 @@ export class LeaderboardService {
       });
     } catch (e) {
       Logger.error('[LeaderboardService.incrementCompletion] error', e);
+    }
+  }
+  async updateQuizStats_FORCE(quizId: string, score: number, totalQuestions: number): Promise<void> {
+    console.log("[STATS] FORCE update START", quizId);
+    try {
+      const url = `${this.baseUrl}/user_quizzes/${quizId}`;
+
+      // 1. Read existing
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (!res.ok) {
+        console.error("[STATS] Failed to load quiz for stats update", res.status);
+        return;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const doc: any = await res.json();
+      console.log("[STATS] Loaded quiz", quizId);
+
+      const f = doc.fields || {};
+      const s = f.stats?.mapValue?.fields || {};
+
+      const prevTotal = s.totalPlays?.integerValue ? parseInt(s.totalPlays.integerValue, 10) : 0;
+      const prevPerfect = s.perfectPlays?.integerValue ? parseInt(s.perfectPlays.integerValue, 10) : 0;
+
+      const newTotal = prevTotal + 1;
+      const newPerfect = prevPerfect + (score === totalQuestions ? 1 : 0);
+      const nowFn = new Date().toISOString();
+
+      const nextStats = {
+        totalPlays: newTotal,
+        perfectPlays: newPerfect,
+        lastUpdatedAt: nowFn
+      };
+
+      console.log("[STATS] Writing stats", nextStats);
+
+      const body = {
+        fields: {
+          stats: {
+            mapValue: {
+              fields: {
+                totalPlays: { integerValue: String(newTotal) },
+                perfectPlays: { integerValue: String(newPerfect) },
+                lastUpdatedAt: { timestampValue: nowFn }
+              }
+            }
+          }
+        }
+      };
+
+      const writeRes = await fetch(url + '?updateMask.fieldPaths=stats', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      console.log("[STATS] Firestore write response status:", writeRes.status);
+      if (!writeRes.ok) {
+        console.error("[STATS] Firestore write failed", await writeRes.text());
+      } else {
+        const json = await writeRes.json();
+        console.log("[STATS] Firestore write response body:", JSON.stringify(json));
+      }
+
+    } catch (e) {
+      console.error('[STATS] FORCE update error', e);
     }
   }
 }

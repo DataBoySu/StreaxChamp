@@ -1,120 +1,175 @@
-🧠 PROMPT — Fix Scoring Correctly + Add Answer Feedback (Minimal Change)
-
+🎯 AI IDE PROMPT — Firestore Partial Writes + Comment Correctness
 Role
 
-You are a senior frontend/gameplay engineer working on StreaxChamp (React + Devvit).
-You are fixing a scoring logic bug and adding a small QoL feedback improvement.
+You are a senior Devvit backend engineer fixing data correctness and side-effect hygiene in StreaxChamp.
 
-The goal is correctness and clarity, not refactoring or visual polish.
+This task has two fixes only:
 
-🎯 Task Objective
+Firestore stats overwrite
 
-Fix custom quiz scoring, which currently always returns 5/5.
+Comment posting correctness
 
-Add per-question red/green feedback so users know which answers were right or wrong.
+Do NOT touch UI, scoring, splash logic, or visual system.
 
-🚫 Hard Rules
+🧱 PART A — FIX FIRESTORE OVERWRITE (CRITICAL)
+Problem
 
-You are NOT allowed to:
+Firestore REST updates currently rewrite the entire user_quizzes/{quizId} document when updating stats.
 
-Redesign UI
+This is incorrect.
 
-Apply visual system tokens
+REQUIRED CHANGE
 
-Change navigation or FSM
+All stats updates MUST use:
 
-Add animations
+PATCH
 
-Refactor unrelated logic
+updateMask
 
-Change Firestore schema
+Only the stats field
 
-Minimal logic changes only.
+Correct REST request (MANDATORY)
+PATCH /v1/projects/{projectId}/databases/(default)/documents/user_quizzes/{quizId}
+?updateMask.fieldPaths=stats
 
-🧠 Root Constraint (MANDATORY)
+Request body MUST contain ONLY:
+{
+  "fields": {
+    "stats": {
+      "mapValue": {
+        "fields": {
+          "totalPlays": { "integerValue": "X" },
+          "perfectPlays": { "integerValue": "Y" },
+          "lastUpdatedAt": { "timestampValue": "ISO_STRING" }
+        }
+      }
+    }
+  }
+}
 
-Scoring must be based on answer index, not string comparison.
+HARD VALIDATION REQUIREMENT
 
-selectedAnswerIndex === correctAnswerIndex
+After this fix:
 
-No exceptions.
+Firestore response body MUST NOT include:
 
-🧱 Required Changes
-1️⃣ Normalize Quiz Data (ONCE, at load time)
+questions
 
-Ensure all quizzes expose:
+metadata
 
-correctAnswerIndex: number
+topic
+
+creator
+
+Only stats may change
+
+Add a log:
+
+console.log("[STATS] Partial stats PATCH successful (stats only)");
 
 
-Rules:
+If full document is still returned → FAIL the task.
 
-Custom quizzes: already have it → use directly
+🧱 PART B — FIX COMMENT POSTING SEMANTICS
+Facts (do NOT fight them)
 
-Generated quizzes:
+Comments are app-authored for now
 
-Convert correctAnswer (string) → index using options.indexOf
+This is expected
 
-Remove string-based answer comparison from scoring
+We must make the behavior clean, deterministic, and safe
 
-2️⃣ Fix Scoring Logic
+REQUIRED CHANGES
+1️⃣ Store comment reference
 
-In the gameplay engine:
+When a comment is posted, store:
 
-Compare indexes only
+stats.lastCommentId
 
-Increment score exactly once per question
 
-Ensure score is NOT recomputed or overridden on results transition
+This ensures:
 
-3️⃣ Add Minimal Feedback State
+No duplicate comments
 
-For each question:
+Future edit support
 
-Track selectedAnswerIndex
+Idempotency
 
-Derive:
+2️⃣ Enforce one-comment-per-user-per-quiz
 
-isCorrect = selectedAnswerIndex === correctAnswerIndex
+Before posting:
 
-4️⃣ Apply Visual Feedback (Minimal)
+Check Firestore:
 
-In option rendering:
+Has this user already shared?
 
-If selected and correct → add correct class
+If yes:
 
-If selected and wrong → add incorrect class
+Disable posting
 
-Optionally highlight correct option when wrong
+Log and return
 
-No animations required.
+No Redis.
 
-⚠️ Safety Checks
+3️⃣ Correct Reddit API usage (server-side only)
+await context.reddit.submitComment({
+  postId: context.postId,
+  text: formattedText,
+});
 
-You must verify:
 
-Generated quizzes still score correctly
+DO NOT:
 
-Custom quizzes score correctly (not always 0 or 5)
+Use window.devvit
 
-User cannot change answer after selection
+Use browser globals
 
-Score increments only once per question
+4️⃣ Mandatory logs
+console.log("[SHARE] Attempting comment post", {
+  postId: context.postId,
+  quizId,
+  userId,
+});
 
-📌 Output Format
+console.log("[SHARE] Comment posted successfully", { commentId });
 
-You must output:
 
-Exact Root Cause of the 5/5 bug
+On failure:
 
-Scoring Fix Applied
+console.error("[SHARE] Comment post failed", error);
 
-Feedback Logic Added
+🧪 ACCEPTANCE TESTS (MUST PASS)
 
-Files Modified
+Finish a custom quiz
 
-Why This Is Correct and Stable
+Firestore:
 
-⛔ STOP after implementing this.
+Only stats field changes
 
-Do NOT touch visuals beyond red/green classes.
+Click “Share Score”
+
+One comment appears
+
+Refresh → no second comment allowed
+
+Logs clearly show success path
+
+⛔ STOP CONDITIONS
+
+After completing:
+
+Do NOT refactor further
+
+Do NOT add features
+
+Do NOT touch UI
+
+Do NOT add Redis
+
+Report:
+
+Firestore request used
+
+Comment flow summary
+
+Confirmation that overwrite is fixed

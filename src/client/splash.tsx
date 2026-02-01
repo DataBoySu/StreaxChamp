@@ -13,10 +13,13 @@ import { requestCommunitySubscribe } from './services/SubscriptionService';
 
 const Splash = () => {
     const [mode, setMode] = useState<'MENU' | 'CUSTOM_SPLASH' | 'QUIZ' | 'RESULTS'>('MENU');
-    const [customQuizMeta, setCustomQuizMeta] = useState<{ title: string; creator?: string; quizId: string } | null>(null);
+    const [customQuizMeta, setCustomQuizMeta] = useState<{ title: string; creator?: string; quizId: string; postId: string } | null>(null);
+    const [quizStats, setQuizStats] = useState<{ totalPlays: number; perfectScores: number } | null>(null);
+    const [hasShared, setHasShared] = useState(false);
     const [quizData, setQuizData] = useState<DailyQuiz | null>(null);
     const [quizLoading, setQuizLoading] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [username, setUsername] = useState<string | null>(null);
 
     const {
         currentIndex,
@@ -24,7 +27,27 @@ const Splash = () => {
         score,
         handleOptionSelect,
         handleNext
-    } = useInlineQuiz(quizData, () => setMode('RESULTS'));
+    } = useInlineQuiz(quizData, async (finalScore) => {
+        if (customQuizMeta && username) {
+            console.log(`[Splash] Custom Quiz Complete. Score: ${finalScore}. Submitting to Leaderboard...`);
+            try {
+                await fetch(`/api/leaderboard/${customQuizMeta.quizId}/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userKey: username,
+                        nickname: username,
+                        score: finalScore,
+                        slug: customQuizMeta.quizId
+                    })
+                });
+                console.log('[Splash] Score submitted successfully.');
+            } catch (e) {
+                console.error('[Splash] Score submission failed', e);
+            }
+        }
+        setMode('RESULTS');
+    });
 
     useEffect(() => {
         const checkContext = async () => {
@@ -38,43 +61,46 @@ const Splash = () => {
 
                 if (initData.customQuiz) {
                     console.log('[Splash] Custom post detected, enhancing UI...');
+                    setUsername(initData.username);
                     setCustomQuizMeta({
                         title: initData.customQuiz.topic || 'Custom Quiz',
                         creator: initData.customQuiz.creatorId || initData.customQuiz.username,
-                        quizId: initData.customQuiz.quizId
+                        quizId: initData.customQuiz.quizId,
+                        postId: initData.postId || initData.customQuiz.postId // Capture PostID from init
                     });
                     setMode('CUSTOM_SPLASH');
                     setQuizLoading(true);
 
+                    setQuizLoading(true);
+
                     console.log('[InlineQuiz] Loading quiz...');
-                    const res = await fetch(`/api/quizzes/${initData.customQuiz.quizId}`);
+                    // PARALLEL FETCH: Load quiz data AND live stats
+                    const [res, statsRes] = await Promise.all([
+                        fetch(`/api/quizzes/${initData.customQuiz.quizId}`),
+                        fetch(`/api/stats/${initData.customQuiz.quizId}`)
+                    ]);
+
                     if (res.ok) {
                         const rawData = await res.json();
 
-                        // FIX: Normalize schema (String -> Index validation)
-                        // Ensure correctAnswer is always a numeric index for strict scoring
+                        // FIX: Normalize schema (String -> Index connection)
                         const normalizedQuestions = (rawData.questions || []).map((q: any) => {
                             const opts = q.options || q.answers || [];
                             let val = q.correctAnswer;
-
-                            // If it's a string, convert to index logic (opposite of previous fix)
-                            // But usually custom quizzes are already numbers. We just ensure it.
-                            if (typeof val === 'string') {
-                                val = opts.indexOf(val);
-                            }
-
-                            return {
-                                ...q,
-                                options: opts,
-                                correctAnswer: val
-                            };
+                            if (typeof val === 'string') val = opts.indexOf(val);
+                            return { ...q, options: opts, correctAnswer: val };
                         });
 
                         const data: DailyQuiz = { ...rawData, questions: normalizedQuestions };
                         setQuizData(data);
-                        console.log(`[InlineQuiz] Quiz loaded and normalized: ${data.questions.length} Qs`);
+                        console.log(`[InlineQuiz] Quiz loaded: ${data.questions.length} Qs`);
                     } else {
                         console.error('[InlineQuiz] Quiz load failed');
+                    }
+
+                    if (statsRes.ok) {
+                        const stats = await statsRes.json();
+                        setQuizStats(stats);
                     }
                     setQuizLoading(false);
                 }
@@ -117,6 +143,43 @@ const Splash = () => {
         }
     };
 
+    const handleShareScore = async () => {
+        if (hasShared || !quizData) return;
+        setHasShared(true); // Optimistic disable
+        try {
+            const tag = CONFIG.SHARE.TAGS_BY_SCORE[score as keyof typeof CONFIG.SHARE.TAGS_BY_SCORE] || CONFIG.SHARE.TAGS_BY_SCORE[5];
+            const text = CONFIG.SHARE.TEMPLATE
+                .replace('{score}', String(score))
+                .replace('{total}', String(quizData.questions.length))
+                .replace('{tag}', tag);
+
+            // CALL SERVER ENDPOINT properly
+            const targetId = customQuizMeta?.postId;
+            if (targetId) {
+                console.log('[Splash] Sharing score to post:', targetId);
+                const res = await fetch('/api/share/comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        postId: targetId,
+                        text: text
+                    })
+                });
+
+                if (res.ok) {
+                    console.log("[SHARE] Comment posted successfully (client view)");
+                } else {
+                    console.error("[SHARE] Server reported failure", res.status);
+                    setHasShared(false); // Re-enable if failed?
+                }
+            } else {
+                console.warn('[Splash] No PostID available to share comment');
+            }
+        } catch (e) {
+            console.error('[Splash] Share failed', e);
+        }
+    };
+
     const renderMenu = () => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
             <button type="button" className="nes-btn is-warning" style={{ width: '100%' }} onClick={handleCreate}>Create</button>
@@ -143,9 +206,16 @@ const Splash = () => {
                     Error: Quiz Unavailable
                 </button>
             ) : (
-                <button type="button" className="nes-btn is-primary" style={{ width: '100%' }} onClick={handleStartQuiz}>
-                    Play Now!
-                </button>
+                <>
+                    {quizStats && quizStats.totalPlays >= CONFIG.STATS.MIN_PLAYS && (
+                        <div style={{ backgroundColor: '#212529', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '0.65rem', marginBottom: '8px' }}>
+                            🔥 {Math.round((quizStats.perfectScores / quizStats.totalPlays) * 100)}% of players scored 5/5
+                        </div>
+                    )}
+                    <button type="button" className="nes-btn is-primary" style={{ width: '100%' }} onClick={handleStartQuiz}>
+                        Play Now!
+                    </button>
+                </>
             )}
         </div>
     );
@@ -170,6 +240,19 @@ const Splash = () => {
             >
                 {CONFIG.COMMUNITY.CTA.JOIN}
             </button>
+
+            {/* Custom: Share Score */}
+            {mode === 'RESULTS' && customQuizMeta && (
+                <button
+                    type="button"
+                    className={`nes-btn ${hasShared ? 'is-disabled' : 'is-success'}`}
+                    style={{ width: '100%', marginTop: '8px' }}
+                    disabled={hasShared}
+                    onClick={handleShareScore}
+                >
+                    {hasShared ? 'Shared!' : 'Share My Score'}
+                </button>
+            )}
 
 
         </div>

@@ -321,7 +321,19 @@ export class QuizController {
 
             const fs = new FirestoreRestService();
             const identifier = `${username}_${topic}`;
-            const success = await fs.saveUserQuiz(identifier, username, topic, quiz);
+
+            // Augment quiz with stats shell
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const quizWithStats = {
+                ...(quiz as any),
+                stats: {
+                    totalPlays: 0,
+                    perfectPlays: 0,
+                    lastUpdatedAt: new Date().toISOString()
+                }
+            };
+
+            const success = await fs.saveUserQuiz(identifier, username, topic, quizWithStats);
 
             if (success) {
                 // Tracking: Increment global quizzes created for milestones
