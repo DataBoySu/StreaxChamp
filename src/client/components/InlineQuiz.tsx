@@ -49,15 +49,17 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
             {/* Layout & Options */}
             <OptionGrid options={answers}>
                 {answers.map((ans: string, idx: number) => (
-                    <OptionButton
-                        key={idx}
-                        index={idx}
-                        label={ans}
-                        isSelected={selectedAnswerIndex === idx}
-                        isCorrect={idx === correctIdx}
-                        isAnswered={isAnswered}
-                        onSelect={onOptionSelect}
-                    />
+                    // OPTION CELL: Responsible for spacing/depth, NOT the button itself
+                    <div key={idx} style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                        <OptionButton
+                            index={idx}
+                            label={ans}
+                            isSelected={selectedAnswerIndex === idx}
+                            isCorrect={idx === correctIdx}
+                            isAnswered={isAnswered}
+                            onSelect={onOptionSelect}
+                        />
+                    </div>
                 ))}
             </OptionGrid>
 

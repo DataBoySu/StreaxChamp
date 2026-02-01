@@ -1,109 +1,154 @@
-🔧 AI IDE PROMPT — Step 2: NES.css Depth Restoration (Inline Quiz)
+🎨 DESIGN INTENT (SO IDE DOESN’T GO ROGUE)
 
-Context
+Before the prompt, here’s the design intent you want to enforce:
 
-The Inline Quiz has been structurally refactored into:
+Creator Studio should feel like:
 
-InlineQuiz
+📒 A cozy desk / notebook
 
-OptionGrid
+🧸 Friendly, calm, non-competitive
 
-OptionButton
+✏️ “I’m making something”, not “I’m playing”
 
-Logic is correct, but NES.css button depth illusion is visually lost, especially in 2×2 grid mode.
+Visual hierarchy > decoration
 
-This task is to restore 3D depth and press feedback, not redesign UI.
+Which means:
 
-🎯 Objective (STRICT)
+Background = supporting actor
 
-Restore NES.css visual depth so that:
+Cards = physical objects
 
-Buttons visibly “float”
+Borders = thick but breathable
 
-Pressing visibly moves them
+Colors = warm neutrals, not loud primaries
 
-Grid mode does NOT flatten buttons
+🎯 TARGETED AI IDE PROMPT (COPY–PASTE)
 
-Mobile rendering remains safe
+This prompt only touches spacing + background, nothing else.
 
-🧱 Required Changes
-1️⃣ Add a Depth Wrapper inside OptionGrid
+🎨 Creator Studio Visual Polish – Spacing & Background Only
 
-Each grid cell must contain:
+Objective
+Refine Creator Studio visuals by:
 
-<div className="option-cell">
-  <OptionButton ... />
-</div>
+Improving spacing between borders and content
 
+Replacing the orange grid background with a calmer, cohesive pattern
 
-The wrapper is responsible for spacing, not the button.
+⚠️ This is a visual-only polish pass.
+Do NOT modify logic, state, layout structure, or text.
 
-2️⃣ Spacing Rules (MANDATORY)
+1️⃣ Fix Border-to-Content Spacing (Breathing Room)
+Problem
 
-Vertical spacing: margin-bottom: 12px
+Content sits too close to thick borders
 
-Horizontal spacing: margin-right: 12px
+NES-style “depth” feels flattened
 
-Do not rely only on gap
+Cards lack internal air
 
-Grid should visually “breathe”
+Required Changes
 
-NES.css shadows must never touch another border.
+Apply consistent internal padding tokens:
 
-3️⃣ Button Size Policy
+Global panel/card rule
 
-Do NOT shrink buttons
+Minimum internal padding: p-4 (16px)
 
-Maintain:
+For hero cards / primary sections: p-6 (24px)
 
-min-height ≥ 44px
+Specific fixes
 
-width: 100%
+Creator header container: add padding-bottom
 
-Depth > compactness
+“Create New Quiz” card: ensure text does NOT touch border
 
-4️⃣ Press / Hover Preservation
+Library items: increase left/right padding so text does not sit on border
 
-Ensure:
+🚫 Do NOT change border thickness
+🚫 Do NOT reduce font sizes
+🚫 Do NOT change spacing between sections — only inside them
 
-:active still shifts button visually
+2️⃣ Replace Background Grid + Orange Theme
+Problem
 
-No parent overflow: hidden blocks shadows
+Orange grid dominates attention
 
-No flex/grid stretch collapses shadow space
+Grid conflicts with NES pixel borders
 
-🚫 Explicit Non-Goals
+Background should frame, not shout
 
-❌ No new design tokens
+New Background Rules (Creator Studio ONLY)
+A. Color
 
-❌ No color changes
+Replace orange background with warm neutral paper tone:
 
-❌ No animation changes
+Light mode base: #FFF7ED (warm cream)
 
-❌ No layout logic changes
+Dark mode base: #1C1917 (warm charcoal, not pure black)
 
-❌ No mobile-specific overrides
+No bright orange backgrounds.
 
-✅ Acceptance Criteria
+B. Pattern (Subtle, Optional)
 
-Grid buttons clearly show shadow separation
+If pattern is used, it must be:
 
-Pressing a button visibly “pushes” it down
+Extremely low contrast
 
-Hover effect is perceptible (desktop)
+Large scale
 
-Mobile rendering unchanged
+Barely noticeable
 
-Only OptionGrid / wrapper touched
+Allowed:
 
-🧪 Visual Check
+Soft dot pattern (2–3% opacity)
 
-Before:
+Very light paper grain
 
-Buttons look flat and merged
+No visible grid lines
 
-After:
+Forbidden:
 
-Buttons look like raised tiles with air between them
+High-contrast grids
 
-Implement this now. Do not touch any other files.
+Checkerboards
+
+Repeating sharp lines
+
+C. Contrast Rule
+
+Background must be at least 2 levels lighter/darker than cards
+
+Cards must always visually “float” above background
+
+3️⃣ Consistency Rule (Very Important)
+
+Creator Studio must look identical in light and dark mode, except for:
+
+Background base color
+
+Text color inversion
+
+Spacing, borders, card structure, and hierarchy must remain unchanged.
+
+4️⃣ Validation Checklist
+
+✅ Content never touches borders
+✅ Cards feel padded and physical
+✅ Background is calm and unobtrusive
+✅ Orange is used only for accents (titles, highlights)
+✅ Switching themes does not change layout or hierarchy
+
+5️⃣ Explicit Non-Goals
+
+Do not redesign UI
+
+Do not introduce new components
+
+Do not adjust logic or data
+
+Do not restyle quiz gameplay screens
+
+Deliverable
+
+Creator Studio feels calm, breathable, and intentional — ready for kawaii polish later.
