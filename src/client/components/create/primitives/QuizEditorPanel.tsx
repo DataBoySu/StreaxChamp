@@ -10,71 +10,86 @@ interface QuizEditorPanelProps {
     onUpdateOption: (optionIndex: number, text: string) => void;
 }
 
+import 'nes.css/css/nes.min.css';
+
 export const QuizEditorPanel: React.FC<QuizEditorPanelProps> = ({
     question,
-    topic,
-    stepNumber,
-    totalSteps,
     onUpdateQuestion,
     onUpdateOption
 }) => {
     return (
-        <div className="flex-1 flex flex-col h-full overflow-y-auto pb-2 px-1">
-            {/* Header - Minimal & Secondary */}
-            <div className="flex justify-between items-center mb-3 shrink-0 px-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#1f1f1f]/40 truncate max-w-[150px]">
-                    {topic}
-                </span>
-                <span className="text-xs font-bold text-[#1f1f1f]/30">
-                    {stepNumber} / {totalSteps}
-                </span>
-            </div>
+        <div className="flex-1 flex flex-col h-full overflow-y-auto pb-4 px-2">
 
-            <div className="space-y-4 flex-1 w-full max-w-2xl mx-auto flex flex-col">
-                <div className="shrink-0">
-                    {/* Question Input - Compact Default, Grows on Focus */}
+
+            <div className="flex-1 flex flex-col gap-6 w-full max-w-2xl mx-auto">
+                {/* Question Input Card */}
+                <div className="nes-container is-rounded with-title p-4" style={{ backgroundColor: 'white' }}>
+                    <p className="title" style={{ backgroundColor: 'white', padding: '0 10px', fontSize: '12px' }}>Question</p>
                     <textarea
                         value={question.question || ''}
                         onChange={(e) => onUpdateQuestion('question', e.target.value)}
                         placeholder="Type question..."
-                        className="w-full bg-white border-2 border-[#1f1f1f]/10 rounded-xl p-4 text-lg font-bold text-[#1f1f1f] placeholder:text-[#1f1f1f]/20 focus:border-[#FB8C00] focus:ring-0 focus:outline-none min-h-[84px] focus:min-h-[140px] resize-none transition-all duration-300 shadow-sm leading-tight"
+                        className="nes-textarea"
+                        rows={3}
+                        style={{ minHeight: '100px', fontSize: '14px', resize: 'none' }}
                     />
                 </div>
 
-                {/* Options Grid - Big Tap Targets */}
-                <div className="grid grid-cols-1 gap-2.5 flex-1 content-start">
+                {/* Options Stack */}
+                <div className="flex flex-col gap-4 pb-4">
                     {question.options.map((opt: string, optIdx: number) => {
                         const isCorrect = question.correctAnswer === optIdx;
                         return (
-                            <div key={optIdx} className="flex items-stretch gap-3 w-full group min-h-[56px]">
-                                {/* Selection Column (Left) */}
+                            <div
+                                key={optIdx}
+                                className={`nes-container is-rounded flex items-center ${isCorrect ? 'is-dark' : ''}`}
+                                style={{
+                                    padding: '0.75rem',
+                                    display: 'flex',
+                                    flexDirection: 'row',
+                                    gap: '12px',
+                                    alignItems: 'center',
+                                    backgroundColor: isCorrect ? '#212529' : '#fff',
+                                    borderColor: isCorrect ? '#fff' : 'black',
+                                    transition: 'transform 0.1s ease-out'
+                                }}
+                            >
+                                {/* Pixel Badge: A/B/C/D */}
+                                <div className="shrink-0">
+                                    <span className={`nes-badge is-icon`}>
+                                        <span className="is-dark" style={{ fontSize: '10px' }}>{['A', 'B', 'C', 'D'][optIdx]}</span>
+                                        <span className={`is-${isCorrect ? 'success' : 'primary'}`}></span>
+                                    </span>
+                                </div>
+
+                                {/* Input */}
+                                <div className="flex-1" style={{ position: 'relative' }}>
+                                    <input
+                                        type="text"
+                                        value={opt}
+                                        onChange={(e) => onUpdateOption(optIdx, e.target.value)}
+                                        placeholder={`Option ${optIdx + 1}`}
+                                        className={`nes-input ${isCorrect ? 'is-dark' : ''}`}
+                                        style={{ margin: 0, fontSize: '12px', height: 'auto', padding: '8px' }}
+                                    />
+                                </div>
+
+                                {/* Right Logic: Action Button */}
                                 <button
                                     onClick={() => onUpdateQuestion('correctAnswer', optIdx)}
-                                    className={`shrink-0 w-[56px] rounded-xl border-2 flex items-center justify-center transition-all shadow-sm active:scale-95 ${isCorrect
-                                            ? 'border-[#FB8C00] bg-[#FFF4E5] text-[#FB8C00] shadow-md z-10'
-                                            : 'border-[#1f1f1f]/10 bg-white text-[#1f1f1f]/20 hover:border-[#1f1f1f]/30'
-                                        }`}
+                                    className={`nes-btn ${isCorrect ? 'is-success' : ''} is-primary`}
+                                    style={{
+                                        width: '40px',
+                                        height: '40px',
+                                        padding: 0,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '16px'
+                                    }}
                                 >
-                                    {isCorrect ? (
-                                        <span className="text-xl font-black">✔</span>
-                                    ) : (
-                                        <span className="text-xs font-bold opacity-60">
-                                            {String.fromCharCode(65 + optIdx)}
-                                        </span>
-                                    )}
+                                    {isCorrect ? '✓' : '?'}
                                 </button>
-
-                                {/* Option Text Input */}
-                                <input
-                                    type="text"
-                                    value={opt}
-                                    onChange={(e) => onUpdateOption(optIdx, e.target.value)}
-                                    placeholder={`Option ${optIdx + 1}`}
-                                    className={`flex-1 bg-white border-2 rounded-xl px-4 text-base font-medium text-[#1f1f1f] placeholder:text-[#1f1f1f]/20 focus:outline-none transition-all shadow-sm active:scale-[0.99] ${isCorrect
-                                            ? 'border-[#FB8C00] bg-[#FFF4E5]/30'
-                                            : 'border-[#1f1f1f]/10 focus:border-[#FB8C00]'
-                                        }`}
-                                />
                             </div>
                         );
                     })}

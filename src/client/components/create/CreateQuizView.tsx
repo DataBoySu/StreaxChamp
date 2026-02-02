@@ -1,28 +1,8 @@
+import 'nes.css/css/nes.min.css';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { InteractiveRobot } from '../InteractiveRobot';
 import { Question } from '../../../shared/types/api';
-import { FlowShell, FlowBody } from './primitives/FlowShell';
-import { FlowHeader } from './primitives/FlowHeader';
-import { FlowFooter } from './primitives/FlowFooter';
 import { QuizEditorPanel } from './primitives/QuizEditorPanel';
-
-
-// 🎨 LOCAL THEME DEFINITION - LOCKED (Ignores Global Dark Mode)
-const CREATE_THEME = {
-    bg: '#F3EFE6',       // Warm Parchment / Stationery Beige
-    canvasBg: '#e4c386ff', // Inner Canvas (Slightly darker)
-    panelBg: '#FFF8F0',  // Input Background
-    text: '#1f1f1f',     // Near Black
-    border: '#1f1f1f',   // Strict Black Border
-    accent: '#FF9DB5',   // Soft Pink CTA
-    backBtn: '#E0D8CC',  // Back Button Bg
-    shadow: '#1f1f1f',   // Strict Shadow
-    // New styles for calm validation
-    warningBg: '#FFF4E5', // Warm Amber/Peach
-    warningBorder: '#FB8C00', // Deep Orange
-    warningText: '#663C00'
-};
 
 interface CreateQuizViewProps {
     username: string;
@@ -33,9 +13,8 @@ interface CreateQuizViewProps {
     initialData?: { topic: string; questions: Question[] } | null;
 }
 
-export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave, onPost, onBack, isSaving = false, initialData }) => {
-    useEffect(() => console.log('[CreateQuizView] Mounted', { initialData }), []);
-    const [step, setStep] = useState(initialData ? 1 : 0); // Skip topic selection if editing
+export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ onSave, onPost, onBack, isSaving = false, initialData }) => {
+    const [step, setStep] = useState(initialData ? 1 : 0);
     const [topic, setTopic] = useState(initialData?.topic || '');
     const [questions, setQuestions] = useState<Question[]>(
         initialData?.questions || Array(5).fill(null).map((_, i) => ({
@@ -45,420 +24,206 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
             correctAnswer: 0,
         }))
     );
-
     const [validationError, setValidationError] = useState<string | null>(null);
 
-    // Auto-dismiss validation error after 2.5s
+    // Auto-dismiss validation after 2.5s
     useEffect(() => {
         if (validationError) {
-            const timer = setTimeout(() => {
-                setValidationError(null);
-            }, 2500);
+            const timer = setTimeout(() => setValidationError(null), 2500);
             return () => clearTimeout(timer);
         }
     }, [validationError]);
 
-    const clearValidation = () => {
-        if (validationError) setValidationError(null);
-    };
-
     const handleNext = () => {
         setValidationError(null);
         if (step === 0 && !topic.trim()) {
-            setValidationError('Please enter a topic name!');
+            setValidationError('Topic is required!');
             return;
         }
         if (step > 0 && step <= 5) {
-            const qIndex = step - 1;
-            const q = questions[qIndex];
+            const q = questions[step - 1];
             if (!q || !q.question.trim()) {
-                setValidationError('Please enter the question text.');
+                setValidationError('Enter a question!');
                 return;
             }
-            if (q.options.some((opt: string) => !opt.trim())) {
-                setValidationError('Please fill in all 4 options.');
+            if (q.options.some(opt => !opt.trim())) {
+                setValidationError('Fill all options!');
                 return;
             }
         }
         setStep(s => Math.min(s + 1, 6));
     };
 
-    const handleBackStep = () => {
-        setValidationError(null);
-        if (step === 0) {
-            onBack();
-        } else {
-            setStep(s => s - 1);
-        }
-    };
-
     const updateQuestion = (index: number, field: keyof Question, value: any) => {
-        clearValidation(); // Dismiss error on interaction
+        if (validationError) setValidationError(null);
         const newQs = [...questions];
-        const target = newQs[index];
-        if (target) {
-            newQs[index] = { ...target, [field]: value };
+        if (newQs[index]) {
+            newQs[index] = { ...newQs[index], [field]: value };
             setQuestions(newQs);
         }
     };
 
     const updateOption = (qIndex: number, oIndex: number, text: string) => {
-        clearValidation(); // Dismiss error on interaction
+        if (validationError) setValidationError(null);
         const newQs = [...questions];
-        const target = newQs[qIndex];
-        if (target) {
-            const newOptions = [...target.options];
+        if (newQs[qIndex]) {
+            const newOptions = [...newQs[qIndex].options];
             newOptions[oIndex] = text;
-            newQs[qIndex] = { ...target, options: newOptions };
+            newQs[qIndex] = { ...newQs[qIndex], options: newOptions };
             setQuestions(newQs);
         }
     };
 
-    // Determine current header/footer props based on step
-    const isReview = step === 6;
-    const isTopic = step === 0;
-    const isEditor = step >= 1 && step <= 5;
-
     return (
-        // ROOT CONTAINER - THEME LOCKED
-        // Uses relative positioning to Ensure it takes up space
-        <div
-            style={{
-                minHeight: '100vh',
-                width: '100%',
-                position: 'relative',
-                backgroundColor: CREATE_THEME.bg,
-                color: CREATE_THEME.text,
-                zIndex: 40,
-                // Layout
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-            }}
-            className="font-sans"
-        >
-            <FlowShell className="z-50">
-                {/* CUSTOM HEADER FOR SCENE 1 (TOPIC) */}
-                {isTopic ? (
-                    <div className="flex items-center justify-between mb-4 pt-4 px-4 w-full max-w-[720px] mx-auto">
-                        {/* Physical Back Button - NES Style */}
-                        <button
-                            onClick={handleBackStep}
-                            className="px-4 py-2 text-sm font-black uppercase tracking-wider transition-none"
-                            style={{
-                                backgroundColor: CREATE_THEME.backBtn,
-                                border: `2px solid ${CREATE_THEME.border}`,
-                                boxShadow: `3px 3px 0 0 ${CREATE_THEME.shadow}`,
-                                color: CREATE_THEME.text,
-                                transform: 'translate(0,0)'
-                            }}
-                            onMouseDown={(e) => {
-                                e.currentTarget.style.transform = "translate(2px, 2px)";
-                                e.currentTarget.style.boxShadow = `1px 1px 0 0 ${CREATE_THEME.shadow}`;
-                            }}
-                            onMouseUp={(e) => {
-                                e.currentTarget.style.transform = "translate(0, 0)";
-                                e.currentTarget.style.boxShadow = `3px 3px 0 0 ${CREATE_THEME.shadow}`;
-                            }}
-                        >
-                            ← Back
+        <div className="w-full min-h-screen flex flex-col items-center justify-center p-4 relative" style={{ backgroundColor: '#fff0f3', fontFamily: '"Press Start 2P", sans-serif' }}>
+            {/* Background Pattern */}
+            <div style={{
+                position: 'absolute', inset: 0, opacity: 0.1,
+                backgroundImage: 'radial-gradient(#ff4d6d 2px, transparent 2px)',
+                backgroundSize: '24px 24px', pointerEvents: 'none'
+            }} />
+
+            {/* Validation Toast - Floating NES Style */}
+            <AnimatePresence>
+                {validationError && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className="fixed bottom-8 left-0 right-0 z-[100] flex justify-center pointer-events-none"
+                    >
+                        <div className="nes-container is-rounded is-dark is-centered" style={{ display: 'inline-block', padding: '1rem', border: '4px solid white' }}>
+                            <p style={{ margin: 0, color: 'white' }}>{validationError}</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Main Canvas */}
+            <div className="w-full max-w-3xl relative z-10">
+                <div className="nes-container is-rounded with-title" style={{ backgroundColor: 'white', minHeight: '600px', paddingBottom: '3rem' }}>
+                    <p className="title" style={{ backgroundColor: 'white' }}>Create Quiz</p>
+
+                    {/* Navigation Header */}
+                    <div className="flex justify-between items-center mb-6 border-b-2 border-slate-100 pb-4">
+                        <button type="button" className="nes-btn" onClick={() => (step === 0 ? onBack() : setStep(s => s - 1))} style={{ fontSize: '0.8rem' }}>
+                            &lt; Back
                         </button>
-
-                        {/* Centered Title - High Contrast */}
-                        <h1 className="text-xl font-black uppercase tracking-widest text-center" style={{ color: CREATE_THEME.text }}>
-                            Create Quiz
-                        </h1>
-
-                        <div className="w-20"></div> {/* Spacer for alignment */}
+                        <span className="nes-text is-primary" style={{ fontSize: '0.8rem' }}>
+                            {step === 0 ? 'Start' : step === 6 ? 'Review' : `Q${step} of 5`}
+                        </span>
                     </div>
-                ) : (
-                    <div className="relative">
-                        <FlowHeader
-                            title="Create Quiz"
-                            onBack={handleBackStep}
-                            currentStep={step}
-                            totalSteps={6}
-                        />
-                        {/* INLINE VALIDATION TOAST (Below Header) */}
-                        <AnimatePresence>
-                            {validationError && (
+
+                    <div className="flex-1 flex flex-col relative px-2">
+                        <AnimatePresence mode="wait">
+                            {/* TOPIC STEP */}
+                            {step === 0 && (
                                 <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -5 }}
-                                    className="absolute top-full left-0 right-0 z-50 flex justify-center mt-2 pointer-events-none"
+                                    key="topic"
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: 20 }}
+                                    className="flex flex-col gap-8 py-8 items-center"
                                 >
-                                    <div
-                                        className="flex items-center gap-2 px-4 py-2 rounded-full shadow-md pointer-events-auto backdrop-blur-sm"
-                                        style={{
-                                            backgroundColor: 'rgba(255, 244, 229, 0.95)', // Warm Amber/Peach with opacity
-                                            border: `1px solid ${CREATE_THEME.warningBorder}`,
-                                            color: CREATE_THEME.warningText
-                                        }}
-                                    >
-                                        <span className="text-lg">⚠️</span>
-                                        <span className="text-sm font-bold">{validationError}</span>
+                                    <div className="nes-field w-full max-w-md">
+                                        <label htmlFor="topic_field" style={{ marginBottom: '1rem', display: 'block' }}>What is your quiz about?</label>
+                                        <input
+                                            type="text"
+                                            id="topic_field"
+                                            className="nes-input"
+                                            value={topic}
+                                            onChange={(e) => setTopic(e.target.value)}
+                                            placeholder="e.g. Retro Games"
+                                            autoFocus
+                                            style={{ textAlign: 'center' }}
+                                        />
+                                    </div>
+                                    <div className="w-full max-w-md mt-4">
+                                        <button type="button" className="nes-btn is-primary w-full" onClick={handleNext}>
+                                            Start Building
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {/* EDITOR STEPS */}
+                            {step >= 1 && step <= 5 && (
+                                <motion.div
+                                    key={`q-${step}`}
+                                    initial={{ opacity: 0, x: 50 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -50 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="flex flex-col h-full"
+                                >
+                                    <QuizEditorPanel
+                                        question={questions[step - 1]!}
+                                        topic={topic}
+                                        stepNumber={step}
+                                        totalSteps={5}
+                                        onUpdateQuestion={(field, val) => updateQuestion(step - 1, field, val)}
+                                        onUpdateOption={(optIdx, val) => updateOption(step - 1, optIdx, val)}
+                                    />
+
+                                    {/* Anchored Next Button */}
+                                    <div className="mt-8 pt-4 w-full flex justify-center">
+                                        <button type="button" className="nes-btn is-primary w-full max-w-md" onClick={handleNext}>
+                                            {step === 5 ? 'Review Quiz >' : 'Next Question >'}
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {/* REVIEW STEP */}
+                            {step === 6 && (
+                                <motion.div
+                                    key="review"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="flex flex-col gap-4 py-4 w-full max-w-xl mx-auto"
+                                >
+                                    <h3 className="nes-text is-primary text-center mb-4">Ready to Launch?</h3>
+
+                                    <div className="nes-container is-dark is-rounded flex justify-between p-4 mb-6">
+                                        <div className="text-center">
+                                            <span className="block text-xs mb-2">TOPIC</span>
+                                            <span className="text-white">{topic}</span>
+                                        </div>
+                                        <div className="text-center">
+                                            <span className="block text-xs mb-2">Qs</span>
+                                            <span className="nes-text is-success">5</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-2 mb-6">
+                                        {questions.map((q, i) => (
+                                            <div key={i} className="nes-container is-rounded p-2" style={{ padding: '0.5rem', fontSize: '0.7rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ maxWidth: '70%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {i + 1}. {q.question || 'Empty'}
+                                                </span>
+                                                <span className="nes-badge is-icon">
+                                                    <span className="is-success" style={{ top: -5 }}>✓</span>
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="flex flex-col gap-4 mt-4">
+                                        {onPost && (
+                                            <button type="button" className={`nes-btn is-success ${isSaving ? 'is-disabled' : ''}`} onClick={() => onPost(topic, questions)} disabled={isSaving}>
+                                                {isSaving ? 'Posting...' : '🚀 Post to Reddit'}
+                                            </button>
+                                        )}
+                                        <button type="button" className={`nes-btn ${isSaving ? 'is-disabled' : ''}`} onClick={() => onSave(topic, questions)} disabled={isSaving}>
+                                            💾 Save to Library
+                                        </button>
                                     </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
-                )}
-
-                <FlowBody className={isEditor ? '' : 'flex flex-col justify-center'}>
-                    <AnimatePresence mode="wait">
-
-                        {/* STEP 0: TOPIC SELECTION */}
-                        {isTopic && (
-                            <motion.div
-                                key="step-topic"
-                                initial={{ opacity: 0, scale: 0.98 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.98 }}
-                                className="w-full flex justify-center px-4"
-                            >
-                                {/* INNER CANVAS - THEME LOCKED & BOUNDED */}
-                                <div
-                                    className="flex flex-col items-center relative mb-16 w-full"
-                                    style={{
-                                        backgroundColor: CREATE_THEME.canvasBg,
-                                        border: `3px solid ${CREATE_THEME.border}`,
-                                        boxShadow: `6px 6px 0 0 ${CREATE_THEME.shadow}`,
-                                        maxWidth: '720px',
-                                        padding: '24px',
-                                        // "Float" effect
-                                    }}
-                                >
-                                    {/* 1. Mascot Anchor Wrapper (Dialogue Safety Zone) */}
-                                    {/* Padding top is RESERVED for dialogue bubbles so they don't clip. */}
-                                    <div
-                                        className="w-full relative flex flex-col items-center justify-end pt-[4px] md:pt-[6px]"
-                                        style={{ overflow: 'visible' }}
-                                    >
-                                        <div className="transform scale-90 origin-bottom relative">
-                                            <InteractiveRobot username={username} forceState="happy" />
-                                        </div>
-                                    </div>
-
-                                    <div className="w-full flex flex-col relative z-10">
-                                        {/* 2. Title */}
-                                        <label
-                                            className="block text-lg font-black uppercase tracking-wide text-center"
-                                            style={{
-                                                color: CREATE_THEME.text,
-                                                marginTop: '12px',
-                                                marginBottom: '8px'
-                                            }}
-                                        >
-                                            What is your quiz about?
-                                        </label>
-
-                                        {/* 3. Input Field (Rectangular, NO rounded) */}
-                                        <input
-                                            type="text"
-                                            value={topic}
-                                            onChange={(e) => {
-                                                setTopic(e.target.value);
-                                                clearValidation();
-                                            }}
-                                            placeholder="e.g., Space Exploration"
-                                            style={{
-                                                height: '44px',
-                                                backgroundColor: CREATE_THEME.panelBg,
-                                                border: `2px solid ${CREATE_THEME.border}`,
-                                                color: CREATE_THEME.text,
-                                                outline: 'none'
-                                            }}
-                                            className="w-full rounded-none px-3 py-2 text-lg text-center font-bold tracking-tight transition-all focus:border-black placeholder:opacity-40"
-                                            autoFocus
-                                        />
-                                    </div>
-
-                                    {/* 4. Primary CTA (Full Width, Pink, Physical) */}
-                                    <div className="w-full mt-8">
-                                        <button
-                                            onClick={handleNext}
-                                            className="w-full text-lg font-black uppercase tracking-widest transition-none"
-                                            style={{
-                                                height: '48px',
-                                                backgroundColor: CREATE_THEME.accent,
-                                                color: '#FFFFFF',
-                                                border: `3px solid ${CREATE_THEME.border}`,
-                                                boxShadow: `4px 4px 0 0 ${CREATE_THEME.shadow}`,
-                                                transform: 'translate(0, 0)',
-                                                textShadow: '1px 1px 0px rgba(0,0,0,0.2)'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                // Hover visual feedback
-                                                e.currentTarget.style.filter = 'brightness(1.05)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.transform = "translate(0, 0)";
-                                                e.currentTarget.style.boxShadow = `4px 4px 0 0 ${CREATE_THEME.shadow}`;
-                                                e.currentTarget.style.filter = 'brightness(1)';
-                                            }}
-                                            onMouseDown={(e) => {
-                                                e.currentTarget.style.transform = "translate(2px, 2px)";
-                                                e.currentTarget.style.boxShadow = `2px 2px 0 0 ${CREATE_THEME.shadow}`;
-                                            }}
-                                            onMouseUp={(e) => {
-                                                e.currentTarget.style.transform = "translate(0, 0)";
-                                                e.currentTarget.style.boxShadow = `4px 4px 0 0 ${CREATE_THEME.shadow}`;
-                                            }}
-                                        >
-                                            Start Building &gt;
-                                        </button>
-
-                                        {/* validation error for topic */}
-                                        <AnimatePresence>
-                                            {validationError && isTopic && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, y: -5 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -5 }}
-                                                    className="w-full mt-3 flex justify-center"
-                                                >
-                                                    <div
-                                                        className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold"
-                                                        style={{
-                                                            color: CREATE_THEME.warningText,
-                                                            backgroundColor: 'rgba(255, 244, 229, 0.8)'
-                                                        }}
-                                                    >
-                                                        <span>⚠️</span>
-                                                        <span>{validationError}</span>
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                </div>
-
-                            </motion.div>
-                        )}
-
-
-                        {/* STEPS 1-5: QUESTIONS */}
-                        {isEditor && (() => {
-                            const currentQ = questions[step - 1];
-                            if (!currentQ) return null;
-                            return (
-                                <motion.div
-                                    key={`step-q-${step}`}
-                                    initial={{ opacity: 0, x: 50 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -50 }}
-                                    className="h-full w-full flex justify-center px-4"
-                                >
-                                    {/* INNER CANVAS WRAPPER - Consistent with Topic Step */}
-                                    <div
-                                        className="flex flex-col w-full h-full relative"
-                                        style={{
-                                            backgroundColor: CREATE_THEME.canvasBg,
-                                            border: `3px solid ${CREATE_THEME.border}`,
-                                            boxShadow: `6px 6px 0 0 ${CREATE_THEME.shadow}`,
-                                            maxWidth: '720px',
-                                            // FIX: We need height constraints to allow internal scrolling of the Panel
-                                            maxHeight: 'calc(100vh - 180px)', // Rough estimate to leave room for header/footer
-                                            overflow: 'hidden' // Panel handles scrolling internally
-                                        }}
-                                    >
-                                        <div className="flex-1 overflow-hidden p-6 relative">
-                                            <QuizEditorPanel
-                                                question={currentQ}
-                                                topic={topic}
-                                                stepNumber={step}
-                                                totalSteps={5}
-                                                onUpdateQuestion={(field, val) => updateQuestion(step - 1, field, val)}
-                                                onUpdateOption={(optIdx, val) => updateOption(step - 1, optIdx, val)}
-                                            />
-                                        </div>
-
-                                        {/* ANCHORED FOOTER - Inside Canvas */}
-                                        <div className="w-full shrink-0 px-4 pb-5 pt-3 border-t border-[#1f1f1f]/5 bg-white/50 backdrop-blur-sm">
-                                            <button
-                                                onClick={handleNext}
-                                                className="w-full text-lg font-black uppercase tracking-widest transition-all active:scale-[0.98] active:translate-y-1"
-                                                style={{
-                                                    height: '56px',
-                                                    backgroundColor: CREATE_THEME.accent,
-                                                    color: '#FFFFFF',
-                                                    borderRadius: '12px',
-                                                    border: `3px solid ${CREATE_THEME.border}`,
-                                                    boxShadow: `0 4px 0 0 ${CREATE_THEME.border}`, // Solid shadow style
-                                                    textShadow: '1px 1px 0px rgba(0,0,0,0.2)'
-                                                }}
-                                            >
-                                                {step === 5 ? 'Review >' : 'Next >'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            );
-                        })()}
-
-                        {/* STEP 6: REVIEW */}
-                        {isReview && (
-                            <motion.div
-                                key="step-review"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="flex-1 flex flex-col items-center justify-center text-center space-y-6"
-                            >
-                                <InteractiveRobot username={username} forceState="happy" />
-
-                                <div className="space-y-2">
-                                    <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
-                                        Ready to Publish?
-                                    </h2>
-                                    <p className="text-secondary max-w-xs mx-auto">
-                                        You've crafted a 5-question quiz about <strong className="text-white">{topic}</strong>.
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 w-full max-w-sm mt-4">
-                                    <div className="modern-card p-4 text-center bg-black/20">
-                                        <div className="text-2xl font-bold text-white">5</div>
-                                        <div className="text-xs text-secondary">Questions</div>
-                                    </div>
-                                    <div className="modern-card p-4 text-center bg-black/20">
-                                        <div className="text-2xl font-bold text-success">Diff</div>
-                                        <div className="text-xs text-secondary">Mixed</div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-
-                    </AnimatePresence>
-                </FlowBody>
-
-
-
-
-
-                {/* Custom Footer for Review Step */}
-                {isReview && (
-                    <FlowFooter
-                        className="w-full max-w-sm mx-auto"
-                        {...(onPost ? {
-                            primaryAction: {
-                                label: isSaving ? 'Processing...' : <><span className="mr-2">🚀</span> Save & Post to Reddit</>,
-                                onClick: () => onPost(topic, questions),
-                                disabled: isSaving
-                            }
-                        } : {})}
-                        secondaryAction={{
-                            label: isSaving ? 'Saving...' : <><span className="mr-2">💾</span> Save to My Library</>,
-                            onClick: () => onSave(topic, questions),
-                            disabled: isSaving
-                        }}
-                    >
-                        <p className="text-[10px] text-center text-secondary opacity-60">
-                            By saving, you agree this content follows our community guidelines.
-                        </p>
-                    </FlowFooter>
-                )}
-            </FlowShell>
+                </div>
+            </div>
         </div>
     );
 };
