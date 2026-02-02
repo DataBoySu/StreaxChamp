@@ -158,7 +158,7 @@ export const App = () => {
       if (res.ok) {
         const data = await res.json();
         console.log('[handleSaveQuiz] Success:', data);
-        setMessage({ text: 'Quiz Created Successfully! 🎉', type: 'success', timesUp: false });
+        setMessage({ text: 'Quiz Created Successfully!', type: 'success', timesUp: false });
         setTimeout(() => {
           setMessage({ text: '', type: '', timesUp: false }); // Auto-dismiss ghost banner
           setIsSavingQuiz(false);

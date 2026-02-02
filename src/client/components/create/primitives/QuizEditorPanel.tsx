@@ -18,12 +18,12 @@ export const QuizEditorPanel: React.FC<QuizEditorPanelProps> = ({
     onUpdateOption
 }) => {
     return (
-        <div className="flex-1 flex flex-col h-full overflow-y-auto pb-4 px-2">
+        <div className="flex-1 flex flex-col h-full overflow-y-auto px-2">
 
 
-            <div className="flex-1 flex flex-col gap-6 w-full max-w-2xl mx-auto">
+            <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto">
                 {/* Question Input Card */}
-                <div className="nes-container is-rounded with-title p-4" style={{ backgroundColor: 'white' }}>
+                <div className="nes-container is-rounded with-title" style={{ backgroundColor: 'white', padding: '0.75rem' }}>
                     <p className="title" style={{ backgroundColor: 'white', padding: '0 10px', fontSize: '12px' }}>Question</p>
                     <textarea
                         value={question.question || ''}
@@ -36,22 +36,22 @@ export const QuizEditorPanel: React.FC<QuizEditorPanelProps> = ({
                 </div>
 
                 {/* Options Stack */}
-                <div className="flex flex-col gap-4 pb-4">
+                <div className="flex flex-col gap-2">
                     {question.options.map((opt: string, optIdx: number) => {
                         const isCorrect = question.correctAnswer === optIdx;
                         return (
                             <div
                                 key={optIdx}
-                                className={`nes-container is-rounded flex items-center ${isCorrect ? 'is-dark' : ''}`}
+                                className={`nes-container is-rounded flex items-center`}
                                 style={{
-                                    padding: '0.75rem',
+                                    padding: '0.5rem',
                                     display: 'flex',
                                     flexDirection: 'row',
                                     gap: '12px',
                                     alignItems: 'center',
-                                    backgroundColor: isCorrect ? '#212529' : '#fff',
-                                    borderColor: isCorrect ? '#fff' : 'black',
-                                    transition: 'transform 0.1s ease-out'
+                                    backgroundColor: isCorrect ? '#FFB6C1' : '#fff',
+                                    borderColor: isCorrect ? '#FF69B4' : '#212529',
+                                    transition: 'all 0.2s ease-out'
                                 }}
                             >
                                 {/* Pixel Badge: A/B/C/D */}
@@ -69,8 +69,16 @@ export const QuizEditorPanel: React.FC<QuizEditorPanelProps> = ({
                                         value={opt}
                                         onChange={(e) => onUpdateOption(optIdx, e.target.value)}
                                         placeholder={`Option ${optIdx + 1}`}
-                                        className={`nes-input ${isCorrect ? 'is-dark' : ''}`}
-                                        style={{ margin: 0, fontSize: '12px', height: 'auto', padding: '8px' }}
+                                        className={`nes-input`}
+                                        style={{
+                                            margin: 0,
+                                            fontSize: '12px',
+                                            height: 'auto',
+                                            padding: '8px',
+                                            width: '100%',
+                                            backgroundColor: isCorrect ? '#4c7a5eff' : '#1a1515ff',
+                                            color: 'white', // Ensure text is visible on dark backgrounds
+                                        }}
                                     />
                                 </div>
 

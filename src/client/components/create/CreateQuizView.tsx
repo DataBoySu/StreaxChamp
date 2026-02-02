@@ -75,11 +75,11 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ onSave, onPost, 
     };
 
     return (
-        <div className="w-full min-h-screen flex flex-col items-center justify-center p-4 relative" style={{ backgroundColor: '#fff0f3', fontFamily: '"Press Start 2P", sans-serif' }}>
+        <div className="w-full min-h-screen flex flex-col items-center justify-center p-2 relative" style={{ backgroundColor: '#FFF0F5', fontFamily: '"Poppins", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
             {/* Background Pattern */}
             <div style={{
-                position: 'absolute', inset: 0, opacity: 0.1,
-                backgroundImage: 'radial-gradient(#ff4d6d 2px, transparent 2px)',
+                position: 'absolute', inset: 0, opacity: 0.08,
+                backgroundImage: 'radial-gradient(#FFB6C1 2px, transparent 2px)',
                 backgroundSize: '24px 24px', pointerEvents: 'none'
             }} />
 
@@ -101,11 +101,10 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ onSave, onPost, 
 
             {/* Main Canvas */}
             <div className="w-full max-w-3xl relative z-10">
-                <div className="nes-container is-rounded with-title" style={{ backgroundColor: 'white', minHeight: '600px', paddingBottom: '3rem' }}>
+                <div className="nes-container is-rounded with-title" style={{ backgroundColor: 'white', minHeight: '600px', padding: '1rem' }}>
                     <p className="title" style={{ backgroundColor: 'white' }}>Create Quiz</p>
 
-                    {/* Navigation Header */}
-                    <div className="flex justify-between items-center mb-6 border-b-2 border-slate-100 pb-4">
+                    <div className="flex justify-between items-center mb-4 pb-2" style={{ borderBottom: '2px solid #f0f0f0' }}>
                         <button type="button" className="nes-btn" onClick={() => (step === 0 ? onBack() : setStep(s => s - 1))} style={{ fontSize: '0.8rem' }}>
                             &lt; Back
                         </button>
@@ -114,7 +113,7 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ onSave, onPost, 
                         </span>
                     </div>
 
-                    <div className="flex-1 flex flex-col relative px-2">
+                    <div className="flex-1 flex flex-col relative">
                         <AnimatePresence mode="wait">
                             {/* TOPIC STEP */}
                             {step === 0 && (
@@ -197,12 +196,9 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ onSave, onPost, 
 
                                     <div className="flex flex-col gap-2 mb-6">
                                         {questions.map((q, i) => (
-                                            <div key={i} className="nes-container is-rounded p-2" style={{ padding: '0.5rem', fontSize: '0.7rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ maxWidth: '70%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <div key={i} className="nes-container is-rounded" style={{ padding: '0.75rem', fontSize: '0.85rem', backgroundColor: 'white', color: 'black' }}>
+                                                <span style={{ color: 'black' }}>
                                                     {i + 1}. {q.question || 'Empty'}
-                                                </span>
-                                                <span className="nes-badge is-icon">
-                                                    <span className="is-success" style={{ top: -5 }}>✓</span>
                                                 </span>
                                             </div>
                                         ))}
@@ -211,11 +207,11 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ onSave, onPost, 
                                     <div className="flex flex-col gap-4 mt-4">
                                         {onPost && (
                                             <button type="button" className={`nes-btn is-success ${isSaving ? 'is-disabled' : ''}`} onClick={() => onPost(topic, questions)} disabled={isSaving}>
-                                                {isSaving ? 'Posting...' : '🚀 Post to Reddit'}
+                                                {isSaving ? 'Posting...' : 'Post to Reddit'}
                                             </button>
                                         )}
                                         <button type="button" className={`nes-btn ${isSaving ? 'is-disabled' : ''}`} onClick={() => onSave(topic, questions)} disabled={isSaving}>
-                                            💾 Save to Library
+                                            Save to Library
                                         </button>
                                     </div>
                                 </motion.div>
