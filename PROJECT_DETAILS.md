@@ -1,117 +1,147 @@
-🚨 MOBILE QUIZ LAYOUT IS STILL UNPLAYABLE — HARD CONSTRAINT FIX REQUIRED
+You are working on StreaxChamp’s Create Quiz flow.
+Your task is NOT to add features.
+Your task is to REALIGN the Create Quiz Question UI to the SAME visual language
+as Creator Studio.
 
-The previous fixes FAILED because they relied on scrolling.
-That is NOT acceptable.
+READ THIS CAREFULLY. DO NOT FREE-STYLING.
 
-We must implement a DETERMINISTIC MOBILE LAYOUT SYSTEM
-that GUARANTEES the "Next" button is always reachable.
+────────────────────────────────────────
+CORE GOAL
+────────────────────────────────────────
+The Create Quiz question editor must feel:
+• playful
+• tactile
+• NES-console-like
+• card-based
+• animated
+• NOT like a form
+• NOT like a spreadsheet
+• NOT like a CRUD editor
 
-══════════════════════════════════════
-🧠 CORE RULE (NON-NEGOTIABLE)
-══════════════════════════════════════
-On MOBILE, the quiz screen must be treated as a FIXED-VISUAL CANVAS
-with INTERNAL ADAPTATION — NOT unbounded vertical growth.
+It must visually belong to the Creator Studio.
 
-The screen is divided into RESERVED ZONES.
+────────────────────────────────────────
+STRICT DESIGN CONSTRAINTS
+────────────────────────────────────────
+1. USE nes.css components for:
+   - containers
+   - input boxes
+   - option rows
+   - buttons
+   - alerts
 
-══════════════════════════════════════
-1️⃣ DEFINE A MOBILE HEIGHT BUDGET
-══════════════════════════════════════
-Introduce a mobile-only layout contract:
+2. USE framer-motion ONLY for:
+   - question transitions (slide / fade)
+   - option select feedback
+   - validation feedback (shake / pulse)
+   - button press depth illusion
 
-Total usable height = viewport height - header - padding
+3. DO NOT:
+   ❌ Use plain HTML inputs without NES styling
+   ❌ Use table/grid layouts
+   ❌ Stack raw inputs edge-to-edge
+   ❌ Let content touch borders
+   ❌ Show permanent warning banners
+   ❌ Show Excel-like row separators
 
-Divide it as:
+────────────────────────────────────────
+LAYOUT ARCHITECTURE (MANDATORY)
+────────────────────────────────────────
+Each question screen must be structured as:
 
-- Question block: MAX 30%
-- Options block: 45–50%
-- Next button block: FIXED (min 56px + margin)
+[ NES-CARD : Question Canvas ]
+  ├── Question Header
+  │     • "Question X / 5"
+  │     • small progress indicator
+  │
+  ├── Question Input Card
+  │     • nes-input
+  │     • multi-line
+  │     • generous padding
+  │
+  ├── Options Stack (4)
+  │     Each option:
+  │       • nes-container
+  │       • left: A / B / C / D badge
+  │       • center: text input
+  │       • right: circular correct-toggle
+  │       • option card lifts when selected
+  │
+  ├── Validation Feedback Area
+  │     • occupies space but hidden by default
+  │     • messages fade in/out automatically
+  │
+  └── Primary Action Button
+        • NES-style
+        • full-width
+        • physical press animation
 
-This must be enforced in code.
+The entire canvas must be CENTERED,
+with breathing room on all sides.
 
-══════════════════════════════════════
-2️⃣ TWO-PASS OPTION RENDERING (MANDATORY)
-══════════════════════════════════════
+────────────────────────────────────────
+VALIDATION BEHAVIOR (IMPORTANT)
+────────────────────────────────────────
+Current behavior is WRONG.
 
-PASS 1 — LAYOUT MODE SELECTION
---------------------------------
-Before rendering options:
+Fix it as follows:
 
-IF mobile:
-  - If answerCount === 4 AND all option lengths <= 16 chars:
-      layout = "GRID_2x2"
-  - ELSE:
-      layout = "STACK_4x1"
+• Validation messages must:
+  - auto-dismiss after 2–3 seconds
+  - animate in (slide-down + fade)
+  - animate out automatically
+  - NEVER persist across screens
 
-Desktop behavior must remain unchanged.
+• Validation must NOT block UI visually.
+• No red banners glued to the top.
 
-PASS 2 — FONT & HEIGHT ADAPTATION
---------------------------------
-For MOBILE ONLY:
+Use motion-based feedback instead of text spam.
 
-Calculate maxOptionHeight = optionsBlockHeight / answerCount
+────────────────────────────────────────
+OPTION SELECTION RULES
+────────────────────────────────────────
+• Only ONE option can be marked correct
+• Selecting correct option:
+  - card glows subtly
+  - checkmark animates in
+• Selection MUST NOT overlap text
+• Touch targets must be large (mobile-first)
 
-Rules:
-- Start with base font size (0.85rem)
-- If option text overflows its maxOptionHeight:
-    ↓ reduce font size stepwise (0.85 → 0.8 → 0.75)
-- HARD STOP at 0.75rem
-- If still overflowing:
-    - Allow internal text wrapping
-    - BUT option height must NEVER exceed its allocated slot
+────────────────────────────────────────
+TRANSITIONS
+────────────────────────────────────────
+• Moving between Question X → X+1:
+  - slide left/right
+  - slight scale-down of old card
+• Review screen:
+  - stacked NES cards
+  - no tables
+  - each question collapsible
 
-No option is allowed to push siblings or the Next button.
+────────────────────────────────────────
+POPUPS / TOASTS
+────────────────────────────────────────
+If a quiz is created successfully:
+• Use a floating NES toast
+• Centered
+• Auto-dismiss
+• NOT stuck on Creator Studio screen
+• MUST clean itself on route change
 
-══════════════════════════════════════
-3️⃣ NEXT BUTTON SAFETY GUARANTEE
-══════════════════════════════════════
-The "Next" button must live in a RESERVED FOOTER ZONE.
+────────────────────────────────────────
+DELIVERABLE
+────────────────────────────────────────
+Refactor ONLY UI & animation.
+DO NOT TOUCH:
+• quiz logic
+• Firestore
+• validation rules
+• API calls
 
-Rules:
-- It is NOT part of the options container
-- It is NOT affected by option height
-- It must always be fully visible without scrolling
-- Add a minimum 16px visual gap above it
+At the end, briefly explain:
+1. Which nes.css components were used
+2. Which framer-motion animations were added
+3. How mobile usability improved
 
-══════════════════════════════════════
-4️⃣ CSS & STYLE CONSTRAINTS
-══════════════════════════════════════
-FORBIDDEN:
-- height: auto on the options container (mobile)
-- options determining parent height
-- relying on overflow scroll to reach Next
-- JS ResizeObserver hacks
-
-REQUIRED:
-- max-height on options container (mobile)
-- overflow: hidden INSIDE options only (never on whole screen)
-- font-size scaling instead of layout collapse
-
-══════════════════════════════════════
-5️⃣ WHAT MUST NOT CHANGE
-══════════════════════════════════════
-- Desktop layout
-- Daily quiz rendering
-- NES button depth / shadows
-- Option correctness logic
-
-══════════════════════════════════════
-6️⃣ VERIFICATION (YOU MUST TEST THESE)
-══════════════════════════════════════
-On MOBILE (Reddit app):
-
-☐ Long question + long answers → Next visible
-☐ Short answers → clean 2x2
-☐ Very long answers → smaller text, no overflow
-☐ No overlap with footer
-☐ No option hides the Next button
-
-If ANY case fails, the fix is INVALID.
-
-══════════════════════════════════════
-7️⃣ OUTPUT REQUIREMENT
-══════════════════════════════════════
-Explain clearly:
-- Where the height budget is enforced
-- How font scaling is applied
-- Why this cannot regress on mobile again
+If you produce anything that looks like a spreadsheet,
+you have failed this task.

@@ -160,6 +160,7 @@ export const App = () => {
         console.log('[handleSaveQuiz] Success:', data);
         setMessage({ text: 'Quiz Created Successfully! 🎉', type: 'success', timesUp: false });
         setTimeout(() => {
+          setMessage({ text: '', type: '', timesUp: false }); // Auto-dismiss ghost banner
           setIsSavingQuiz(false);
           if (shouldClose) setIsCreating(false);
         }, 2000);
@@ -204,6 +205,7 @@ export const App = () => {
       if (res.ok) {
         setMessage({ text: 'Posted to Reddit! 🚀', type: 'success', timesUp: false });
         setTimeout(() => {
+          setMessage({ text: '', type: '', timesUp: false }); // Auto-dismiss ghost banner
           setIsSavingQuiz(false);
           // Do NOT setIsCreating(false) here - let CreatorDashboard handle state
         }, 2000);

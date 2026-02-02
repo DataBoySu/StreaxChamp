@@ -6,7 +6,7 @@ import { FlowShell, FlowBody } from './primitives/FlowShell';
 import { FlowHeader } from './primitives/FlowHeader';
 import { FlowFooter } from './primitives/FlowFooter';
 import { QuizEditorPanel } from './primitives/QuizEditorPanel';
-import { NoticeCard } from './primitives/NoticeCard';
+
 
 // 🎨 LOCAL THEME DEFINITION - LOCKED (Ignores Global Dark Mode)
 const CREATE_THEME = {
@@ -17,7 +17,11 @@ const CREATE_THEME = {
     border: '#1f1f1f',   // Strict Black Border
     accent: '#FF9DB5',   // Soft Pink CTA
     backBtn: '#E0D8CC',  // Back Button Bg
-    shadow: '#1f1f1f'    // Strict Shadow
+    shadow: '#1f1f1f',   // Strict Shadow
+    // New styles for calm validation
+    warningBg: '#FFF4E5', // Warm Amber/Peach
+    warningBorder: '#FB8C00', // Deep Orange
+    warningText: '#663C00'
 };
 
 interface CreateQuizViewProps {
@@ -43,6 +47,20 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
     );
 
     const [validationError, setValidationError] = useState<string | null>(null);
+
+    // Auto-dismiss validation error after 2.5s
+    useEffect(() => {
+        if (validationError) {
+            const timer = setTimeout(() => {
+                setValidationError(null);
+            }, 2500);
+            return () => clearTimeout(timer);
+        }
+    }, [validationError]);
+
+    const clearValidation = () => {
+        if (validationError) setValidationError(null);
+    };
 
     const handleNext = () => {
         setValidationError(null);
@@ -75,6 +93,7 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
     };
 
     const updateQuestion = (index: number, field: keyof Question, value: any) => {
+        clearValidation(); // Dismiss error on interaction
         const newQs = [...questions];
         const target = newQs[index];
         if (target) {
@@ -84,6 +103,7 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
     };
 
     const updateOption = (qIndex: number, oIndex: number, text: string) => {
+        clearValidation(); // Dismiss error on interaction
         const newQs = [...questions];
         const target = newQs[qIndex];
         if (target) {
@@ -152,12 +172,37 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                         <div className="w-20"></div> {/* Spacer for alignment */}
                     </div>
                 ) : (
-                    <FlowHeader
-                        title="Create Quiz"
-                        onBack={handleBackStep}
-                        currentStep={step}
-                        totalSteps={6}
-                    />
+                    <div className="relative">
+                        <FlowHeader
+                            title="Create Quiz"
+                            onBack={handleBackStep}
+                            currentStep={step}
+                            totalSteps={6}
+                        />
+                        {/* INLINE VALIDATION TOAST (Below Header) */}
+                        <AnimatePresence>
+                            {validationError && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -5 }}
+                                    className="absolute top-full left-0 right-0 z-50 flex justify-center mt-2 pointer-events-none"
+                                >
+                                    <div
+                                        className="flex items-center gap-2 px-4 py-2 rounded-full shadow-md pointer-events-auto backdrop-blur-sm"
+                                        style={{
+                                            backgroundColor: 'rgba(255, 244, 229, 0.95)', // Warm Amber/Peach with opacity
+                                            border: `1px solid ${CREATE_THEME.warningBorder}`,
+                                            color: CREATE_THEME.warningText
+                                        }}
+                                    >
+                                        <span className="text-lg">⚠️</span>
+                                        <span className="text-sm font-bold">{validationError}</span>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 )}
 
                 <FlowBody className={isEditor ? '' : 'flex flex-col justify-center'}>
@@ -212,7 +257,10 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                                         <input
                                             type="text"
                                             value={topic}
-                                            onChange={(e) => setTopic(e.target.value)}
+                                            onChange={(e) => {
+                                                setTopic(e.target.value);
+                                                clearValidation();
+                                            }}
                                             placeholder="e.g., Space Exploration"
                                             style={{
                                                 height: '44px',
@@ -260,6 +308,29 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                                         >
                                             Start Building &gt;
                                         </button>
+
+                                        {/* validation error for topic */}
+                                        <AnimatePresence>
+                                            {validationError && isTopic && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -5 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -5 }}
+                                                    className="w-full mt-3 flex justify-center"
+                                                >
+                                                    <div
+                                                        className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold"
+                                                        style={{
+                                                            color: CREATE_THEME.warningText,
+                                                            backgroundColor: 'rgba(255, 244, 229, 0.8)'
+                                                        }}
+                                                    >
+                                                        <span>⚠️</span>
+                                                        <span>{validationError}</span>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
                                 </div>
 
@@ -277,16 +348,51 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                                     initial={{ opacity: 0, x: 50 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -50 }}
-                                    className="h-full"
+                                    className="h-full w-full flex justify-center px-4"
                                 >
-                                    <QuizEditorPanel
-                                        question={currentQ}
-                                        topic={topic}
-                                        stepNumber={step}
-                                        totalSteps={5}
-                                        onUpdateQuestion={(field, val) => updateQuestion(step - 1, field, val)}
-                                        onUpdateOption={(optIdx, val) => updateOption(step - 1, optIdx, val)}
-                                    />
+                                    {/* INNER CANVAS WRAPPER - Consistent with Topic Step */}
+                                    <div
+                                        className="flex flex-col w-full h-full relative"
+                                        style={{
+                                            backgroundColor: CREATE_THEME.canvasBg,
+                                            border: `3px solid ${CREATE_THEME.border}`,
+                                            boxShadow: `6px 6px 0 0 ${CREATE_THEME.shadow}`,
+                                            maxWidth: '720px',
+                                            // FIX: We need height constraints to allow internal scrolling of the Panel
+                                            maxHeight: 'calc(100vh - 180px)', // Rough estimate to leave room for header/footer
+                                            overflow: 'hidden' // Panel handles scrolling internally
+                                        }}
+                                    >
+                                        <div className="flex-1 overflow-hidden p-6 relative">
+                                            <QuizEditorPanel
+                                                question={currentQ}
+                                                topic={topic}
+                                                stepNumber={step}
+                                                totalSteps={5}
+                                                onUpdateQuestion={(field, val) => updateQuestion(step - 1, field, val)}
+                                                onUpdateOption={(optIdx, val) => updateOption(step - 1, optIdx, val)}
+                                            />
+                                        </div>
+
+                                        {/* ANCHORED FOOTER - Inside Canvas */}
+                                        <div className="w-full shrink-0 px-4 pb-5 pt-3 border-t border-[#1f1f1f]/5 bg-white/50 backdrop-blur-sm">
+                                            <button
+                                                onClick={handleNext}
+                                                className="w-full text-lg font-black uppercase tracking-widest transition-all active:scale-[0.98] active:translate-y-1"
+                                                style={{
+                                                    height: '56px',
+                                                    backgroundColor: CREATE_THEME.accent,
+                                                    color: '#FFFFFF',
+                                                    borderRadius: '12px',
+                                                    border: `3px solid ${CREATE_THEME.border}`,
+                                                    boxShadow: `0 4px 0 0 ${CREATE_THEME.border}`, // Solid shadow style
+                                                    textShadow: '1px 1px 0px rgba(0,0,0,0.2)'
+                                                }}
+                                            >
+                                                {step === 5 ? 'Review >' : 'Next >'}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </motion.div>
                             );
                         })()}
@@ -326,26 +432,9 @@ export const CreateQuizView: React.FC<CreateQuizViewProps> = ({ username, onSave
                     </AnimatePresence>
                 </FlowBody>
 
-                {/* Validation Message */}
-                {validationError && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50"
-                    >
-                        <NoticeCard type="error" message={validationError} />
-                    </motion.div>
-                )}
 
-                {/* Footer Navigation - HIDE on Step 0 since we have custom one */}
-                {!isTopic && !isReview && (
-                    <FlowFooter
-                        primaryAction={{
-                            label: step === 5 ? 'Review >' : 'Next >',
-                            onClick: handleNext
-                        }}
-                    />
-                )}
+
+
 
                 {/* Custom Footer for Review Step */}
                 {isReview && (

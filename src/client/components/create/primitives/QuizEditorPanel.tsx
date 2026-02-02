@@ -19,53 +19,65 @@ export const QuizEditorPanel: React.FC<QuizEditorPanelProps> = ({
     onUpdateOption
 }) => {
     return (
-        <div className="flex-1">
-            <div className="text-center mb-6">
-                <span className="inline-block bg-primary/20 text-primary px-3 py-1 rounded-full text-sm font-bold mb-2">
-                    Question {stepNumber}/{totalSteps}
+        <div className="flex-1 flex flex-col h-full overflow-y-auto pb-2 px-1">
+            {/* Header - Minimal & Secondary */}
+            <div className="flex justify-between items-center mb-3 shrink-0 px-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#1f1f1f]/40 truncate max-w-[150px]">
+                    {topic}
                 </span>
-                <h3 className="text-white text-xl font-bold">{topic}</h3>
+                <span className="text-xs font-bold text-[#1f1f1f]/30">
+                    {stepNumber} / {totalSteps}
+                </span>
             </div>
 
-            <div className="space-y-6">
-                <div>
-                    <label className="text-sm text-secondary uppercase font-bold mb-2 block">Question Text</label>
+            <div className="space-y-4 flex-1 w-full max-w-2xl mx-auto flex flex-col">
+                <div className="shrink-0">
+                    {/* Question Input - Compact Default, Grows on Focus */}
                     <textarea
                         value={question.question || ''}
                         onChange={(e) => onUpdateQuestion('question', e.target.value)}
-                        placeholder="Enter your question here..."
-                        className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-lg text-white focus:border-primary/50 focus:outline-none min-h-[120px]"
+                        placeholder="Type question..."
+                        className="w-full bg-white border-2 border-[#1f1f1f]/10 rounded-xl p-4 text-lg font-bold text-[#1f1f1f] placeholder:text-[#1f1f1f]/20 focus:border-[#FB8C00] focus:ring-0 focus:outline-none min-h-[84px] focus:min-h-[140px] resize-none transition-all duration-300 shadow-sm leading-tight"
                     />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                    {question.options.map((opt: string, optIdx: number) => (
-                        <div key={optIdx} className="relative group">
-                            <input
-                                type="text"
-                                value={opt}
-                                onChange={(e) => onUpdateOption(optIdx, e.target.value)}
-                                placeholder={`Option ${optIdx + 1}`}
-                                className={`w-full bg-black/30 border-2 rounded-xl p-4 pr-16 text-base focus:outline-none transition-all min-h-[60px] ${question.correctAnswer === optIdx
-                                    ? 'border-success bg-success/10 text-white'
-                                    : 'border-white/10 text-secondary focus:border-primary/50'
-                                    }`}
-                            />
-                            <button
-                                onClick={() => onUpdateQuestion('correctAnswer', optIdx)}
-                                className={`absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors shadow-lg z-10 ${question.correctAnswer === optIdx
-                                    ? 'border-success bg-success text-black'
-                                    : 'border-white/20 hover:border-white/50 bg-black/50'
-                                    }`}
-                            >
-                                {question.correctAnswer === optIdx && <span className="font-bold text-lg">✓</span>}
-                            </button>
-                        </div>
-                    ))}
-                </div>
+                {/* Options Grid - Big Tap Targets */}
+                <div className="grid grid-cols-1 gap-2.5 flex-1 content-start">
+                    {question.options.map((opt: string, optIdx: number) => {
+                        const isCorrect = question.correctAnswer === optIdx;
+                        return (
+                            <div key={optIdx} className="flex items-stretch gap-3 w-full group min-h-[56px]">
+                                {/* Selection Column (Left) */}
+                                <button
+                                    onClick={() => onUpdateQuestion('correctAnswer', optIdx)}
+                                    className={`shrink-0 w-[56px] rounded-xl border-2 flex items-center justify-center transition-all shadow-sm active:scale-95 ${isCorrect
+                                            ? 'border-[#FB8C00] bg-[#FFF4E5] text-[#FB8C00] shadow-md z-10'
+                                            : 'border-[#1f1f1f]/10 bg-white text-[#1f1f1f]/20 hover:border-[#1f1f1f]/30'
+                                        }`}
+                                >
+                                    {isCorrect ? (
+                                        <span className="text-xl font-black">✔</span>
+                                    ) : (
+                                        <span className="text-xs font-bold opacity-60">
+                                            {String.fromCharCode(65 + optIdx)}
+                                        </span>
+                                    )}
+                                </button>
 
-                <div className="text-center text-sm text-secondary/70 italic mt-4">
-                    Tap the circle to mark the correct answer.
+                                {/* Option Text Input */}
+                                <input
+                                    type="text"
+                                    value={opt}
+                                    onChange={(e) => onUpdateOption(optIdx, e.target.value)}
+                                    placeholder={`Option ${optIdx + 1}`}
+                                    className={`flex-1 bg-white border-2 rounded-xl px-4 text-base font-medium text-[#1f1f1f] placeholder:text-[#1f1f1f]/20 focus:outline-none transition-all shadow-sm active:scale-[0.99] ${isCorrect
+                                            ? 'border-[#FB8C00] bg-[#FFF4E5]/30'
+                                            : 'border-[#1f1f1f]/10 focus:border-[#FB8C00]'
+                                        }`}
+                                />
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>
