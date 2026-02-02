@@ -1353,19 +1353,22 @@ export class FirestoreRestService {
         structuredQuery: {
           from: [{ collectionId: 'daily-quizzes' }],
           select: { fields: [{ fieldPath: '__name__' }] }, // Only fetch ID
-          orderBy: [{ field: { fieldPath: '__name__' }, direction: 'DESCENDING' }],
+          // orderBy: removed to avoid index requirement
           limit: 100 // Reasonable limit for archive
         }
       };
 
       const results = await this.runQuery(query);
 
-      return results.map((doc: any) => {
+      const ids = results.map((doc: any) => {
         // ID is the last part of the name path
         // e.g., projects/.../databases/.../documents/daily-quizzes/2026-02-02
         const path = doc.document?.name || '';
         return path.split('/').pop() || '';
       }).filter(Boolean);
+
+      // Sort descending (newest first)
+      return ids.sort().reverse();
 
     } catch (e) {
       Logger.error('[Firestore] listDailyQuizDates failed', e);
@@ -1443,9 +1446,10 @@ export class FirestoreRestService {
       const query = {
         structuredQuery: {
           from: [{ collectionId: 'leaderboard' }],
+          // Sort ONLY by score to avoid composite index requirement (FAILED_PRECONDITION).
+          // Secondary sort (completedAt) will be done in-memory.
           orderBy: [
-            { field: { fieldPath: 'score' }, direction: 'DESCENDING' },
-            { field: { fieldPath: 'completedAt' }, direction: 'ASCENDING' }
+            { field: { fieldPath: 'score' }, direction: 'DESCENDING' }
           ],
           limit: limit
         }

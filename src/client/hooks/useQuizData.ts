@@ -49,6 +49,10 @@ export const useQuizData = (contextPostId?: string | null, date?: string): UseQu
       setLoading(true);
       setError(null);
       setConnectionStatus('connecting');
+      // Deep Reset: Clear previous data immediately to prevent stale renders
+      setQuestions([]);
+      setQuiz(null);
+      setHasCompleted(false);
       // Fetch via internal API (avoids CSP blocked external Firestore origin)
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (contextPostId) {

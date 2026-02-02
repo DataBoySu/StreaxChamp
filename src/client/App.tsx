@@ -19,7 +19,6 @@ import { QuizActiveView } from './components/quiz/QuizActiveView';
 import { QuizResult } from './components/quiz/QuizResult';
 import { GapView } from './components/quiz/GapView';
 import { BonusQuestionView } from './components/quiz/BonusQuestionView';
-import { firebaseQuizService } from './services/FirebaseQuizService';
 import { NoTopicPrompt } from './components/modals/NoTopicPrompt';
 import { GameSidebar } from './components/dashboard/GameSidebar';
 import { GlobalDashboard } from './components/dashboard/GlobalDashboard';
@@ -39,7 +38,8 @@ export const App = () => {
   const theme = useTheme();
   // Archive State
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const { questions: dailyQuestions, quiz: dailyQuiz, loading, hasCompleted: hasDailyCompleted, refetch: refetchDaily } = useQuizData(selectedDate);
+  // Fix: pass null for contextPostId, and selectedDate as second argument
+  const { questions: dailyQuestions, quiz: dailyQuiz, loading, hasCompleted: hasDailyCompleted, refetch: refetchDaily } = useQuizData(null, selectedDate);
 
   const [quizStarted, setQuizStarted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -66,7 +66,12 @@ export const App = () => {
   const [showTopicMenu, setShowTopicMenu] = useState(false);
   const [userTotalScore, setUserTotalScore] = useState(0);
   const [selectedTopic, setSelectedTopic] = useState<{ title: string; slug: string } | null>(null);
-  interface SelectedTopicQuiz { id?: string | undefined; questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[]; bonus?: { question: string; options: string[]; correctIndex: number } | null }
+  interface SelectedTopicQuiz {
+    id?: string | undefined;
+    topicSlug?: string; // [FIX] Track which topic this quiz belongs to
+    questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[];
+    bonus?: { question: string; options: string[]; correctIndex: number } | null
+  }
   const [selectedTopicQuiz, setSelectedTopicQuiz] = useState<SelectedTopicQuiz | null>(null);
   const [topicQuizStatus, setTopicQuizStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [showNoTopicPrompt, setShowNoTopicPrompt] = useState(false);
@@ -230,10 +235,7 @@ export const App = () => {
     !selectedTopic
   );
   const { data: landingSummary, loading: landingSummaryLoading, refresh: refreshLandingSummary } = useLandingSummary(!quizStarted && !showScore && !isCreating, pollingEnabled && !isCreating);
-  const { username: hookUsername, postId: currentPostId } = useUsername();
-
-  // Load quiz data (Daily or specific to Post)
-  const { quiz, loading: quizLoading, error: quizError, connectionStatus: quizConnStatus, lastUpdated: quizLastUpdated } = useQuizData(currentPostId);
+  const { username: hookUsername } = useUsername();
 
   // Use new global play history hook
   const { history: globalHistory, loading: globalHistoryLoading, savePlay, hasPlayed } = useHistory(!quizStarted && !isCreating, pollingEnabled && !isCreating);
@@ -574,17 +576,46 @@ export const App = () => {
     [bonusAnswered, timer, score, completeQuiz]
   );
 
+  // Refs for robust timer/state management
+  const timerRef = useRef<number | null>(null);
+  const quizStartedRef = useRef(quizStarted);
+
+  useEffect(() => {
+    quizStartedRef.current = quizStarted;
+  }, [quizStarted]);
+
+
+
+  // Robust Logic: Helper to stop timer using Ref to avoid state staleness
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setTimer(null); // Sync state
+    setTimerActive(false);
+  };
+
   // startTimer reads handler refs to avoid circular deps
+  // Guards added: Check !quizStarted to prevent ghost timers
   const startTimer = useCallback(
     (duration: number) => {
-      if (timer) clearInterval(timer);
+      stopTimer();
+      // Guard: Do not start timer if quiz not started
+      if (!quizStarted && !showBonusQuestion) return;
+
       setTimeLeft(duration);
       setTimerActive(true);
       const newTimer = window.setInterval(() => {
+        // Guard: If quiz stopped mid-timer, kill it
+        if (!quizStartedRef.current && !showBonusQuestion) {
+          stopTimer();
+          return;
+        }
+
         setTimeLeft((prevTime) => {
           if (prevTime <= 1) {
-            clearInterval(newTimer);
-            setTimerActive(false);
+            stopTimer();
             if (showScore) return 0;
             if (showBonusQuestion && !bonusAnswered && bonusQuestion) {
               handleBonusAnswerRef.current?.(null, bonusQuestion.correctAnswer);
@@ -597,15 +628,16 @@ export const App = () => {
         });
       }, 1000);
       setTimer(newTimer);
+      timerRef.current = newTimer;
     },
     [
-      timer,
       showScore,
       showBonusQuestion,
       bonusAnswered,
       questions,
       currentQuestionIndex,
       bonusQuestion,
+      quizStarted
     ]
   );
 
@@ -655,6 +687,8 @@ export const App = () => {
     setShowBonusQuestion(false);
     setShowScore(false);
     setShowGap(false);
+    setShowExplanation(false); // [FIX] Reset explanation screen state
+    setExplanationData(null);  // [FIX] Clear explanation data
     setSelectedAnswer(null);
     setCorrectAnswer(null);
     setMessage({ text: '', type: '', timesUp: false });
@@ -703,7 +737,17 @@ export const App = () => {
 
     // Unified Play Handler: Log history AND submit score
     const finalizePlay = async () => {
-      // Step 1: Save to History (ALWAYS, even on replays)
+      // Check for Dev Mode (Invisible Activity)
+      const isDevMode = CONFIG.DEV.SAFE_MODE && CONFIG.DEV.USERNAMES.includes(nickname);
+      if (isDevMode) {
+        console.log('[DevMode] 🛡️ SAFE MODE ACTIVE: Suppressing activity for', nickname);
+        setMessage({ type: 'info', text: 'Dev Mode: Results not saved', timesUp: false });
+        // Still refresh summary so they see current state without their contribution
+        try { void refreshLandingSummary?.(); } catch {/* ignore */ }
+        return;
+      }
+
+      // Step 1: Save to History (ALWAYS, even on replays, unless Dev Mode)
       await savePlay(
         key, // username
         nickname, // nickname
@@ -772,6 +816,19 @@ export const App = () => {
 
   useEffect(() => { if (!showScore) submittedRef.current = false; }, [showScore]);
 
+  // Reset quiz state when topic or date changes to prevent stale index
+  useEffect(() => {
+    resetQuiz();
+    // Universal Cache Clearing: Check if topic changed to clear persistent Topic Quiz data
+    // This ensures that switching from Topic A -> Topic B doesn't keep Topic A's questions.
+    // Also runs when switching to Daily (null) -> Clears topic data.
+    if (selectedTopic === null || (selectedTopicQuiz && selectedTopicQuiz.topicSlug !== selectedTopic?.slug)) {
+      // Only clear if the quiz we have doesn't match the current slug
+      setSelectedTopicQuiz(null);
+      setTopicQuizStatus('idle');
+    }
+  }, [selectedTopic?.slug, selectedDate]);
+
   // History is now managed by useHistory hook and saved after quiz completion
 
   if (showTopicMenu) {
@@ -780,27 +837,24 @@ export const App = () => {
         onClose={() => setShowTopicMenu(false)}
         onTopicReady={async (topic) => {
           setSelectedTopic({ title: topic.title, slug: topic.slug });
-          setShowTopicMenu(false);
-          // If quiz data comes from the selector (e.g. newly generated), use it directly
+
+          // Trust the Selector: Data MUST be ready here.
           if (topic.quiz && Array.isArray(topic.quiz.questions)) {
-            setSelectedTopicQuiz({ id: topic.quizId, questions: topic.quiz.questions, bonus: topic.bonus || null });
+            setSelectedTopicQuiz({
+              id: topic.quizId,
+              topicSlug: topic.slug, // [FIX] Store the slug for verification
+              questions: topic.quiz.questions,
+              bonus: topic.bonus || null
+            });
             setTopicQuizStatus('ready');
+            setShowTopicMenu(false); // Only close menu when data is successfully set
             return;
           }
-          // Otherwise fall back to fetch
-          setTopicQuizStatus('loading');
-          try {
-            const quiz = await firebaseQuizService.getOrGenerateTopicQuiz(topic.slug, authUser?.nickname);
-            if (quiz && Array.isArray(quiz.questions)) {
-              setSelectedTopicQuiz({ id: quiz.id, questions: quiz.questions, bonus: quiz.bonus || null });
-              setTopicQuizStatus('ready');
-            } else {
-              setTopicQuizStatus('error');
-            }
-          } catch (err) {
-            console.error('Quiz fetch error:', err);
-            setTopicQuizStatus('error');
-          }
+
+          // Fallback if Selector failed to pass data (Should not happen in new flow)
+          console.error('[App] TopicReady called without quiz data!', topic);
+          addError('quiz_load_failed', "I couldn't load that quiz. Please try again.");
+          // Do NOT close menu so user can retry
         }}
         onError={(code, robotDialogue) => {
           setShowTopicMenu(false);
@@ -999,12 +1053,16 @@ export const App = () => {
                         return;
                       }
                       if (!selectedTopic) {
-                        if (hasDailyCompleted) {
-                          console.log('[App] Daily quiz already completed.');
-                          return; // Strict block
+                        // Daily Quiz Logic:
+                        // 1. If date explicitly selected from Archive -> Start immediately.
+                        // 2. If default (Latest) -> Show confirmation popup (User request).
+                        if (selectedDate) {
+                          console.log('[App] ℹ️ Archive Quiz (Selected Date) Start Requested');
+                          startQuiz();
+                        } else {
+                          console.log('[App] ℹ️ Daily Quiz (Latest) Start Requested -> Showing Prompt');
+                          setShowNoTopicPrompt(true);
                         }
-                        console.log('[App] ℹ️ No topic selected, showing prompt');
-                        setShowNoTopicPrompt(true);
                         return;
                       }
                       console.log('[App] 🚀 Starting selected topic quiz:', selectedTopic.slug);
@@ -1015,6 +1073,7 @@ export const App = () => {
                     hasPlayed={hasCompletedQuizSession}
                     totalPoints={userTotalScore}
                     dailyCompleted={hasDailyCompleted}
+                    dailyQuizLoading={(loading || (!!selectedDate && dailyQuiz?.id !== selectedDate)) && !selectedTopic} // Check strict loading + stale data
                     onBrowseArchive={() => setShowArchive(true)} // NEW PROP
                   />
                 ) : showExplanation && explanationData ? (
@@ -1084,6 +1143,24 @@ export const App = () => {
           onSelectTopic={(slug, title) => {
             setSelectedTopic({ slug, title });
             localStorage.setItem('streax:selectedTopic', JSON.stringify({ slug, title }));
+          }}
+        />
+      )}
+
+      {showArchive && (
+        <DailyQuizArchive
+          onClose={() => setShowArchive(false)}
+          onSelectDate={(date) => {
+            // Unset selectedTopic AND selectedTopicQuiz to ensure daily mode
+            setSelectedTopic(null);
+            setSelectedTopicQuiz(null); // Fix: Clear stale topic quiz data!
+            localStorage.removeItem('streax:selectedTopic'); // Ensure persistence is cleared
+            setSelectedDate(date);
+            setShowArchive(false);
+            // Do NOT auto-start. 
+            // The UI will now show "DAILY QUIZ (Date)" and user clicks "START QUIZ".
+            // Since we updated selectedDate, the useQuizData hook will fetch the new quiz.
+            // And LandingHero will re-render with the new status.
           }}
         />
       )}

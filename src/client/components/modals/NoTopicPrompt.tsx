@@ -30,9 +30,9 @@ export const NoTopicPrompt: React.FC<NoTopicPromptProps> = ({
                 >
                     ✕
                 </button>
-                <h3 className="text-2xl font-extrabold mb-3 text-gradient">Select a Topic</h3>
+                <h3 className="text-2xl font-extrabold mb-3 text-gradient">Ready to Play?</h3>
                 <p className="text-secondary mb-6 leading-relaxed">
-                    You have not selected a topic. Please pick a topic to generate a quiz.
+                    Start a generated quiz for a specific topic, or challenge yourself with the official Daily Quiz.
                 </p>
                 <div className="flex flex-col gap-3">
                     <button

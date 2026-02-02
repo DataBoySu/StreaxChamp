@@ -16,7 +16,8 @@ interface LandingHeroProps {
     hasPlayed?: boolean;
     totalPoints?: number;
     dailyCompleted?: boolean;
-    onBrowseArchive?: () => void; // NEW
+    dailyQuizLoading?: boolean;
+    onBrowseArchive?: () => void;
 }
 
 export const LandingHero: React.FC<LandingHeroProps> = ({
@@ -30,7 +31,8 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
     hasPlayed = false,
     totalPoints = 0,
     dailyCompleted = false,
-    onBrowseArchive, // NEW
+    dailyQuizLoading = false,
+    onBrowseArchive,
 }) => {
     return (
         <motion.div
@@ -95,19 +97,21 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                     <div className="relative">
                         <InteractiveRobot username={username} errorMessage={errorMessage} hasPlayed={hasPlayed} totalPoints={totalPoints} />
                     </div>
-                    {/* Create Quiz Button (Small, under robot) */}
                 </div>
 
-
-                {/* Playful Timeout Message - REMOVED (Robot handles this now) */}
-
-                {/* Topic Select Button */}
-                <motion.div className="text-center mb-2">
+                {/* Topic Select & Daily Quiz Buttons */}
+                <motion.div className="text-center mb-2 flex justify-center gap-3">
                     <button
                         onClick={onOpenTopicMenu}
-                        className="modern-button modern-button-primary px-4 py-2 font-bold"
+                        className="modern-button modern-button-primary px-4 py-2 font-bold text-sm md:text-base"
                     >
                         {selectedTopic ? `Topic: ${selectedTopic.title}` : 'Topic Select'}
+                    </button>
+                    <button
+                        onClick={onBrowseArchive}
+                        className="modern-button modern-button-secondary px-4 py-2 font-bold text-sm md:text-base"
+                    >
+                        Daily Quiz
                     </button>
                 </motion.div>
             </motion.div>
@@ -160,11 +164,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                 <motion.button
                     onClick={() => {
                         if (selectedTopic && (!topicQuizStatus || topicQuizStatus !== 'ready')) return;
-                        // Parent handles "if !selectedTopic then showPrompt" logic
+                        if (!selectedTopic && dailyQuizLoading) return; // Prevent start if loading daily
                         onStartQuiz();
                     }}
-                    disabled={!!selectedTopic && topicQuizStatus !== 'ready'}
-                    className={`relative px-8 py-4 text-xl font-black text-white rounded-xl overflow-hidden group transform transition-all duration-200 ${selectedTopic && topicQuizStatus !== 'ready' ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
+                    disabled={(!!selectedTopic && topicQuizStatus !== 'ready') || (!selectedTopic && dailyQuizLoading)}
+                    className={`relative px-8 py-4 text-xl font-black text-white rounded-xl overflow-hidden group transform transition-all duration-200 ${((selectedTopic && topicQuizStatus !== 'ready') || (!selectedTopic && dailyQuizLoading)) ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
                     style={{
                         background:
                             'linear-gradient(45deg, #ff4500, #ff6b35, #ff8c00, #ffa500, #ff4500)',
@@ -195,13 +199,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             _
                         </motion.span>
                         {selectedTopic
-                            ? topicQuizStatus === 'ready'
-                                ? 'START QUIZ'
-                                : topicQuizStatus === 'error'
-                                    ? 'GENERATION FAILED'
-                                    : 'GENERATING…'
-                            : dailyCompleted
-                                ? 'COMPLETED'
+                            ? topicQuizStatus === 'error'
+                                ? 'GENERATION FAILED'
+                                : 'START QUIZ'
+                            : dailyQuizLoading
+                                ? 'LOADING...'
                                 : 'START QUIZ'}
                         <motion.span
                             animate={{ rotate: [0, -360] }}
@@ -225,15 +227,15 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         </div>
                     )}
 
-                    {!selectedTopic && dailyCompleted && (
+                    {!selectedTopic && dailyQuizLoading && (
+                        <div className="mt-4 text-center flex flex-col items-center gap-2">
+                            <LoadingDots text="Fetching Daily Quiz" />
+                        </div>
+                    )}
+
+                    {!selectedTopic && !dailyQuizLoading && dailyCompleted && (
                         <div className="mt-2 text-center flex flex-col items-center gap-2">
                             <span className="text-success text-sm font-bold">✓ Has Played Today</span>
-                            <button
-                                className="text-xs text-accent underline hover:text-white transition-colors cursor-pointer"
-                                onClick={onBrowseArchive}
-                            >
-                                Browse Past Quizzes
-                            </button>
                         </div>
                     )}
 
@@ -245,6 +247,6 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                     />
                 </motion.button>
             </motion.div>
-        </motion.div >
+        </motion.div>
     );
 };

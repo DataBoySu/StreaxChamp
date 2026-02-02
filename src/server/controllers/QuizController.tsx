@@ -101,8 +101,21 @@ export class QuizController {
 
                 // Generation Logic (ONLY if it's Today and missing)
                 if (!quizData && isToday) {
-                    Logger.db('[DailyQuiz] Generating new quiz for today', { date: todayStr });
-                    const generated = await generateUnifiedContent('General Knowledge');
+                    // DIVERSITY FIX: Rotate topics by day of week to avoid repetition
+                    const dayOfWeek = new Date().getDay(); // 0=Sunday, 1=Monday, etc.
+                    const topicRotation = [
+                        'Mixed General Knowledge', // Sunday - truly random
+                        'Science & Technology',     // Monday
+                        'History & Geography',      // Tuesday
+                        'Arts & Literature',        // Wednesday
+                        'Sports & Entertainment',   // Thursday
+                        'Nature & Animals',         // Friday
+                        'World Cultures & Traditions' // Saturday
+                    ];
+                    const dailyTopic = topicRotation[dayOfWeek];
+
+                    Logger.db('[DailyQuiz] Generating new quiz for today', { date: todayStr, topic: dailyTopic, dayOfWeek });
+                    const generated = await generateUnifiedContent(dailyTopic || 'General Knowledge');
                     const questions = generated.quiz.questions.map((q: any) => ({
                         id: `q${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                         question: q.question,
@@ -119,10 +132,10 @@ export class QuizController {
                         metadata: {
                             generatedAt: new Date().toISOString(),
                             sourceWikis: generated.topic.sources,
-                            version: 'v5-deterministic',
+                            version: 'v6-diverse',
                             model: generated.model,
                             generator: 'gemini',
-                            topic: 'General Knowledge',
+                            topic: dailyTopic, // Store the actual topic used
                             difficulty: 'mixed'
                         }
                     };

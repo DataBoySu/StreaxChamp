@@ -114,18 +114,18 @@ export const CONFIG = {
         BACKUP_CONTENT_MODELS: ['gemini-2.5-flash', 'gemini-3-flash'],
         PROMPTS: {
 
-            QUIZ_GENERATOR: `SYSTEM ROLE: You are a headless QUIZ GENERATOR. Your ONLY function is to output question data in JSON.
-                            CONSTRAINTS:
-                            - OUTPUT MUST BE RAW JSON ONLY.
-                            - NO PREAMBLE. NO CODE BLOCKS. NO MARKDOWN.
-                            - NO EXPLANATIONS OUTSIDE THE "explanation" FIELD.
-                            - START WITH { AND END WITH }.
-                            SCHEMA: {"questions": [{"id": "uuid", "question": "...", "options": ["...", "...", "...", "..."], "correctAnswer": "Exact String Match", "difficulty": "...", "category": "...", "explanation": "..."}]}
-                            GOAL: 5 challenging, unique, and factually accurate questions.
-                            IMPORTANT:
-                            - "options" MUST be an array of 4 distinct string choices.
-                            - "correctAnswer" MUST be an exact string match to one of the "options".
-                            - Do not use "answers", use "options".`,
+            // QUIZ_GENERATOR: `SYSTEM ROLE: You are a headless QUIZ GENERATOR. Your ONLY function is to output question data in JSON.
+            //                 CONSTRAINTS:
+            //                 - OUTPUT MUST BE RAW JSON ONLY.
+            //                 - NO PREAMBLE. NO CODE BLOCKS. NO MARKDOWN.
+            //                 - NO EXPLANATIONS OUTSIDE THE "explanation" FIELD.
+            //                 - START WITH { AND END WITH }.
+            //                 SCHEMA: {"questions": [{"id": "uuid", "question": "...", "options": ["...", "...", "...", "..."], "correctAnswer": "Exact String Match", "difficulty": "...", "category": "...", "explanation": "..."}]}
+            //                 GOAL: 5 challenging, unique, and factually accurate questions.
+            //                 IMPORTANT:
+            //                 - "options" MUST be an array of 4 distinct string choices.
+            //                 - "correctAnswer" MUST be an exact string match to one of the "options".
+            //                 - Do not use "answers", use "options".`,
 
             UNIFIED_GENERATOR: `SYSTEM ROLE: You are a KNOWLEDGE GRAPH & QUIZ ENGINE.
                                 INPUT: A raw user topic string which may be deformed.
@@ -153,8 +153,8 @@ export const CONFIG = {
                                     "questions": [
                                       {
                                         "question": "...",
-                                        "options": ["A", "B", "C", "D"],
-                                        "correctAnswer": "A",
+                                        "options": ["First Option", "Second Option", "Third Option", "Fourth Option"],
+                                        "correctAnswer": 0,
                                         "difficulty": "easy, medium, or hard",
                                         "category": "Lore/Gameplay/History/etc",
                                         "explanation": "Concise fact."
@@ -162,9 +162,25 @@ export const CONFIG = {
                                     ]
                                   }
                                 }
+                                
+                                CRITICAL - correctAnswer FORMAT:
+                                - "correctAnswer" MUST be a NUMBER (0, 1, 2, or 3)
+                                - 0 = first option in the array
+                                - 1 = second option in the array
+                                - 2 = third option in the array
+                                - 3 = fourth option in the array
+                                - DO NOT use strings like "A", "B", "C", "D"
+                                - DO NOT use the actual answer text as the value
+                                - ONLY use the numeric index (0-3)
+                                
+                                EXAMPLES:
+                                - If "Mars" is the correct answer and it's the first option → "correctAnswer": 0
+                                - If "1912" is the correct answer and it's the third option → "correctAnswer": 2
+                                - If "Nile River" is correct and it's option[0] → "correctAnswer": 0
+                                
                                 IMPORTANT:
                                 - "options" MUST be an array of 4 distinct string choices.
-                                - "correctAnswer" MUST be an exact string match to one of the "options".
+                                - "correctAnswer" MUST be a NUMBER between 0-3 indicating the index of the correct option.
                                 - Do not use "answers", use "options".`
         }
     },
@@ -174,6 +190,10 @@ export const CONFIG = {
     },
     LIMITS: {
         DAILY_TOPIC_GEN: 1,
-        DEV_USERNAME: 'Pretend-Pangolin-846'
+    },
+    DEV: {
+        // [MASTER TOGGLE] If true, users in USERNAMES list are "invisible" (no scores/history saved)
+        SAFE_MODE: true,
+        USERNAMES: ['Pretend-Pangolin-846'],
     }
 };

@@ -115,7 +115,7 @@ export class TopicController {
             }
 
             // Bypass for Developer
-            const isDev = username === CONFIG.LIMITS.DEV_USERNAME;
+            const isDev = CONFIG.DEV.USERNAMES.includes(username);
 
             if (!isDev) {
                 const today = new Date().toISOString().slice(0, 10);
@@ -168,28 +168,55 @@ export class TopicController {
             const sources = topicData.sources;
             const today = new Date().toISOString().slice(0, 10);
 
-            // Prepare quiz payload with correctAnswer normalization
+            // Prepare quiz payload with correctAnswer validation
             const questions: GeneratedQuizQuestion[] = quizData.questions.map((q: any, idx: number) => {
-                const answerMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
                 let correctIdx: number;
 
-                if (typeof q.correctAnswer === 'string') {
-                    // Try letter mapping first
+                // Gemini should now return a numeric index (0-3) directly
+                if (typeof q.correctAnswer === 'number') {
+                    correctIdx = q.correctAnswer;
+
+                    // Validate range
+                    if (correctIdx < 0 || correctIdx > 3) {
+                        const errorMsg = `[Generate] Q${idx + 1}: correctAnswer index ${correctIdx} is out of bounds (must be 0-3)`;
+                        Logger.error(errorMsg);
+                        throw new Error(`Invalid quiz data: ${errorMsg}`);
+                    }
+                } else if (typeof q.correctAnswer === 'string') {
+                    // Fallback: Legacy support for string-based answers (A/B/C/D or exact match)
+                    // This can be removed after confirming all new quizzes use numeric format
+                    const answerMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
                     const letterIdx = answerMap[q.correctAnswer.toUpperCase()];
+
                     if (letterIdx !== undefined) {
                         correctIdx = letterIdx;
+                        Logger.warn(`[Generate] Q${idx + 1}: Using legacy letter format. Update prompt to return numeric index.`);
                     } else {
                         // Try exact match in options
+                        const normalize = (str: string) => str.trim().toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
                         correctIdx = q.options.findIndex((opt: string) =>
                             opt.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()
                         );
+
                         if (correctIdx === -1) {
-                            Logger.warn(`[Generate] Q${idx + 1}: correctAnswer "${q.correctAnswer}" not found, defaulting to 0`);
-                            correctIdx = 0;
+                            const normalizedAnswer = normalize(q.correctAnswer);
+                            correctIdx = q.options.findIndex((opt: string) =>
+                                normalize(opt) === normalizedAnswer
+                            );
                         }
+
+                        if (correctIdx === -1) {
+                            const errorMsg = `[Generate] Q${idx + 1}: correctAnswer "${q.correctAnswer}" not found in options: [${q.options.join(', ')}]`;
+                            Logger.error(errorMsg);
+                            throw new Error(`Invalid quiz data: ${errorMsg}`);
+                        }
+
+                        Logger.warn(`[Generate] Q${idx + 1}: Had to match string answer. Prompt should return numeric index.`);
                     }
                 } else {
-                    correctIdx = Number(q.correctAnswer) || 0;
+                    const errorMsg = `[Generate] Q${idx + 1}: correctAnswer has invalid type: ${typeof q.correctAnswer}`;
+                    Logger.error(errorMsg);
+                    throw new Error(`Invalid quiz data: ${errorMsg}`);
                 }
 
                 return {

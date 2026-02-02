@@ -1,81 +1,117 @@
-You are continuing work on an existing Daily Quiz system.
-DO NOT claim completion unless every item below is verified in code.
+🚨 CRITICAL MOBILE BREAKAGE — CREATOR QUIZZES UNPLAYABLE
 
-TASK: Fix remaining Daily Quiz system bugs and missing UI.
+We have a production-blocking bug:
+Creator-mode quizzes are UNPLAYABLE on mobile devices.
+Daily quizzes are fine.
+Desktop is fine.
 
-========================
-PART 1: Explanation Interstitial (MANDATORY)
-========================
-- Each question already contains `explanation` in Firestore.
-- Modify the quiz progression state machine so that AFTER an answer is locked:
-  1. Show Correct / Incorrect
-  2. Show Correct Answer
-  3. THEN show the explanation text in a dedicated interstitial screen
-- This explanation screen must:
-  - Render `question.explanation`
-  - Enforce a minimum visible duration (e.g. 2–3 seconds)
-  - Block "Next Question" until duration passes
-- This must work in BOTH normal play and replay mode.
-- Verify explanation is never skipped.
+Your task is NOT cosmetic. This is a layout correctness fix.
 
-FILES TO CHECK:
-- QuizFlow / QuestionController component
-- Any `isAnswerLocked`, `showResult`, `nextQuestion` logic
+══════════════════════════════════════
+1️⃣ ROOT CAUSE ANALYSIS (MANDATORY)
+══════════════════════════════════════
+Before changing anything, identify EXACTLY why this happens.
 
-========================
-PART 2: Replay Mode Integrity (CRITICAL)
-========================
-Replay mode must be PURELY READ-ONLY.
+You MUST:
+- Compare the render path for:
+  - Daily quiz questions
+  - Creator-mode quiz questions
+- Identify ALL layout differences (containers, height, flex, grid, overflow)
 
-Fix all of the following:
-- When server returns `{ replay: true }`:
-  - NO leaderboard writes
-  - NO score increments
-  - NO duplicate history records
-- Verify replay check happens BEFORE:
-  - leaderboard writes
-  - XP updates
-  - topic stats updates
+Specifically inspect:
+- InlineQuiz.tsx
+- OptionGrid / OptionButton
+- Parent containers (Canvas / Card / Modal)
+- Any usage of:
+  - height: 100%
+  - minHeight
+  - vh units
+  - overflow: hidden
+  - flex-1 inside constrained parents
+  - grid-auto-rows
+  - NES.css shadow overflow
 
-Add explicit logs:
-`[DAILY QUIZ] Replay detected – skipping writes`
+Log your findings in comments before fixing.
 
-========================
-PART 3: Leaderboard Scope Fix
-========================
-- Daily quizzes MUST use a per-quiz leaderboard:
-  Path: `daily-quizzes/{date}/leaderboard/{userId}`
-- REMOVE all topic-based leaderboard rendering for daily quizzes.
-- UI must:
-  - Render leaderboard ONLY for the current quiz date
-  - Never show topic leaderboard for daily quizzes
-- Ensure duplicate users cannot appear (keyed by userId).
+══════════════════════════════════════
+2️⃣ REQUIRED MOBILE-SAFE RULES
+══════════════════════════════════════
+Apply ALL of the following rules:
 
-========================
-PART 4: "Browse Past Quizzes" UI (MISSING FEATURE)
-========================
-- After completing today's daily quiz:
-  - Unlock a button: `Browse Past Quizzes`
-- Clicking it must:
-  - Call `GET /api/quiz/daily/list`
-  - Display a modal or screen listing quiz dates (latest first)
-  - Visually mark completed dates
-- Selecting a date:
-  - Loads that specific quiz
-  - Honors replay mode rules
+❌ FORBIDDEN on mobile:
+- height: 100% on option buttons
+- fixed container heights
+- vertical centering that assumes available space
+- clipping via overflow:hidden on quiz containers
 
-This feature MUST NOT auto-play older quizzes.
-Selection must be explicit.
+✅ REQUIRED:
+- Options must size by CONTENT, not container
+- Next button must ALWAYS be visually separated
+- Page must scroll naturally if content exceeds viewport
+- NES.css shadow must never overlap adjacent buttons
 
-========================
-PART 5: Verification (MANDATORY)
-========================
-Before responding, verify ALL of the following:
-- Explanation text renders from Firestore
-- Replay mode does not write ANY data
-- Leaderboard shows only per-date entries
-- "Browse Past Quizzes" button is visible and functional
-- No topic leaderboard is shown for daily quizzes
+══════════════════════════════════════
+3️⃣ IMPLEMENTATION REQUIREMENTS
+══════════════════════════════════════
+Implement a MOBILE-FIRST FIX:
 
-If ANY item is not implemented, report it explicitly.
-Do NOT claim "complete" otherwise.
+A. Option Buttons
+- Remove height: '100%' from option buttons
+- Use min-height ONLY (e.g. 44–48px)
+- Let buttons grow naturally with text
+
+B. Option Grid
+- Mobile (<640px):
+  - FORCE stacked layout (1 column)
+  - Disable grid-cols-2 entirely
+- Desktop only may use 2x2 grid
+
+C. Container Behavior
+- The quiz container MUST:
+  - NOT trap height
+  - NOT use flex:1 for vertical sizing
+  - Allow full vertical scrolling
+
+D. Spacing Guarantees
+- Minimum 16–24px gap between:
+  - Last option
+  - Next button
+- NES shadow must have breathing room
+
+══════════════════════════════════════
+4️⃣ DO NOT BREAK THESE
+══════════════════════════════════════
+- Desktop 2x2 layout must remain unchanged
+- Daily quiz flow must remain unchanged
+- Visual NES button depth must remain intact
+- No ResizeObserver hacks
+- No JS-based viewport measurements
+
+══════════════════════════════════════
+5️⃣ VERIFICATION CHECKLIST (MANDATORY)
+══════════════════════════════════════
+After fix, verify:
+
+☐ Mobile (Reddit app):
+   - All options fully visible
+   - No overlap
+   - Next button always clickable
+   - Natural scrolling works
+
+☐ Desktop:
+   - Creator quizzes unchanged
+   - Daily quizzes unchanged
+
+☐ Regression check:
+   - Test with long option text
+   - Test with short options (4x1 layout)
+
+If ANY of these fail, the fix is incorrect.
+
+══════════════════════════════════════
+6️⃣ OUTPUT REQUIREMENT
+══════════════════════════════════════
+Explain:
+- Root cause (1–2 paragraphs)
+- Exact code changes made
+- Why this fix is stable long-term
