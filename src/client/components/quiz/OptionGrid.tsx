@@ -3,9 +3,10 @@ import React, { ReactNode } from 'react';
 interface OptionGridProps {
     options: string[];
     children: ReactNode;
+    optionFontSize?: string;
 }
 
-export const OptionGrid: React.FC<OptionGridProps> = ({ options, children }) => {
+export const OptionGrid: React.FC<OptionGridProps> = ({ options, children, optionFontSize }) => {
     // Deterministic Layout Policy: Grid if 4 options and all are short (<= 18 chars)
     const isGrid = (() => {
         if (options.length !== 4) return false;
@@ -14,8 +15,12 @@ export const OptionGrid: React.FC<OptionGridProps> = ({ options, children }) => 
 
     return (
         <div
-            className={`flex-1 grid ${isGrid ? 'grid-cols-2 gap-6' : 'grid-cols-1 gap-y-6'}`}
-            style={{ marginBottom: '1.5rem', minHeight: 0 }}
+            className={`flex-1 grid ${isGrid ? 'grid-cols-2 gap-3' : 'grid-cols-1 gap-y-3'}`}
+            style={{
+                marginBottom: '0.5rem',
+                minHeight: 0,
+                fontSize: optionFontSize
+            }}
         >
             {children}
         </div>

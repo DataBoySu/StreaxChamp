@@ -7,6 +7,7 @@ interface OptionButtonProps {
     isCorrect: boolean;
     isAnswered: boolean;
     onSelect: (index: number) => void;
+    fontSize?: string;
 }
 
 export const OptionButton: React.FC<OptionButtonProps> = ({
@@ -15,7 +16,8 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
     isSelected,
     isCorrect,
     isAnswered,
-    onSelect
+    onSelect,
+    fontSize = '0.8rem'
 }) => {
     let btnClass = 'nes-btn';
     if (isAnswered) {
@@ -32,10 +34,10 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
             style={{
                 width: '100%',
                 textAlign: 'left',
-                fontSize: '0.8rem',
-                minHeight: '44px',
+                fontSize: fontSize,
+                minHeight: '36px',
                 height: 'auto',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 display: 'flex',
                 alignItems: 'center'
             }}

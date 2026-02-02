@@ -1,117 +1,117 @@
-🚨 CRITICAL MOBILE BREAKAGE — CREATOR QUIZZES UNPLAYABLE
+🚨 MOBILE QUIZ LAYOUT IS STILL UNPLAYABLE — HARD CONSTRAINT FIX REQUIRED
 
-We have a production-blocking bug:
-Creator-mode quizzes are UNPLAYABLE on mobile devices.
-Daily quizzes are fine.
-Desktop is fine.
+The previous fixes FAILED because they relied on scrolling.
+That is NOT acceptable.
 
-Your task is NOT cosmetic. This is a layout correctness fix.
-
-══════════════════════════════════════
-1️⃣ ROOT CAUSE ANALYSIS (MANDATORY)
-══════════════════════════════════════
-Before changing anything, identify EXACTLY why this happens.
-
-You MUST:
-- Compare the render path for:
-  - Daily quiz questions
-  - Creator-mode quiz questions
-- Identify ALL layout differences (containers, height, flex, grid, overflow)
-
-Specifically inspect:
-- InlineQuiz.tsx
-- OptionGrid / OptionButton
-- Parent containers (Canvas / Card / Modal)
-- Any usage of:
-  - height: 100%
-  - minHeight
-  - vh units
-  - overflow: hidden
-  - flex-1 inside constrained parents
-  - grid-auto-rows
-  - NES.css shadow overflow
-
-Log your findings in comments before fixing.
+We must implement a DETERMINISTIC MOBILE LAYOUT SYSTEM
+that GUARANTEES the "Next" button is always reachable.
 
 ══════════════════════════════════════
-2️⃣ REQUIRED MOBILE-SAFE RULES
+🧠 CORE RULE (NON-NEGOTIABLE)
 ══════════════════════════════════════
-Apply ALL of the following rules:
+On MOBILE, the quiz screen must be treated as a FIXED-VISUAL CANVAS
+with INTERNAL ADAPTATION — NOT unbounded vertical growth.
 
-❌ FORBIDDEN on mobile:
-- height: 100% on option buttons
-- fixed container heights
-- vertical centering that assumes available space
-- clipping via overflow:hidden on quiz containers
-
-✅ REQUIRED:
-- Options must size by CONTENT, not container
-- Next button must ALWAYS be visually separated
-- Page must scroll naturally if content exceeds viewport
-- NES.css shadow must never overlap adjacent buttons
+The screen is divided into RESERVED ZONES.
 
 ══════════════════════════════════════
-3️⃣ IMPLEMENTATION REQUIREMENTS
+1️⃣ DEFINE A MOBILE HEIGHT BUDGET
 ══════════════════════════════════════
-Implement a MOBILE-FIRST FIX:
+Introduce a mobile-only layout contract:
 
-A. Option Buttons
-- Remove height: '100%' from option buttons
-- Use min-height ONLY (e.g. 44–48px)
-- Let buttons grow naturally with text
+Total usable height = viewport height - header - padding
 
-B. Option Grid
-- Mobile (<640px):
-  - FORCE stacked layout (1 column)
-  - Disable grid-cols-2 entirely
-- Desktop only may use 2x2 grid
+Divide it as:
 
-C. Container Behavior
-- The quiz container MUST:
-  - NOT trap height
-  - NOT use flex:1 for vertical sizing
-  - Allow full vertical scrolling
+- Question block: MAX 30%
+- Options block: 45–50%
+- Next button block: FIXED (min 56px + margin)
 
-D. Spacing Guarantees
-- Minimum 16–24px gap between:
-  - Last option
-  - Next button
-- NES shadow must have breathing room
+This must be enforced in code.
 
 ══════════════════════════════════════
-4️⃣ DO NOT BREAK THESE
+2️⃣ TWO-PASS OPTION RENDERING (MANDATORY)
 ══════════════════════════════════════
-- Desktop 2x2 layout must remain unchanged
-- Daily quiz flow must remain unchanged
-- Visual NES button depth must remain intact
-- No ResizeObserver hacks
-- No JS-based viewport measurements
+
+PASS 1 — LAYOUT MODE SELECTION
+--------------------------------
+Before rendering options:
+
+IF mobile:
+  - If answerCount === 4 AND all option lengths <= 16 chars:
+      layout = "GRID_2x2"
+  - ELSE:
+      layout = "STACK_4x1"
+
+Desktop behavior must remain unchanged.
+
+PASS 2 — FONT & HEIGHT ADAPTATION
+--------------------------------
+For MOBILE ONLY:
+
+Calculate maxOptionHeight = optionsBlockHeight / answerCount
+
+Rules:
+- Start with base font size (0.85rem)
+- If option text overflows its maxOptionHeight:
+    ↓ reduce font size stepwise (0.85 → 0.8 → 0.75)
+- HARD STOP at 0.75rem
+- If still overflowing:
+    - Allow internal text wrapping
+    - BUT option height must NEVER exceed its allocated slot
+
+No option is allowed to push siblings or the Next button.
 
 ══════════════════════════════════════
-5️⃣ VERIFICATION CHECKLIST (MANDATORY)
+3️⃣ NEXT BUTTON SAFETY GUARANTEE
 ══════════════════════════════════════
-After fix, verify:
+The "Next" button must live in a RESERVED FOOTER ZONE.
 
-☐ Mobile (Reddit app):
-   - All options fully visible
-   - No overlap
-   - Next button always clickable
-   - Natural scrolling works
-
-☐ Desktop:
-   - Creator quizzes unchanged
-   - Daily quizzes unchanged
-
-☐ Regression check:
-   - Test with long option text
-   - Test with short options (4x1 layout)
-
-If ANY of these fail, the fix is incorrect.
+Rules:
+- It is NOT part of the options container
+- It is NOT affected by option height
+- It must always be fully visible without scrolling
+- Add a minimum 16px visual gap above it
 
 ══════════════════════════════════════
-6️⃣ OUTPUT REQUIREMENT
+4️⃣ CSS & STYLE CONSTRAINTS
 ══════════════════════════════════════
-Explain:
-- Root cause (1–2 paragraphs)
-- Exact code changes made
-- Why this fix is stable long-term
+FORBIDDEN:
+- height: auto on the options container (mobile)
+- options determining parent height
+- relying on overflow scroll to reach Next
+- JS ResizeObserver hacks
+
+REQUIRED:
+- max-height on options container (mobile)
+- overflow: hidden INSIDE options only (never on whole screen)
+- font-size scaling instead of layout collapse
+
+══════════════════════════════════════
+5️⃣ WHAT MUST NOT CHANGE
+══════════════════════════════════════
+- Desktop layout
+- Daily quiz rendering
+- NES button depth / shadows
+- Option correctness logic
+
+══════════════════════════════════════
+6️⃣ VERIFICATION (YOU MUST TEST THESE)
+══════════════════════════════════════
+On MOBILE (Reddit app):
+
+☐ Long question + long answers → Next visible
+☐ Short answers → clean 2x2
+☐ Very long answers → smaller text, no overflow
+☐ No overlap with footer
+☐ No option hides the Next button
+
+If ANY case fails, the fix is INVALID.
+
+══════════════════════════════════════
+7️⃣ OUTPUT REQUIREMENT
+══════════════════════════════════════
+Explain clearly:
+- Where the height budget is enforced
+- How font scaling is applied
+- Why this cannot regress on mobile again
