@@ -6,6 +6,7 @@ import { useTheme } from './hooks/useTheme';
 import { useQuizData } from './hooks/useQuizData';
 import { useUsername } from './hooks/useUsername';
 import { useLeaderboard } from './hooks/useLeaderboard';
+import { useDailyLeaderboard } from './hooks/useDailyLeaderboard'; // NEW
 import { useLandingSummary } from './hooks/useLandingSummary';
 import { useHistory } from './hooks/useHistory';
 import { useBackgroundMusic } from './hooks/useBackgroundMusic';
@@ -24,6 +25,8 @@ import { GameSidebar } from './components/dashboard/GameSidebar';
 import { GlobalDashboard } from './components/dashboard/GlobalDashboard';
 import { MessageDisplay } from './components/ui/MessageDisplay';
 import { KawaiiLoader } from './components/loading/KawaiiLoader';
+import { ExplanationScreen } from './components/quiz/ExplanationScreen';
+import { DailyQuizArchive } from './components/quiz/DailyQuizArchive'; // NEW
 
 const QUIZ_DURATIONS = Array(CONFIG.GAME.DEFAULT_QUESTIONS_COUNT).fill(CONFIG.GAME.TIMER_DURATION);
 const BONUS_QUIZ_DURATION = CONFIG.GAME.BONUS_TIMER_DURATION;
@@ -34,7 +37,9 @@ const NUM_QUESTIONS = CONFIG.GAME.DEFAULT_QUESTIONS_COUNT;
  */
 export const App = () => {
   const theme = useTheme();
-  const { questions: dailyQuestions, quiz: dailyQuiz, loading } = useQuizData();
+  // Archive State
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
+  const { questions: dailyQuestions, quiz: dailyQuiz, loading, hasCompleted: hasDailyCompleted, refetch: refetchDaily } = useQuizData(selectedDate);
 
   const [quizStarted, setQuizStarted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -66,6 +71,17 @@ export const App = () => {
   const [topicQuizStatus, setTopicQuizStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [showNoTopicPrompt, setShowNoTopicPrompt] = useState(false);
   const [hasCompletedQuizSession, setHasCompletedQuizSession] = useState(false);
+
+  // Explanation Screen State
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [showArchive, setShowArchive] = useState(false); // NEW
+  const [explanationData, setExplanationData] = useState<{
+    question: string;
+    correct: string;
+    explanation?: string;
+    isCorrect: boolean;
+  } | null>(null);
+
   const [authUser, setAuthUser] = useState<{ redditUsername: string; nickname: string } | null>(() => {
     try {
       const raw = localStorage.getItem(CONFIG.STORAGE_KEYS.AUTH);
@@ -203,9 +219,16 @@ export const App = () => {
   const isUserActive = useUserActivity(60000);
   const pollingEnabled = isUserActive;
 
-  // Leaderboard hook (per selected topic)
-  // Enable leaderboard as soon as quiz ends (showScore) or while viewing start screen for previously selected topic
-  const { entries: topicLeaderboard, loading: topicLbLoading, submitScore: submitLeaderboardScore, refresh: refreshTopicLeaderboard } = useLeaderboard({ slug: selectedTopic?.slug || null, enabled: !!selectedTopic && (showScore || !quizStarted) && !isCreating });
+  // Leaderboards
+  const { entries: topicLeaderboard, loading: topicLbLoading, submitScore: submitLeaderboardScore, refresh: refreshTopicLeaderboard } = useLeaderboard({
+    slug: selectedTopic ? selectedTopic.slug : null,
+    enabled: !!selectedTopic
+  });
+
+  const { entries: dailyLeaderboard, loading: dailyLbLoading, refresh: refreshDailyLeaderboard } = useDailyLeaderboard(
+    selectedTopic ? undefined : (dailyQuiz?.id || new Date().toISOString().slice(0, 10)),
+    !selectedTopic
+  );
   const { data: landingSummary, loading: landingSummaryLoading, refresh: refreshLandingSummary } = useLandingSummary(!quizStarted && !showScore && !isCreating, pollingEnabled && !isCreating);
   const { username: hookUsername, postId: currentPostId } = useUsername();
 
@@ -246,7 +269,7 @@ export const App = () => {
   const historyLoading = globalHistoryLoading;
 
   // Derive active questions: prefer topic quiz if present
-  interface TopicQuizQuestionRaw { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string; }
+  interface TopicQuizQuestionRaw { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string; explanation?: string; }
   const questions = useMemo(() => {
     if (selectedTopicQuiz && Array.isArray(selectedTopicQuiz.questions)) {
       return (selectedTopicQuiz.questions as TopicQuizQuestionRaw[]).map((q) => {
@@ -255,7 +278,12 @@ export const App = () => {
         if (typeof q.correctAnswer === 'number' && options[q.correctAnswer] !== undefined) correct = options[q.correctAnswer] ?? '';
         else if (typeof q.correctAnswer === 'string') correct = q.correctAnswer;
         else correct = options[0] || '';
-        return { question: q.question || '', answers: options, correctAnswer: correct };
+        return {
+          question: q.question || '',
+          answers: options,
+          correctAnswer: correct,
+          explanation: q.explanation // Preserve explanation
+        };
       });
     }
     return dailyQuestions;
@@ -478,11 +506,17 @@ export const App = () => {
             completeQuiz(newScore);
           }
         } else {
-          setShowGap(true);
-          setTimeout(() => {
-            setShowGap(false);
-            setCurrentQuestionIndex((prev) => prev + 1);
-          }, 3000);
+          // Show Explanation Screen instead of auto-advancing
+          const currentQ = questions[currentQuestionIndex];
+          if (currentQ) {
+            setExplanationData({
+              question: currentQ.question,
+              correct: currentQ.correctAnswer,
+              explanation: (currentQ as any).explanation || '',
+              isCorrect
+            });
+            setShowExplanation(true);
+          }
         }
       }, 1500);
     },
@@ -493,10 +527,17 @@ export const App = () => {
       currentQuestionIndex,
       showBonusQuestion,
       showScore,
-      completeQuiz,
       selectedTopicQuiz,
+      questions
     ]
   );
+
+  const handleNextQuestion = useCallback(() => {
+    setShowExplanation(false);
+    setShowGap(false);
+    setMessage({ text: '', type: '', timesUp: false });
+    setCurrentQuestionIndex((prev) => prev + 1);
+  }, []);
 
   const handleBonusAnswer = useCallback(
     (selected: string | null, correct: string) => {
@@ -657,8 +698,8 @@ export const App = () => {
     const quizId = (selectedTopic ? selectedTopicQuiz?.id : dailyQuiz?.id);
     const submissionPayload = { userKey: key, nickname, score, timeTakenMs: totalMs, ...(quizId ? { quizId } : {}) };
 
-    // Check if replay (deferred implementation - check hasPlayed)
-    const isReplay = hasPlayed(slug);
+    // Check if replay (correctly using Daily status vs Topic cache)
+    const isReplay = selectedTopic ? hasPlayed(slug) : hasDailyCompleted;
 
     // Unified Play Handler: Log history AND submit score
     const finalizePlay = async () => {
@@ -671,10 +712,35 @@ export const App = () => {
         score
       );
 
-      // Step 2: Submit to Leaderboard if not replay (one-a-day logic is mostly backend-enforced now)
-      if (!isReplay) {
+      // Step 1.5: Submit Daily Score (New Architecture)
+      if (!selectedTopic) {
+        try {
+          const res = await fetch('/api/quiz/daily/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              quizDate: dailyQuiz?.id || new Date().toISOString().slice(0, 10),
+              score,
+              totalQuestions: NUM_QUESTIONS,
+              nickname // Pass nickname for leaderboard
+            })
+          });
+          const data = await res.json();
+          if (data.replay) {
+            setMessage({ type: 'info', text: '🔁 Replay - Score not recorded', timesUp: false });
+          } else {
+            console.log('[App] 📅 Daily Score Submitted Successfully');
+          }
+        } catch (err) {
+          console.error('[App] Failed to submit daily score', err);
+        }
+      }
+
+      // Step 2: Submit to TOPIC Leaderboard (Skip if Daily Mode)
+      // Daily Mode uses its own separate endpoint above.
+      if (selectedTopic && !isReplay) {
         await submitLeaderboardScore(slug, submissionPayload);
-      } else {
+      } else if (isReplay && selectedTopic) {
         setMessage({
           type: 'info',
           text: '🔁 Replay mode - stats updated',
@@ -684,12 +750,25 @@ export const App = () => {
 
       // Step 3: Refresh local state
       void loadUserData();
+
+      // Force refresh of daily history if generic
+      if (!selectedTopic) {
+        void refetchDaily();
+      }
+
       try { void refreshLandingSummary?.(); } catch {/* ignore */ }
-      setTimeout(() => { try { void refreshTopicLeaderboard?.(); } catch {/* ignore */ } }, 300);
+      setTimeout(() => {
+        try {
+          if (selectedTopic) void refreshTopicLeaderboard?.();
+          else void refreshDailyLeaderboard?.();
+        } catch {/* ignore */ }
+      }, 300);
     };
 
+
+
     void finalizePlay();
-  }, [showScore, selectedTopic?.slug, authUser?.nickname, authUser?.redditUsername, hookUsername, score, totalTime, submitLeaderboardScore, topicLeaderboard, refreshTopicLeaderboard]);
+  }, [showScore, selectedTopic?.slug, authUser?.nickname, authUser?.redditUsername, hookUsername, score, totalTime, submitLeaderboardScore, topicLeaderboard, refreshTopicLeaderboard, dailyQuiz?.id, refreshDailyLeaderboard, hasPlayed, hasDailyCompleted, savePlay, selectedTopic?.title, selectedTopicQuiz?.id]);
 
   useEffect(() => { if (!showScore) submittedRef.current = false; }, [showScore]);
 
@@ -797,6 +876,18 @@ export const App = () => {
         <div
           className={`grid grid-cols-1 gap-4 lg:gap-6 ${!quizStarted || showScore ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}
         >
+          {/* Archive Modal */}
+          {showArchive && (
+            <DailyQuizArchive
+              onClose={() => setShowArchive(false)}
+              onSelectDate={(date) => {
+                setSelectedDate(date);
+                setShowArchive(false);
+                startQuiz(); // Assuming auto-start, or user clicks Start on landing
+              }}
+            />
+          )}
+
           {/* No Topic Selected Prompt Modal */}
           {showNoTopicPrompt && !quizStarted && (
             <NoTopicPrompt
@@ -908,6 +999,10 @@ export const App = () => {
                         return;
                       }
                       if (!selectedTopic) {
+                        if (hasDailyCompleted) {
+                          console.log('[App] Daily quiz already completed.');
+                          return; // Strict block
+                        }
                         console.log('[App] ℹ️ No topic selected, showing prompt');
                         setShowNoTopicPrompt(true);
                         return;
@@ -919,6 +1014,16 @@ export const App = () => {
                     errorMessage={currentError?.robotDialogue}
                     hasPlayed={hasCompletedQuizSession}
                     totalPoints={userTotalScore}
+                    dailyCompleted={hasDailyCompleted}
+                    onBrowseArchive={() => setShowArchive(true)} // NEW PROP
+                  />
+                ) : showExplanation && explanationData ? (
+                  <ExplanationScreen
+                    question={explanationData.question}
+                    correctAnswer={explanationData.correct}
+                    explanation={explanationData.explanation || ''}
+                    isCorrect={explanationData.isCorrect}
+                    onNext={handleNextQuestion}
                   />
                 ) : showGap ? (
                   <GapView multiplier={multiplier} />
@@ -957,13 +1062,13 @@ export const App = () => {
             </div>
           </div>
 
-          {/* Side Panel: History (idle) OR Topic Leaderboard (score screen) */}
+          {/* Sidebar (Leaderboard) */}
           {(!quizStarted || showScore) && !isCreating && (
             <GameSidebar
               showScore={showScore}
-              selectedTopicTitle={selectedTopic?.title}
-              topicLbLoading={topicLbLoading}
-              topicLeaderboard={topicLeaderboard as any[]} // explicit cast for simplicity
+              selectedTopicTitle={selectedTopic ? selectedTopic.title : 'Daily Quiz'}
+              topicLbLoading={selectedTopic ? topicLbLoading : dailyLbLoading}
+              topicLeaderboard={selectedTopic ? topicLeaderboard : dailyLeaderboard}
               historyLoading={historyLoading}
               history={history}
             />

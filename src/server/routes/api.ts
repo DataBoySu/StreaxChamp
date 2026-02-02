@@ -20,6 +20,9 @@ router.post('/topics/generate', TopicController.generateTopic);
 
 // --- Quizzes ---
 router.get('/quiz', QuizController.getDailyQuiz);
+router.get('/quiz/daily/leaderboard', QuizController.getDailyLeaderboard); // NEW
+router.post('/quiz/daily/submit', QuizController.submitDailyScore); // NEW
+router.get('/quiz/daily/list', QuizController.listDailyQuizzes);    // NEW
 router.get('/quiz/bonus', QuizController.getDailyBonus); // New
 // This was POST in index.ts for "Generate or Get" logic
 router.post('/topics/:slug/quiz', QuizController.getTopicQuiz);

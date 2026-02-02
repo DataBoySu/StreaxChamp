@@ -25,16 +25,18 @@ export interface DailyQuiz {
 export interface UseQuizDataResult {
   questions: AppQuestion[];
   quiz: DailyQuiz | null;
+  hasCompleted: boolean; // NEW
   loading: boolean;
   error: string | null;
   connectionStatus: 'connecting' | 'firebase' | 'fallback' | 'error';
   lastUpdated: string | null;
-  refetch: () => Promise<void>;
+  refetch: (date?: string) => Promise<void>;
 }
 
-export const useQuizData = (contextPostId?: string | null): UseQuizDataResult => {
+export const useQuizData = (contextPostId?: string | null, date?: string): UseQuizDataResult => {
   const [questions, setQuestions] = useState<AppQuestion[]>([]);
   const [quiz, setQuiz] = useState<DailyQuiz | null>(null);
+  const [hasCompleted, setHasCompleted] = useState(false); // NEW
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<
@@ -54,9 +56,15 @@ export const useQuizData = (contextPostId?: string | null): UseQuizDataResult =>
         console.log('[useQuizData] Fetching with context PostID:', contextPostId);
       }
 
-      const apiRes = await fetch('/api/quiz', { headers });
+      const url = date ? `/api/quiz?date=${date}` : '/api/quiz';
+      const apiRes = await fetch(url, { headers });
       if (!apiRes.ok) throw new Error('Quiz API failed');
-      const raw = await apiRes.json();
+      const payload = await apiRes.json();
+
+      // Support new structure { quiz: ..., hasCompleted: ... } or fallback for legacy
+      const raw = payload.quiz || payload; // If nested 'quiz', use it, otherwise assume payload IS the quiz
+      const completedStatus = payload.hasCompleted || false;
+
       if (!raw || !Array.isArray(raw.questions)) throw new Error('Malformed quiz payload');
 
       interface ApiQuestion { question?: string; options?: unknown[]; correctAnswer?: string; difficulty?: string; }
@@ -83,6 +91,7 @@ export const useQuizData = (contextPostId?: string | null): UseQuizDataResult =>
           correctAnswer: corr,
           difficulty: q.difficulty || 'medium',
           category: raw.metadata?.topic || 'General',
+          explanation: (q as any).explanation // Ensure explanation is passed
         };
       });
 
@@ -98,6 +107,7 @@ export const useQuizData = (contextPostId?: string | null): UseQuizDataResult =>
       };
 
       setQuiz(quizData);
+      setHasCompleted(completedStatus);
       setConnectionStatus('firebase'); // treat internal API as authoritative
       setLastUpdated(quizData.metadata.generatedAt);
       setQuestions(quizData.questions);
@@ -113,18 +123,25 @@ export const useQuizData = (contextPostId?: string | null): UseQuizDataResult =>
     }
   };
 
-  const refetch = async () => {
+
+
+  const refetch = async (newDate?: string) => {
+    // If we support dynamic switching, we might need a way to update the 'date' state if we had it,
+    // but here the date comes from props. 'refetch' normally just re-runs with current props.
+    // However, if the user explicitly asks for a new date, we should probably support it.
+    // For now, let's just re-run standard fetch.
     await fetchQuizData();
   };
 
   useEffect(() => {
-    console.log('[useQuizData] Effect triggered. PostID:', contextPostId);
+    console.log('[useQuizData] Effect triggered. PostID:', contextPostId, 'Date:', date);
     void fetchQuizData();
-  }, [contextPostId]);
+  }, [contextPostId, date]);
 
   return {
     questions,
     quiz,
+    hasCompleted,
     loading,
     error,
     connectionStatus,

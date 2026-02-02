@@ -1,119 +1,81 @@
-🎯 TARGETED AI IDE PROMPT — Robot Mascot Bounding & Dialogue Safety Fix
+You are continuing work on an existing Daily Quiz system.
+DO NOT claim completion unless every item below is verified in code.
 
-Paste this as-is.
+TASK: Fix remaining Daily Quiz system bugs and missing UI.
 
-Context (Critical)
+========================
+PART 1: Explanation Interstitial (MANDATORY)
+========================
+- Each question already contains `explanation` in Firestore.
+- Modify the quiz progression state machine so that AFTER an answer is locked:
+  1. Show Correct / Incorrect
+  2. Show Correct Answer
+  3. THEN show the explanation text in a dedicated interstitial screen
+- This explanation screen must:
+  - Render `question.explanation`
+  - Enforce a minimum visible duration (e.g. 2–3 seconds)
+  - Block "Next Question" until duration passes
+- This must work in BOTH normal play and replay mode.
+- Verify explanation is never skipped.
 
-The robot mascot has:
+FILES TO CHECK:
+- QuizFlow / QuestionController component
+- Any `isAnswerLocked`, `showResult`, `nextQuestion` logic
 
-Hover / cursor-follow micro-interactions
+========================
+PART 2: Replay Mode Integrity (CRITICAL)
+========================
+Replay mode must be PURELY READ-ONLY.
 
-Time-based dialogue bubbles
+Fix all of the following:
+- When server returns `{ replay: true }`:
+  - NO leaderboard writes
+  - NO score increments
+  - NO duplicate history records
+- Verify replay check happens BEFORE:
+  - leaderboard writes
+  - XP updates
+  - topic stats updates
 
-Special prompt bubbles that appear above its head
+Add explicit logs:
+`[DAILY QUIZ] Replay detected – skipping writes`
 
-Currently, these dialogues are being clipped by the inner canvas top edge.
+========================
+PART 3: Leaderboard Scope Fix
+========================
+- Daily quizzes MUST use a per-quiz leaderboard:
+  Path: `daily-quizzes/{date}/leaderboard/{userId}`
+- REMOVE all topic-based leaderboard rendering for daily quizzes.
+- UI must:
+  - Render leaderboard ONLY for the current quiz date
+  - Never show topic leaderboard for daily quizzes
+- Ensure duplicate users cannot appear (keyed by userId).
 
-This is a layout anchoring bug, not a visual one.
+========================
+PART 4: "Browse Past Quizzes" UI (MISSING FEATURE)
+========================
+- After completing today's daily quiz:
+  - Unlock a button: `Browse Past Quizzes`
+- Clicking it must:
+  - Call `GET /api/quiz/daily/list`
+  - Display a modal or screen listing quiz dates (latest first)
+  - Visually mark completed dates
+- Selecting a date:
+  - Loads that specific quiz
+  - Honors replay mode rules
 
-1️⃣ Root Cause (Do Not Skip)
+This feature MUST NOT auto-play older quizzes.
+Selection must be explicit.
 
-The mascot is currently:
+========================
+PART 5: Verification (MANDATORY)
+========================
+Before responding, verify ALL of the following:
+- Explanation text renders from Firestore
+- Replay mode does not write ANY data
+- Leaderboard shows only per-date entries
+- "Browse Past Quizzes" button is visible and functional
+- No topic leaderboard is shown for daily quizzes
 
-Positioned too close to the top boundary of the inner canvas
-
-With dialogue bubbles rendered using absolute positioning above the mascot
-
-Without any vertical safety margin for dialogue height
-
-2️⃣ Mandatory Fix Strategy
-
-We do NOT resize the canvas
-We do NOT shrink the robot
-We do NOT disable dialogue
-
-Instead, we introduce a dialogue-safe anchor zone.
-
-3️⃣ Exact Structural Changes Required
-A. Mascot Anchor Wrapper
-
-Wrap the mascot in a container with top padding reserved only for dialogue:
-
-Add a wrapper div:
-
-position: relative
-
-padding-top: 96px (desktop)
-
-padding-top: 72px (mobile)
-
-⚠️ This padding exists ONLY to absorb dialogue height, not as visual spacing.
-
-B. Mascot Vertical Alignment
-
-The robot itself must be:
-
-Vertically centered within the remaining space
-
-NOT pushed further down than necessary
-
-Do NOT add margin-top to the robot itself
-
-C. Dialogue Bubble Rules
-
-Dialogue bubbles must:
-
-Render with position: absolute
-
-Anchor to mascot top (bottom: 100%)
-
-Never exceed the top padding zone
-
-Add:
-
-max-width constraint
-
-Soft vertical offset (bottom: calc(100% + 8px))
-
-4️⃣ Overflow & Clipping Rules (MANDATORY)
-
-Inner canvas must have:
-
-overflow: visible
-
-Only the outer app shell may clip overflow
-
-Do NOT use overflow: hidden anywhere in the mascot subtree
-
-5️⃣ Mobile-Specific Safety
-
-On mobile:
-
-Dialogue-safe padding must be smaller
-
-Ensure no dialogue is clipped even when:
-
-Keyboard opens
-
-Address bar collapses
-
-Scroll is at top
-
-6️⃣ What NOT To Do
-
-🚫 Do NOT move the mascot lower arbitrarily
-🚫 Do NOT disable or shorten dialogue text
-🚫 Do NOT add scroll just for dialogue
-🚫 Do NOT convert dialogue to inline flow
-
-✅ Success Criteria
-
-Idle robot: centered, compact
-
-Dialogue appears: fully visible, never clipped
-
-Special prompt appears: always readable
-
-Canvas size unchanged
-
-No visual dead space when dialogue is hidden
+If ANY item is not implemented, report it explicitly.
+Do NOT claim "complete" otherwise.

@@ -15,6 +15,8 @@ interface LandingHeroProps {
     errorMessage?: string | undefined;
     hasPlayed?: boolean;
     totalPoints?: number;
+    dailyCompleted?: boolean;
+    onBrowseArchive?: () => void; // NEW
 }
 
 export const LandingHero: React.FC<LandingHeroProps> = ({
@@ -24,9 +26,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
     onOpenTopicMenu,
     onStartQuiz,
     totalQuestions,
-    errorMessage, // NEW
+    errorMessage,
     hasPlayed = false,
     totalPoints = 0,
+    dailyCompleted = false,
+    onBrowseArchive, // NEW
 }) => {
     return (
         <motion.div
@@ -196,7 +200,9 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                                 : topicQuizStatus === 'error'
                                     ? 'GENERATION FAILED'
                                     : 'GENERATING…'
-                            : 'START QUIZ'}
+                            : dailyCompleted
+                                ? 'COMPLETED'
+                                : 'START QUIZ'}
                         <motion.span
                             animate={{ rotate: [0, -360] }}
                             transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
@@ -216,6 +222,18 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             )}
                             {topicQuizStatus === 'ready' && <span className="text-success text-sm font-bold">✓ Quiz Loaded</span>}
                             {topicQuizStatus === 'error' && <span className="text-error text-sm">Failed to load quiz. Try another topic.</span>}
+                        </div>
+                    )}
+
+                    {!selectedTopic && dailyCompleted && (
+                        <div className="mt-2 text-center flex flex-col items-center gap-2">
+                            <span className="text-success text-sm font-bold">✓ Has Played Today</span>
+                            <button
+                                className="text-xs text-accent underline hover:text-white transition-colors cursor-pointer"
+                                onClick={onBrowseArchive}
+                            >
+                                Browse Past Quizzes
+                            </button>
                         </div>
                     )}
 

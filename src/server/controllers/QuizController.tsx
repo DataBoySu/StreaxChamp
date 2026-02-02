@@ -71,126 +71,184 @@ export class QuizController {
             const cache = CacheService.getInstance();
             const todayStr = new Date().toISOString().slice(0, 10);
 
-            // 0. Check for Context (Post ID specific quiz)
-            // @ts-ignore
-            const contextPostId = req.headers['x-devvit-post-id'] as string;
-            if (contextPostId) {
-                Logger.info(`[DailyQuiz] Context Mode detected: PostID=${contextPostId}`);
-                const rawMapping = await redis.get(`post_quiz:${contextPostId}`);
-                let mappedQuizId: string | null = null;
-
-                if (rawMapping) {
-                    try {
-                        const mapping = JSON.parse(rawMapping);
-                        if (mapping && mapping.quizId) {
-                            mappedQuizId = mapping.quizId;
-                        }
-                    } catch {
-                        // Legacy fallback
-                        mappedQuizId = rawMapping;
-                    }
-                }
-
-                if (mappedQuizId) {
-                    Logger.info(`[DailyQuiz] Resolved Post Context -> QuizID=${mappedQuizId}`);
-                    // Fetch that user quiz directly
-                    const userQuiz = await fs.getUserQuiz(mappedQuizId);
-                    if (userQuiz) {
-                        return res.status(200).json(userQuiz);
-                    }
-                }
-            }
-
-            // 1. Resolve User & Check Stickiness
+            // 0. Resolve User
             const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
-            let forceQuizId: string | null = null;
 
-            if (userId) {
-                const stats = await fs.getUserTopicStats(userId, 'daily-quizzes');
-                if (stats) {
-                    // Logic: If previous attempt exists, wasn't today, and wasn't completed -> FORCE IT
-                    const isNewDay = stats.lastAttemptDate !== todayStr;
-                    if (isNewDay && !stats.isCompleted && stats.lastQuizId) {
-                        forceQuizId = stats.lastQuizId;
-                        Logger.info('[Daily] Forcing sticky incomplete quiz', { userId, quizId: forceQuizId });
-                    }
-                }
+            // 1. Determine Requested Date
+            let reqDate = req.query.date as string;
+            // Validate format YYYY-MM-DD
+            if (reqDate && !/^\d{4}-\d{2}-\d{2}$/.test(reqDate)) {
+                reqDate = ''; // invalid, fallback to today
+            }
+            // Use today if no date provided
+            const targetDate = reqDate || todayStr;
+            const isToday = targetDate === todayStr;
+
+            // 2. Fetch Quiz Content (Cache logic allowed for CONTENT only)
+            let quizData: any = null;
+            const cacheKey = `daily_quiz_content_v2_${targetDate}`; // New key namespace with V2 to fix explanation
+
+            // Try Cache
+            const cached = await cache.get(cacheKey);
+            if (cached) {
+                quizData = cached;
             }
 
-            // 2. Fetch Quiz Content (Forced or Today's)
-            let quizData: any = null;
+            // Try Firestore if no cache
+            if (!quizData) {
+                // Fetch content by date ID
+                quizData = await fs.getDailyQuizByDate(targetDate);
 
-            if (forceQuizId) {
-                // Fetch specific past quiz (no cache for optimization yet, safe fallthrough)
-                quizData = await fs.getTopicQuiz('daily-quizzes', forceQuizId);
-                // Fallback: If deleted/missing, we just continue to today's quiz
+                // Generation Logic (ONLY if it's Today and missing)
+                if (!quizData && isToday) {
+                    Logger.db('[DailyQuiz] Generating new quiz for today', { date: todayStr });
+                    const generated = await generateUnifiedContent('General Knowledge');
+                    const questions = generated.quiz.questions.map((q: any) => ({
+                        id: `q${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                        question: q.question,
+                        options: q.options,
+                        correctAnswer: Number(q.correctAnswer) || 0,
+                        difficulty: String(q.difficulty || 'medium'),
+                        category: String(q.category || 'General'),
+                        explanation: q.explanation,
+                        createdAt: new Date().toISOString()
+                    }));
+
+                    const payload = {
+                        questions,
+                        metadata: {
+                            generatedAt: new Date().toISOString(),
+                            sourceWikis: generated.topic.sources,
+                            version: 'v5-deterministic',
+                            model: generated.model,
+                            generator: 'gemini',
+                            topic: 'General Knowledge',
+                            difficulty: 'mixed'
+                        }
+                    };
+
+                    await fs.saveTodaysQuiz(payload);
+                    quizData = { id: todayStr, ...payload };
+                }
+
+                // Cache if found
+                if (quizData) {
+                    await cache.set(cacheKey, quizData, 86400); // 24h
+                }
             }
 
             if (!quizData) {
-                // Standard Daily Flow - Check Cache First
-                const cacheKey = `daily_quiz_${todayStr}`;
-                const cached = await cache.get(cacheKey);
+                return res.status(404).json({ error: 'Quiz not found for this date' });
+            }
 
-                if (cached) {
-                    quizData = cached;
-                } else {
-                    // Cache Miss: DB or Gen
-                    const existing = await fs.getTodaysQuiz();
-                    if (existing) {
-                        quizData = existing;
-                        await cache.set(cacheKey, existing, 1800); // 30 mins
-                        void fs.incrementTopicPlayCount?.('daily-quizzes');
-                    } else {
-                        // Generation (same as before)
-                        Logger.db('[DailyQuiz] Cache Miss - Initiating AI generation...', { date: todayStr });
-                        const generated = await generateUnifiedContent('General Knowledge');
-                        // ... mapping logic ...
-                        const questions = generated.quiz.questions.map((q: any) => ({
-                            id: `q${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                            question: q.question,
-                            options: q.options,
-                            correctAnswer: Number(q.correctAnswer) || 0,
-                            difficulty: String(q.difficulty || 'medium'),
-                            category: String(q.category || 'General'),
-                            explanation: q.explanation,
-                            createdAt: new Date().toISOString()
-                        }));
-
-                        const payload = {
-                            questions,
-                            metadata: {
-                                generatedAt: new Date().toISOString(),
-                                sourceWikis: generated.topic.sources,
-                                version: 'v4-unified',
-                                model: generated.model,
-                                generator: 'gemini',
-                                topic: 'General Knowledge',
-                                difficulty: 'mixed'
-                            }
-                        };
-
-                        await fs.saveTodaysQuiz(payload);
-                        quizData = { id: todayStr, ...payload };
-                        await cache.set(cacheKey, quizData, 1800);
-                        Logger.ai('[DailyQuiz] AI Generation Successful');
-                    }
+            // 3. Fetch Completion Status
+            let hasCompleted = false;
+            let userScore = 0;
+            if (userId) {
+                const history = await fs.getDailyPlayHistory(userId, quizData.id);
+                if (history) {
+                    hasCompleted = true;
+                    userScore = history.score;
                 }
             }
 
-            // 3. Update User Stats (Mark as Started)
-            if (userId && quizData) {
-                await fs.updateUserTopicStats(userId, 'daily-quizzes', {
-                    lastQuizId: quizData.id || todayStr,
-                    lastAttemptDate: todayStr,
-                    isCompleted: false
-                });
-            }
-
-            return res.status(200).json(quizData);
+            return res.json({
+                quiz: quizData,
+                quizDate: quizData.id,
+                hasCompleted,
+                userScore
+            });
 
         } catch (error) {
-            Logger.error('Error fetching/generating daily quiz:', error);
-            res.status(500).json({ error: 'System Unavailable: Failed to load daily quiz.' });
+            Logger.error('Error fetching daily quiz:', error);
+            res.status(500).json({ error: 'System Unavailable' });
+        }
+    }
+
+    /**
+     * Submit a score for a daily quiz.
+     */
+    static async submitDailyScore(req: Request, res: Response) {
+        try {
+            const { quizDate, score, totalQuestions, nickname } = req.body;
+            // 0. Resolve User
+            const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
+            const effectiveUserId = userId; // username is not available from getDevvitUserId
+            const effectiveNickname = nickname || 'Player';
+
+            if (!effectiveUserId) return res.status(401).json({ error: 'User required' });
+
+            const fs = new FirestoreRestService();
+
+            // 1. Replay Check (Authority)
+            const existing = await fs.getDailyPlayHistory(effectiveUserId, quizDate);
+            if (existing && existing.completed) {
+                Logger.info(`[DAILY QUIZ] Replay detected – skipping writes`, { userId: effectiveUserId, date: quizDate });
+                return res.json({ success: true, replay: true });
+            }
+
+            // 2. Save History (New Record)
+            const now = new Date().toISOString();
+            await fs.saveDailyPlayHistory(effectiveUserId, quizDate, {
+                score,
+                totalQuestions,
+                isPerfect: score === totalQuestions
+            });
+
+            // 3. Quiz-Specific Leaderboard (New Phase 4 Requirements)
+            await fs.saveQuizLeaderboardEntry(quizDate, effectiveUserId, {
+                score,
+                completedAt: now,
+                nickname: effectiveNickname
+            });
+
+            // 4. Update Global XP (Only on first play)
+            await fs.incrementUserTotalScore(effectiveUserId, score);
+
+            return res.json({ success: true, replay: false });
+        } catch (e) {
+            Logger.error('[SubmitDaily] Error', e);
+            res.status(500).json({ error: 'Submission failed' });
+        }
+    }
+
+    /**
+     * Get leaderboard for a specific daily quiz.
+     */
+    static async getDailyLeaderboard(req: Request, res: Response) {
+        try {
+            const date = req.query.date as string || new Date().toISOString().slice(0, 10);
+            const limit = parseInt(req.query.limit as string || '25');
+
+            const fs = new FirestoreRestService();
+            const entries = await fs.getQuizLeaderboard(date, limit);
+
+            return res.json({ entries });
+        } catch (e) {
+            Logger.error('[GetDailyLeaderboard] Error', e);
+            res.status(500).json({ error: 'Failed' });
+        }
+    }
+
+    /**
+     * List all available daily quizzes for the archive.
+     */
+    static async listDailyQuizzes(req: Request, res: Response) {
+        try {
+            const fs = new FirestoreRestService();
+            const dates = await fs.listDailyQuizDates();
+
+            const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
+            let completedDates: string[] = [];
+
+            if (userId) {
+                completedDates = await fs.getUserDailyHistory(userId);
+            }
+
+            return res.json({ dates, completedDates });
+        } catch (e) {
+            Logger.error('[ListDaily] Error', e);
+            res.status(500).json({ error: 'List failed' });
         }
     }
 

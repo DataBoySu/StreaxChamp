@@ -12,6 +12,7 @@ export interface QuizData {
     question: string;
     answers: string[];
     correctAnswer: string;
+    explanation?: string; // Added field
   }>;
   metadata: {
     generatedAt: string;
@@ -67,8 +68,20 @@ export class FirestoreRestService {
    */
   async getTodaysQuiz(): Promise<QuizData | null> {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const documentPath = `daily-quizzes/${today}`;
+      const today = new Date().toISOString().split('T')[0] || new Date().toISOString().slice(0, 10);
+      return this.getDailyQuizByDate(today);
+    } catch (error) {
+      Logger.error('[FirestoreRest.getTodaysQuiz] error', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get a daily quiz by specific date ID
+   */
+  async getDailyQuizByDate(date: string): Promise<QuizData | null> {
+    try {
+      const documentPath = `daily-quizzes/${date}`;
       const url = `${this.baseUrl}/${documentPath}`;
 
       const response = await fetch(url, {
@@ -85,7 +98,7 @@ export class FirestoreRestService {
       const data = await response.json();
       return this.parseFirestoreDocument(data);
     } catch (error) {
-      Logger.error('[FirestoreRest.getTodaysQuiz] error', error);
+      Logger.error(`[FirestoreRest.getDailyQuizByDate] error for ${date}`, error);
       return null;
     }
   }
@@ -170,6 +183,7 @@ export class FirestoreRestService {
         question: String(qFields.question.stringValue),
         answers: options,
         correctAnswer: options[correctAnswerIndex],
+        explanation: qFields.explanation?.stringValue, // Fix missing explanation
       };
     });
 
@@ -798,6 +812,7 @@ export class FirestoreRestService {
    */
   async incrementUserTotalScore(userId: string, points: number, nickname?: string): Promise<boolean> {
     try {
+
       const dbPath = `projects/${this.projectId}/databases/(default)/documents`;
       // We need the full resource path for the transformation
       const docPath = `${dbPath}/users/${userId}`;
@@ -1263,6 +1278,207 @@ export class FirestoreRestService {
       return quizzes;
     } catch (e) {
       Logger.error('[FirestoreRest.getUserCreatedQuizzes] error', e);
+      return [];
+    }
+  }
+
+  /**
+   * Save a daily quiz completion record.
+   * Collection: daily-play-history
+   * ID: {userId}_{quizDate}
+   */
+  async saveDailyPlayHistory(userId: string, quizDate: string, stats: { score: number; totalQuestions: number; isPerfect: boolean }): Promise<boolean> {
+    try {
+      const docId = `${userId}_${quizDate}`;
+      const url = `${this.baseUrl}/daily-play-history/${docId}`;
+      const nowIso = new Date().toISOString();
+
+      const body = {
+        fields: {
+          id: { stringValue: docId },
+          userId: { stringValue: userId },
+          quizDate: { stringValue: quizDate },
+          score: { integerValue: String(stats.score) },
+          totalQuestions: { integerValue: String(stats.totalQuestions) },
+          isPerfect: { booleanValue: stats.isPerfect },
+          completedAt: { stringValue: nowIso }
+        }
+      };
+
+      const res = await fetch(url, {
+        method: 'PATCH', // Upsert
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      return res.ok;
+    } catch (e) {
+      Logger.error('[Firestore] saveDailyPlayHistory failed', e);
+      return false;
+    }
+  }
+
+  /**
+   * Check if user completed a daily quiz.
+   */
+  async getDailyPlayHistory(userId: string, quizDate: string): Promise<{ completed: boolean; score: number } | null> {
+    try {
+      const docId = `${userId}_${quizDate}`;
+      const url = `${this.baseUrl}/daily-play-history/${docId}`;
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+
+      const data: any = await res.json();
+      const f = data.fields || {};
+
+      return {
+        completed: true,
+        score: Number(f.score?.integerValue || 0)
+      };
+    } catch (e) {
+      Logger.error('[Firestore] getDailyPlayHistory failed', e);
+      return null;
+    }
+  }
+
+  /**
+   * List all daily quiz dates descending (for Archive).
+   * Uses runQuery to fetch document ID keys from daily-quizzes collection.
+   */
+  async listDailyQuizDates(): Promise<string[]> {
+    try {
+      // Structured Query to get document IDs only
+      const query = {
+        structuredQuery: {
+          from: [{ collectionId: 'daily-quizzes' }],
+          select: { fields: [{ fieldPath: '__name__' }] }, // Only fetch ID
+          orderBy: [{ field: { fieldPath: '__name__' }, direction: 'DESCENDING' }],
+          limit: 100 // Reasonable limit for archive
+        }
+      };
+
+      const results = await this.runQuery(query);
+
+      return results.map((doc: any) => {
+        // ID is the last part of the name path
+        // e.g., projects/.../databases/.../documents/daily-quizzes/2026-02-02
+        const path = doc.document?.name || '';
+        return path.split('/').pop() || '';
+      }).filter(Boolean);
+
+    } catch (e) {
+      Logger.error('[Firestore] listDailyQuizDates failed', e);
+      return [];
+    }
+  }
+
+  /**
+   * Get all completed daily quiz dates for a user.
+   */
+  async getUserDailyHistory(userId: string): Promise<string[]> {
+    try {
+      const query = {
+        structuredQuery: {
+          from: [{ collectionId: 'daily-play-history' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'userId' },
+              op: 'EQUAL',
+              value: { stringValue: userId }
+            }
+          },
+          select: { fields: [{ fieldPath: 'quizDate' }] },
+          limit: 365 // 1 year history is enough for now
+        }
+      };
+
+      const results = await this.runQuery(query);
+      return results.map((doc: any) => doc.document?.fields?.quizDate?.stringValue || '').filter(Boolean);
+    } catch (e) {
+      Logger.error('[Firestore] getUserDailyHistory failed', e);
+      return [];
+    }
+  }
+
+  /**
+   * Save entry to quiz-specific leaderboard.
+   * Path: daily-quizzes/{date}/leaderboard/{userId}
+   */
+  async saveQuizLeaderboardEntry(date: string, userId: string, data: { score: number, completedAt: string, nickname: string }): Promise<void> {
+    try {
+      const path = `daily-quizzes/${date}/leaderboard/${userId}`;
+      const url = `${this.baseUrl}/${path}`;
+      const body = {
+        fields: {
+          score: { integerValue: String(data.score) },
+          completedAt: { stringValue: data.completedAt },
+          nickname: { stringValue: data.nickname },
+          userId: { stringValue: userId }
+        }
+      };
+
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    } catch (e) {
+      Logger.error('[Firestore] saveQuizLeaderboardEntry failed', e);
+    }
+  }
+
+  /**
+   * Get leaderboard for a specific daily quiz.
+   * Query: daily-quizzes/{date}/leaderboard
+   * Sort: score DESC, completedAt ASC
+   */
+  async getQuizLeaderboard(date: string, limit: number = 25): Promise<Array<{ userKey: string; nickname: string; score: number; completedAt: string }>> {
+    try {
+      // Parent path: projects/.../documents/daily-quizzes/{date}
+      // This limits the query to the subcollection of this specific document.
+      const parent = `projects/${this.projectId}/databases/(default)/documents/daily-quizzes/${date}`;
+      const url = `https://firestore.googleapis.com/v1/${parent}:runQuery`;
+
+      const query = {
+        structuredQuery: {
+          from: [{ collectionId: 'leaderboard' }],
+          orderBy: [
+            { field: { fieldPath: 'score' }, direction: 'DESCENDING' },
+            { field: { fieldPath: 'completedAt' }, direction: 'ASCENDING' }
+          ],
+          limit: limit
+        }
+      };
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(query)
+      });
+
+      if (!res.ok) {
+        throw new Error(`Firestore query failed: ${res.statusText}`);
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const results: any = await res.json();
+
+      // Parse results
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return results.map((r: any) => {
+        const fields = r.document?.fields;
+        if (!fields) return null;
+        return {
+          userKey: fields.userId?.stringValue || '',
+          nickname: fields.nickname?.stringValue || 'Anonymous',
+          score: parseInt(fields.score?.integerValue || '0'),
+          completedAt: fields.completedAt?.stringValue || '',
+        };
+      }).filter(Boolean);
+
+    } catch (e) {
+      Logger.error('[Firestore] getQuizLeaderboard failed', e);
       return [];
     }
   }
