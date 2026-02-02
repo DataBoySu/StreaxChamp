@@ -15,9 +15,9 @@ export const OptionGrid: React.FC<OptionGridProps> = ({ options, children, optio
 
     return (
         <div
-            className={`flex-1 grid ${isGrid ? 'grid-cols-2 gap-3' : 'grid-cols-1 gap-y-3'}`}
+            className={`flex-1 grid ${isGrid ? 'grid-cols-2 gap-4' : 'grid-cols-1 gap-y-4'}`}
             style={{
-                marginBottom: '0.5rem',
+                marginBottom: '0.4rem',
                 minHeight: 0,
                 fontSize: optionFontSize
             }}

@@ -35,11 +35,13 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
                 width: '100%',
                 textAlign: 'left',
                 fontSize: fontSize,
-                minHeight: '36px',
+                minHeight: '32px',
                 height: 'auto',
-                padding: '6px 10px',
+                padding: '5px 8px',
                 display: 'flex',
-                alignItems: 'center'
+                alignItems: 'center',
+                position: 'relative',
+                zIndex: isSelected ? 10 : 1
             }}
             disabled={isAnswered}
             onClick={() => !isAnswered && onSelect(index)}

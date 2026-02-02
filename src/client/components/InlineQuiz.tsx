@@ -39,11 +39,11 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
     const questionLength = question.question.length;
     const maxOptionLength = Math.max(...answers.map((ans: string) => ans.length));
 
-    // Dynamic question font size: shorter questions can be larger
-    const questionFontSize = questionLength > 100 ? '0.85rem' : questionLength > 60 ? '0.95rem' : '1rem';
+    // Dynamic question font size: more aggressive reduction for better fit
+    const questionFontSize = questionLength > 120 ? '0.75rem' : questionLength > 80 ? '0.8rem' : questionLength > 50 ? '0.85rem' : '0.9rem';
 
-    // Dynamic option font size: adjust based on longest option
-    const optionFontSize = maxOptionLength > 25 ? '0.7rem' : maxOptionLength > 15 ? '0.75rem' : '0.8rem';
+    // Dynamic option font size: smaller sizes for better space optimization  
+    const optionFontSize = maxOptionLength > 30 ? '0.6rem' : maxOptionLength > 20 ? '0.65rem' : maxOptionLength > 12 ? '0.7rem' : '0.75rem';
 
     return (
         <div
@@ -57,9 +57,9 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
         >
             {/* Header / Meta */}
             <div style={{
-                marginBottom: '0.4rem',
+                marginBottom: '0.3rem',
                 color: '#6c757d',
-                fontSize: '0.7rem',
+                fontSize: '0.65rem',
                 flexShrink: 0
             }}>
                 Question {currentIndex + 1} of {quizData.questions.length}
@@ -67,8 +67,8 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
 
             {/* Question Text */}
             <h3 style={{
-                marginBottom: '0.75rem',
-                lineHeight: '1.3',
+                marginBottom: '0.6rem',
+                lineHeight: '1.25',
                 flexShrink: 0,
                 fontSize: questionFontSize,
                 fontWeight: 'bold'
@@ -97,7 +97,7 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
             <div style={{
                 textAlign: 'center',
                 flexShrink: 0,
-                marginTop: '0.5rem'
+                marginTop: '0.4rem'
             }}>
                 <button
                     className={`nes-btn ${isAnswered ? 'is-success' : 'is-disabled'}`}
@@ -105,9 +105,9 @@ export const InlineQuiz = ({ quizData, currentIndex, selectedAnswerIndex, onOpti
                     onClick={onNext}
                     style={{
                         width: '100%',
-                        fontSize: '0.75rem',
-                        padding: '0.5rem 1rem',
-                        minHeight: '36px'
+                        fontSize: '0.7rem',
+                        padding: '0.4rem 1rem',
+                        minHeight: '32px'
                     }}
                 >
                     {currentIndex === quizData.questions.length - 1 ? 'Finish' : 'Next >'}
