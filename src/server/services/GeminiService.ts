@@ -282,6 +282,24 @@ export async function generateUnifiedContent(rawTopic: string): Promise<{ topic:
             parsed.topic.sources = [];
         }
 
+        // SANITIZATION: Remove letter prefixes from options (A), B), C), D), etc.)
+        // Gemini sometimes adds these despite instructions not to
+        if (parsed?.quiz?.questions && Array.isArray(parsed.quiz.questions)) {
+            parsed.quiz.questions.forEach((q: any, idx: number) => {
+                if (Array.isArray(q.options)) {
+                    q.options = q.options.map((opt: string) => {
+                        if (typeof opt === 'string') {
+                            // Remove patterns like "A) ", "B) ", "1. ", etc.
+                            // Regex: ^[A-D]\)\s* or ^[1-4]\.\s*
+                            return opt.replace(/^[A-D]\)\s*/i, '').replace(/^[1-4]\.\s*/, '').trim();
+                        }
+                        return opt;
+                    });
+                    Logger.ai(`  Q${idx + 1} options sanitized:`, q.options);
+                }
+            });
+        }
+
         const qList = parsed.quiz?.questions;
         if (!Array.isArray(qList) || qList.length < 5) {
             Logger.warn('[UnifiedGen] Rejected: Insufficient questions', { count: qList?.length });
