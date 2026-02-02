@@ -64,6 +64,7 @@ export const App = () => {
   const [userInfo, setUserInfo] = useState<{ userId: string | null; username: string | null; displayName: string | null } | null>(null);
 
   const [showTopicMenu, setShowTopicMenu] = useState(false);
+  const [hotTopicQuery, setHotTopicQuery] = useState<string>(''); // NEW: For pre-filling TopicSelector from hot topics
   const [userTotalScore, setUserTotalScore] = useState(0);
   const [selectedTopic, setSelectedTopic] = useState<{ title: string; slug: string } | null>(null);
   interface SelectedTopicQuiz {
@@ -834,7 +835,11 @@ export const App = () => {
   if (showTopicMenu) {
     return (
       <TopicSelector
-        onClose={() => setShowTopicMenu(false)}
+        initialQuery={hotTopicQuery} // Pass the hot topic query
+        onClose={() => {
+          setShowTopicMenu(false);
+          setHotTopicQuery(''); // Clear the query when closing
+        }}
         onTopicReady={async (topic) => {
           setSelectedTopic({ title: topic.title, slug: topic.slug });
 
@@ -848,6 +853,7 @@ export const App = () => {
             });
             setTopicQuizStatus('ready');
             setShowTopicMenu(false); // Only close menu when data is successfully set
+            setHotTopicQuery(''); // Clear the query
             return;
           }
 
@@ -858,6 +864,7 @@ export const App = () => {
         }}
         onError={(code, robotDialogue) => {
           setShowTopicMenu(false);
+          setHotTopicQuery(''); // Clear the query
           addError(code, robotDialogue);
         }}
       />
@@ -1140,9 +1147,10 @@ export const App = () => {
           landingSummaryLoading={landingSummaryLoading}
           landingSummary={landingSummary}
           authUser={authUser}
-          onSelectTopic={(slug, title) => {
-            setSelectedTopic({ slug, title });
-            localStorage.setItem('streax:selectedTopic', JSON.stringify({ slug, title }));
+          onSelectTopic={(_slug, title) => {
+            // Open TopicSelector with this topic pre-filled in search
+            setHotTopicQuery(title); // Store the query to pass to TopicSelector
+            setShowTopicMenu(true); // Open the selector
           }}
         />
       )}

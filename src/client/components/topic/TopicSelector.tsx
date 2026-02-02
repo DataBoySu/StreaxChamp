@@ -31,12 +31,13 @@ const toTitleCase = (s: string) =>
 
 export const TopicSelector: React.FC<{
   onClose?: () => void;
+  initialQuery?: string; // NEW: Pre-fill search box with this value
   // onTopicReady now provides the generated quiz (if successful) so parent can gate UI
   onTopicReady?: (topic: { title: string; slug: string; quizId?: string; quiz?: { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[] }; bonus?: { question: string; options: string[]; correctIndex: number } | null }) => void;
   onError?: (code: string, robotDialogue: string) => void; // NEW: Callback for robot errors
-}> = ({ onClose, onTopicReady, onError }) => {
+}> = ({ onClose, initialQuery, onTopicReady, onError }) => {
   const [topics, setTopics] = useState<TopicDoc[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery || ''); // Initialize with initialQuery
   const [addingTopic, setAddingTopic] = useState(false);
   const [progress, setProgress] = useState(0);
   const [generatingSlug, setGeneratingSlug] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export const TopicSelector: React.FC<{
   const [loading] = useState(false);
   const [popularSlugs] = useState<string[]>(['science', 'technology', 'history', 'movies', 'sports']);
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
 
   // Fetch topics from REST API with client-side caching
   const CACHE_KEY = 'streax:topics_selector';
