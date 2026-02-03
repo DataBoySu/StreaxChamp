@@ -19,6 +19,7 @@ interface LandingHeroProps {
     dailyCompleted?: boolean;
     dailyQuizLoading?: boolean;
     onBrowseArchive?: () => void;
+    onClearTopic?: () => void;
 }
 
 export const LandingHero: React.FC<LandingHeroProps> = ({
@@ -34,6 +35,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
     dailyCompleted = false,
     dailyQuizLoading = false,
     onBrowseArchive,
+    onClearTopic,
 }) => {
     return (
         <GeneratorShell>
@@ -89,7 +91,10 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         {selectedTopic ? `Topic: ${selectedTopic.title}` : 'Topic Select'}
                     </button>
                     <button
-                        onClick={onBrowseArchive}
+                        onClick={() => {
+                            if (onClearTopic) onClearTopic();
+                            if (onBrowseArchive) onBrowseArchive();
+                        }}
                         className="modern-button modern-button-secondary px-6 py-3 font-bold text-sm md:text-base shadow-md hover:shadow-lg font-pixel transition-all active:scale-95"
                     >
                         Daily Quiz

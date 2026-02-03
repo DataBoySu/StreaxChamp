@@ -129,7 +129,7 @@ export const useQuizData = (contextPostId?: string | null, date?: string): UseQu
 
 
 
-  const refetch = async (newDate?: string) => {
+  const refetch = async (_newDate?: string) => {
     // If we support dynamic switching, we might need a way to update the 'date' state if we had it,
     // but here the date comes from props. 'refetch' normally just re-runs with current props.
     // However, if the user explicitly asks for a new date, we should probably support it.

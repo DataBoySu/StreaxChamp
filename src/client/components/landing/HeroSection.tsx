@@ -4,7 +4,7 @@ import { InteractiveRobot } from '../InteractiveRobot';
 
 interface HeroSectionProps {
     username: string;
-    errorMessage?: string;
+    errorMessage?: string | undefined;
     hasPlayed?: boolean;
     totalPoints?: number;
 }
@@ -45,7 +45,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       */}
             <div
                 className="relative w-full flex justify-center items-end"
-                style={{ minHeight: '240px' }}
+                style={{ minHeight: '340px' }}
             >
                 {/* 
              Robot wrapper:
@@ -54,12 +54,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
              - The bubble pops up ~60px above the head.
              - We rely on the margin from Title/Subtitle (mb-12 = ~48px) + Robot's own spacing.
           */}
-                <div className="relative z-10 w-full flex justify-center pointer-events-auto">
+                <div className="relative z-30 w-full flex justify-center pointer-events-auto" style={{ marginBottom: '-20px' }}>
                     <InteractiveRobot
                         username={username}
                         errorMessage={errorMessage}
-                        hasPlayed={hasPlayed}
-                        totalPoints={totalPoints}
+                        hasPlayed={hasPlayed || false}
+                        totalPoints={totalPoints || 0}
                     />
                 </div>
             </div>

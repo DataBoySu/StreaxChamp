@@ -12,7 +12,7 @@ export const GeneratorShell: React.FC<GeneratorShellProps> = ({ children, classN
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`min-h-full w-full bg-primary text-primary relative flex flex-col items-center py-8 px-4 md:px-6 lg:px-8 ${className}`}
+            className={`min-h-full w-full bg-primary text-primary generator-theme-locked relative flex flex-col items-center py-8 px-4 md:px-6 lg:px-8 ${className}`}
         >
             {/* Background Pattern/Texture - kept subtle to match "Warm Parchment" or "Cyber Slate" */}
             <div className="absolute inset-0 opacity-10 pointer-events-none"

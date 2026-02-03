@@ -1084,6 +1084,7 @@ export const App = () => {
                     dailyCompleted={hasDailyCompleted}
                     dailyQuizLoading={(loading || (!!selectedDate && dailyQuiz?.id !== selectedDate)) && !selectedTopic} // Check strict loading + stale data
                     onBrowseArchive={() => setShowArchive(true)} // NEW PROP
+                    onClearTopic={() => setSelectedTopic(null)}
                   />
                 ) : showExplanation && explanationData ? (
                   <ExplanationScreen
