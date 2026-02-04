@@ -361,10 +361,32 @@ export const TopicSelector: React.FC<{
         </div>
       </div>
 
+      {/* Informational Banner - Moved to flow below header */}
+      <div className="flex-none w-full py-4 px-6 z-20 flex flex-col items-center gap-2 bg-slate-900/50 backdrop-blur-sm border-b border-white/5">
+        <div className="w-full flex justify-center">
+          <div className="inline-block px-6 py-3 rounded-lg 
+                         bg-gradient-to-r from-red-950/40 via-red-900/40 to-red-950/40
+                         shadow-lg shadow-red-500/20 border border-red-500/30
+                         animate-pulse-subtle">
+            <span className="text-sm text-red-100/90 font-medium tracking-wide
+                           drop-shadow-lg shadow-red-500">
+              Custom topics take 1–3 minutes. Cached after first generation.
+            </span>
+          </div>
+        </div>
+        {generationError && (
+          <div className="flex justify-center">
+            <div className="px-4 py-2 rounded bg-red-900/60 border border-red-600 text-red-200 text-sm">
+              {generationError}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Main content area - flex-1 to take available space between header and footer */}
       <div className="flex-1 w-full overflow-y-auto overscroll-contain min-h-0">
         {/* Content wrapper with INCREASED padding to avoid footer overlap */}
-        <div className="w-full px-4 sm:px-5 pt-6 pb-64">
+        <div className="w-full px-4 sm:px-5 pt-6 pb-20">
           <div className="w-full max-w-4xl mx-auto">
 
             {/* Loading State */}
@@ -424,31 +446,7 @@ export const TopicSelector: React.FC<{
         </div>
       </div>
 
-      {/* Fixed footer at bottom - Absolute within fixed container */}
-      <div className="absolute bottom-0 left-0 right-0 py-8 px-6 pointer-events-none z-20">
-        {/* Separation line with glow */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent shadow-lg shadow-red-500/20"></div>
 
-        {/* Centered content with more top space */}
-        <div className="w-full flex justify-center mt-2">
-          <div className="inline-block px-6 py-3 rounded-lg backdrop-blur-md 
-                         bg-gradient-to-r from-red-950/40 via-red-900/40 to-red-950/40
-                         shadow-lg shadow-red-500/20 border border-red-500/30
-                         animate-pulse-subtle" style={{ transform: 'translateY(20px)' }}>
-            <span className="text-sm text-red-100/90 font-medium tracking-wide
-                           drop-shadow-lg shadow-red-500">
-              Custom topics take 1–3 minutes. Cached after first generation.
-            </span>
-          </div>
-        </div>
-        {generationError && (
-          <div className="mt-4 flex justify-center">
-            <div className="px-4 py-2 rounded bg-red-900/60 border border-red-600 text-red-200 text-sm">
-              {generationError}
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* UNIVERSAL KAWAII LOADER */}
       {/* Shows for addingTopic (Add) OR generatingSlug (Quiz Gen) */}
