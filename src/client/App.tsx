@@ -273,6 +273,13 @@ export const App = () => {
 
   const historyLoading = globalHistoryLoading;
 
+  // Compute User Rank for Landing Page (Global Leaderboard)
+  const userGlobalRank = useMemo(() => {
+    if (!landingSummary?.globalTop || !hookUsername) return null;
+    const index = landingSummary.globalTop.findIndex(p => p.nickname === hookUsername);
+    return index !== -1 ? index + 1 : null;
+  }, [landingSummary, hookUsername]);
+
   // Derive active questions: prefer topic quiz if present
   interface TopicQuizQuestionRaw { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string; explanation?: string; }
   const questions = useMemo(() => {
@@ -736,7 +743,7 @@ export const App = () => {
     const submissionPayload = { userKey: key, nickname, score, timeTakenMs: totalMs, ...(quizId ? { quizId } : {}) };
 
     // Check if replay (correctly using Daily status vs Topic cache)
-    const isReplay = selectedTopic ? hasPlayed(slug) : hasDailyCompleted;
+    const isReplay = selectedTopic ? hasPlayed(slug, key) : hasDailyCompleted;
 
     // Unified Play Handler: Log history AND submit score
     const finalizePlay = async () => {
@@ -769,7 +776,8 @@ export const App = () => {
               quizDate: dailyQuiz?.id || new Date().toISOString().slice(0, 10),
               score,
               totalQuestions: NUM_QUESTIONS,
-              nickname // Pass nickname for leaderboard
+              nickname, // Pass nickname for leaderboard
+              timeTakenMs: totalMs // Pass timeTakenMs for tie breaking
             })
           });
           const data = await res.json();
@@ -783,16 +791,13 @@ export const App = () => {
         }
       }
 
-      // Step 2: Submit to TOPIC Leaderboard (Skip if Daily Mode)
-      // Daily Mode uses its own separate endpoint above.
-      if (selectedTopic && !isReplay) {
+      // Step 2: Submit to TOPIC Leaderboard
+      // ALWAYS submit to allow score improvements. Server handles "only update if better".
+      if (selectedTopic) {
         await submitLeaderboardScore(slug, submissionPayload);
-      } else if (isReplay && selectedTopic) {
-        setMessage({
-          type: 'info',
-          text: '🔁 Replay mode - stats updated',
-          timesUp: false
-        });
+        if (isReplay) {
+          console.log('[App] Replay submission sent');
+        }
       }
 
       // Step 3: Refresh local state
@@ -1085,6 +1090,8 @@ export const App = () => {
                     dailyQuizLoading={(loading || (!!selectedDate && dailyQuiz?.id !== selectedDate)) && !selectedTopic} // Check strict loading + stale data
                     onBrowseArchive={() => setShowArchive(true)} // NEW PROP
                     onClearTopic={() => setSelectedTopic(null)}
+                    userRank={userGlobalRank}
+                    timerDuration={CONFIG.GAME.TIMER_DURATION}
                   />
                 ) : showExplanation && explanationData ? (
                   <ExplanationScreen

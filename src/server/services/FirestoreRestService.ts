@@ -1405,13 +1405,25 @@ export class FirestoreRestService {
   }
 
   /**
-   * Save entry to quiz-specific leaderboard.
+   * Save entry to quiz-specific leaderboard used by Daily Quiz results.
    * Path: daily-quizzes/{date}/leaderboard/{userId}
+   * STRICT: Only insert if missing to prevent replays from overwriting first score.
    */
   async saveQuizLeaderboardEntry(date: string, userId: string, data: { score: number, completedAt: string, nickname: string }): Promise<void> {
     try {
       const path = `daily-quizzes/${date}/leaderboard/${userId}`;
       const url = `${this.baseUrl}/${path}`;
+
+      // Check existence first
+      try {
+        const check = await fetch(url, { method: 'GET' });
+        if (check.ok) {
+          // Entry exists - DO NOT OVERWRITE
+          Logger.info('[Firestore] saveQuizLeaderboardEntry skipped (exists)', { userId, date });
+          return;
+        }
+      } catch { /* ignore check error, proceed to try write */ }
+
       const body = {
         fields: {
           score: { integerValue: String(data.score) },
@@ -1421,6 +1433,7 @@ export class FirestoreRestService {
         }
       };
 
+      // Using PATCH as verified upsert mechanism but gated by check above
       await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

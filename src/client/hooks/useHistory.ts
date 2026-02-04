@@ -12,7 +12,7 @@ interface UseHistoryReturn {
     history: PlayHistoryEntry[];
     loading: boolean;
     savePlay: (username: string, nickname: string, topicSlug: string, topicTitle: string, score: number) => Promise<void>;
-    hasPlayed: (topicSlug: string) => boolean;
+    hasPlayed: (topicSlug: string, username?: string) => boolean;
     refresh: () => Promise<void>;
 }
 
@@ -99,8 +99,8 @@ export const useHistory = (enabled = true, pollingEnabled = true): UseHistoryRet
         }
     }, [fetchHistory]);
 
-    const hasPlayed = useCallback((topicSlug: string) => {
-        return history.some(entry => entry.topicSlug === topicSlug);
+    const hasPlayed = useCallback((topicSlug: string, username?: string) => {
+        return history.some(entry => entry.topicSlug === topicSlug && (!username || entry.username === username));
     }, [history]);
 
     const refresh = useCallback(async () => {

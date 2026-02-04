@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import LoadingDots from '../LoadingDots';
 import { GeneratorShell } from './GeneratorShell';
 import { HeroSection } from './HeroSection';
+import { CONFIG } from '../../../shared/constants';
 
 interface LandingHeroProps {
     username: string;
@@ -20,6 +21,8 @@ interface LandingHeroProps {
     dailyQuizLoading?: boolean;
     onBrowseArchive?: () => void;
     onClearTopic?: () => void;
+    userRank?: number | null;
+    timerDuration?: number;
 }
 
 export const LandingHero: React.FC<LandingHeroProps> = ({
@@ -36,6 +39,8 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
     dailyQuizLoading = false,
     onBrowseArchive,
     onClearTopic,
+    userRank,
+    timerDuration = CONFIG.GAME.TIMER_DURATION,
 }) => {
     return (
         <GeneratorShell>
@@ -79,14 +84,14 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
 
                 {/* Topic Select & Daily Quiz Buttons */}
                 <motion.div
-                    className="flex justify-center gap-4"
+                    className="flex justify-center gap-4 items-center"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
                 >
                     <button
                         onClick={onOpenTopicMenu}
-                        className="modern-button modern-button-primary px-6 py-3 font-bold text-sm md:text-base shadow-lg hover:shadow-xl font-pixel border-2 border-transparent hover:border-white/20 transition-all active:scale-95"
+                        className="pixel-btn pixel-btn-primary"
                     >
                         {selectedTopic ? `Topic: ${selectedTopic.title}` : 'Topic Select'}
                     </button>
@@ -95,7 +100,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             if (onClearTopic) onClearTopic();
                             if (onBrowseArchive) onBrowseArchive();
                         }}
-                        className="modern-button modern-button-secondary px-6 py-3 font-bold text-sm md:text-base shadow-md hover:shadow-lg font-pixel transition-all active:scale-95"
+                        className="pixel-btn pixel-btn-secondary"
                     >
                         Daily Quiz
                     </button>
@@ -124,7 +129,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             animate={{ scale: [1, 1.1, 1] }}
                             transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
                         >
-                            15s
+                            {timerDuration}s
                         </motion.div>
                         <div className="text-[10px] uppercase tracking-wider text-secondary font-bold mt-1">Timer</div>
                     </div>
@@ -134,9 +139,9 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             animate={{ scale: [1, 1.1, 1] }}
                             transition={{ duration: 2, repeat: Infinity, delay: 1 }}
                         >
-                            1st
+                            {userRank ? (userRank <= 3 ? ['1st', '2nd', '3rd'][userRank - 1] : `#${userRank}`) : '-'}
                         </motion.div>
-                        <div className="text-[10px] uppercase tracking-wider text-secondary font-bold mt-1">Rank 1</div>
+                        <div className="text-[10px] uppercase tracking-wider text-secondary font-bold mt-1">Rank</div>
                     </div>
                 </motion.div>
 

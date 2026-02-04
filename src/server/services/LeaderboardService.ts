@@ -143,8 +143,11 @@ export class LeaderboardService {
         Logger.info('[LeaderboardService.submit] no existing doc or fetch error');
       }
 
-      const better = !existing || (entry.score > existing.score) || (entry.score === existing.score && entry.timeTakenMs < existing.timeTakenMs);
+      const better = !existing; // STRICT: Only insert if no record exists (First attempt counts)
+
       if (!better) {
+        // Log skip for clarity
+        // Logger.info(`[Leaderboard] Skip update for ${entry.nickname} (already played)`);
         return { ok: true, updated: false, previous: existing };
       }
       const now = new Date().toISOString();

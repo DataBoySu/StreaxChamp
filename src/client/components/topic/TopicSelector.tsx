@@ -283,10 +283,13 @@ export const TopicSelector: React.FC<{
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col w-full min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black text-white">
+    <div
+      className="fixed inset-0 z-50 flex flex-col w-full bg-gradient-to-b from-slate-950 via-slate-900 to-black text-white overflow-hidden"
+      style={{ height: '100dvh' }}
+    >
 
       {/* Search Bar Header */}
-      <div className="sticky top-0 z-10 w-full bg-slate-900/95 backdrop-blur-sm border-b border-white/10 shadow-lg px-4 py-4 mb-5">
+      <div className="flex-none z-10 w-full bg-slate-900/95 backdrop-blur-sm border-b border-white/10 shadow-lg px-4 py-4">
         <div className="max-w-[90%] mx-auto flex gap-2 items-center">
           {/* Search Input */}
           <div className="relative flex-[8]">
@@ -359,21 +362,18 @@ export const TopicSelector: React.FC<{
       </div>
 
       {/* Main content area - flex-1 to take available space between header and footer */}
-      <div className="flex-1 w-full max-w-full overflow-y-auto">
-
-        {/* Keep generic loading for fetch only */}
-        {(loading && !addingTopic && !generatingSlug) && (
-          <div className="w-full max-w-4xl mx-auto px-5 pt-6 pb-2">
-            <div className="bg-slate-800/60 rounded-lg p-4 mb-5 animate-pulse">
-              <div className="text-center text-sm text-slate-400">Loading topics...</div>
-            </div>
-            <div className="h-8" aria-hidden />
-          </div>
-        )}
-
-        {/* Content wrapper - top-aligned so it doesn't overlap the sticky header */}
-        <div className="w-full h-full flex items-start justify-center px-4 sm:px-5 pt-8 pb-24" style={{ paddingTop: 'calc(2rem + 35px)' }}>
+      <div className="flex-1 w-full overflow-y-auto overscroll-contain min-h-0">
+        {/* Content wrapper with INCREASED padding to avoid footer overlap */}
+        <div className="w-full px-4 sm:px-5 pt-6 pb-64">
           <div className="w-full max-w-4xl mx-auto">
+
+            {/* Loading State */}
+            {(loading && !addingTopic && !generatingSlug) && (
+              <div className="bg-slate-800/60 rounded-lg p-4 mb-5 animate-pulse">
+                <div className="text-center text-sm text-slate-400">Loading topics...</div>
+              </div>
+            )}
+
             {!loading && topics.length === 0 && (
               <div className="text-center text-slate-400 py-10">
                 <p>No topics found. Add your first topic!</p>
@@ -381,8 +381,9 @@ export const TopicSelector: React.FC<{
             )}
 
             {!loading && topics.length > 0 && (
-              <div className={`w-full ${topics.length === 1 ? 'flex justify-center' : ''}`}>
-                <div className={topics.length === 1 ? 'w-full max-w-md' : 'grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full'}>
+              <div className="w-full">
+                {/* Always use 2-column grid */}
+                <div className="grid grid-cols-2 gap-3 w-full">
                   {topics
                     .filter(t => (t.name && t.name.trim().length > 0))
                     // [SEARCH FILTER] Real-time filtering (starts with query, case-insensitive)
@@ -394,24 +395,6 @@ export const TopicSelector: React.FC<{
                       const isPopular = popularSlugs.includes(slug);
                       const isExclusive = exclusiveSlug === slug;
                       const vibeClass = exclusiveSlug ? (isExclusive ? 'vibe-beacon' : '') : (isPopular ? 'vibe-beacon' : '');
-
-                      if (topics.length === 1) {
-                        return (
-                          <div
-                            key={topic.id}
-                            ref={(el) => { topicRefs.current[topic.name] = el; }}
-                          >
-                            <div className="relative w-full flex justify-center">
-                              <TopicButtonNew
-                                title={displayName}
-                                compact
-                                onClick={() => requestQuiz(topic)}
-                                className={`${isHighlighted ? 'animate-shake' : ''} ${vibeClass} ${generatingSlug === (slug) ? 'opacity-60 pointer-events-none' : ''}`}
-                              />
-                            </div>
-                          </div>
-                        );
-                      }
 
                       return (
                         <div
@@ -430,7 +413,7 @@ export const TopicSelector: React.FC<{
                       );
                     })}
                   {topics.length > 0 && topics.filter(t => (t.name && t.name.trim().length > 0)).length === 0 && (
-                    <div className="text-sm text-red-400 col-span-full">
+                    <div className="text-sm text-red-400 col-span-2">
                       Topics fetched but missing 'name' field. Check seeding / backfill.
                     </div>
                   )}
@@ -441,8 +424,8 @@ export const TopicSelector: React.FC<{
         </div>
       </div>
 
-      {/* Fixed footer at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 py-8 px-6 pointer-events-none">
+      {/* Fixed footer at bottom - Absolute within fixed container */}
+      <div className="absolute bottom-0 left-0 right-0 py-8 px-6 pointer-events-none z-20">
         {/* Separation line with glow */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent shadow-lg shadow-red-500/20"></div>
 

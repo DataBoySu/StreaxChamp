@@ -4,6 +4,7 @@ import { UserService } from '../services/UserService';
 import { Logger } from '../Logger';
 import { generateUnifiedContent, validateGeminiKey } from '../services/GeminiService';
 import { CacheService } from '../services/CacheService';
+import { LeaderboardService } from '../services/LeaderboardService'; // NEW
 import { reddit, redis } from '@devvit/web/server';
 
 /**
@@ -195,12 +196,12 @@ export class QuizController {
 
             // 1. Replay Check (Authority)
             const existing = await fs.getDailyPlayHistory(effectiveUserId, quizDate);
-            if (existing && existing.completed) {
-                Logger.info(`[DAILY QUIZ] Replay detected – skipping writes`, { userId: effectiveUserId, date: quizDate });
-                return res.json({ success: true, replay: true });
-            }
 
-            // 2. Save History (New Record)
+            // Allow Write IF: History missing OR User not in leaderboard yet (Recover state)
+            // We check leaderboard existence implicitly by letting saveQuizLeaderboardEntry safeguard itself.
+            // But we still want to indicate "Replay" to client if history exists.
+
+            // 2. Save History (New Record) - Upsert to ensure latest metadata
             const now = new Date().toISOString();
             await fs.saveDailyPlayHistory(effectiveUserId, quizDate, {
                 score,
@@ -208,15 +209,60 @@ export class QuizController {
                 isPerfect: score === totalQuestions
             });
 
-            // 3. Quiz-Specific Leaderboard (New Phase 4 Requirements)
+            // 3. Quiz-Specific Leaderboard
+            // SAFEGUARDED INTERNALLY: Will only write if missing.
             await fs.saveQuizLeaderboardEntry(quizDate, effectiveUserId, {
                 score,
                 completedAt: now,
                 nickname: effectiveNickname
             });
 
+            const isReplay = existing && existing.completed;
+
+            if (isReplay) {
+                Logger.info(`[DAILY QUIZ] Replay play processed`, { userId: effectiveUserId, date: quizDate });
+                // Return replay: true so client shows badge, but we attempted recovery above
+                return res.json({ success: true, replay: true });
+            }
+
             // 4. Update Global XP (Only on first play)
             await fs.incrementUserTotalScore(effectiveUserId, score);
+
+            // 5. [NEW] Bridge to Topic Leaderboard
+            // If this daily quiz belongs to a Topic, also submit score there!
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const quizContent: any = await fs.getDailyQuizByDate(quizDate);
+                const topicTitle = quizContent?.metadata?.topic || quizContent?.topic;
+
+                if (topicTitle && typeof topicTitle === 'string') {
+                    // Simple slugify: lowercase, replace non-alphanum with hyphens, trim
+                    const slug = topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+                    if (slug && slug !== 'mixed-general-knowledge' && slug !== 'general-knowledge') {
+                        Logger.info(`[SubmitDaily] Bridging score to Topic Leaderboard: ${slug}`, { nickname: effectiveNickname, score });
+                        const ls = new LeaderboardService();
+                        // Note: timeTakenMs defaults to 0 as it's not currently in the daily payload
+                        const timeTakenMs = req.body.timeTakenMs || 0;
+
+                        await ls.submit(slug, {
+                            userKey: effectiveUserId,
+                            nickname: effectiveNickname,
+                            score,
+                            timeTakenMs
+                        });
+                        // Also Rolling
+                        await ls.submitRolling(slug, {
+                            userKey: effectiveUserId,
+                            nickname: effectiveNickname,
+                            score,
+                            timeTakenMs
+                        });
+                    }
+                }
+            } catch (bridgeErr) {
+                Logger.error('[SubmitDaily] Bridge Failed', bridgeErr);
+            }
 
             return res.json({ success: true, replay: false });
         } catch (e) {

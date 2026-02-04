@@ -1,4 +1,4 @@
-TASK: Generator Landing Page UI Bug Audit (NO DESIGN CHANGES)
+TASK: Topic Leaderboard Data Loss Audit & Fix
 
 IMPORTANT:
 Before proceeding, read:
@@ -8,43 +8,49 @@ Before proceeding, read:
 ---
 
 PROBLEM:
-Players report UI bugs on the Generator landing page.
-Issues appear after navigation, returning from quizzes, or state changes.
+The Topic Leaderboard is NOT recording scores for all players
+who have completed a topic quiz.
+
+Some scores are missing or overwritten.
 
 ---
 
-GOALS:
-- Identify ALL UI bugs caused by state, lifecycle, or rendering logic
-- Do NOT redesign or restyle anything
-- Do NOT touch animations, colors, or layout aesthetics
+INVESTIGATION SCOPE:
+- Client submission flow
+- Server controllers handling topic quiz completion
+- Firestore write paths
+- Replay mode logic
+- Leaderboard query logic
 
 ---
 
-INVESTIGATION REQUIREMENTS:
-1. Audit the Generator landing page component tree
-2. Identify:
-   - Components that remain mounted when they should unmount
-   - Hidden elements still consuming layout space
-   - State that is not reset on route re-entry
-   - Effects that run multiple times unexpectedly
-3. Verify behavior in:
-   - First load
-   - After completing a quiz
-   - After navigating back from quiz
-   - Expanded view
+REQUIRED ANALYSIS:
+1. Identify EXACTLY where topic leaderboard writes occur
+2. Verify:
+   - Document paths
+   - Document IDs
+   - Whether writes overwrite previous players
+3. Confirm:
+   - Replay mode does NOT write leaderboard entries
+   - First-time plays ALWAYS write leaderboard entries
+4. Check whether leaderboard is:
+   - Per topic
+   - Per quiz instance
+   - Per date
+   (and whether this is consistent across code)
 
 ---
 
 EXPECTED OUTPUT:
-- A list of concrete bugs (with file + component names)
-- Why each bug happens (state, effect, conditional render)
-- Minimal fixes for each bug
-- Confirmation that fixes do NOT change visuals
+- Root cause(s) of missing leaderboard entries
+- Whether data is overwritten or skipped
+- A corrected Firestore schema (if needed)
+- Minimal code changes to fix the issue
+- NO UI changes
 
 ---
 
 DO NOT:
-- Introduce new UI
-- Change spacing
-- Change robot behavior
-- Touch Framer Motion animations
+- Change leaderboard UI
+- Add new features
+- Modify unrelated stats or XP logic
