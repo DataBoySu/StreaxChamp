@@ -20,12 +20,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             {/* Title & Subtitle Group with more breathing room */}
             <div className="mb-12 md:mb-16 relative z-20 px-4">
                 <motion.h1
-                    // NES aesthetic: Press Start 2P font with text shadow for depth
+                    // Cyberpunk neon aesthetic with strong glow for readability
                     style={{
                         fontFamily: "'Press Start 2P', cursive",
-                        color: '#FF4500', // Reddit orange
-                        textShadow: '4px 4px 0px rgba(0, 0, 0, 0.2)',
-                        fontSize: 'clamp(1.5rem, 5vw, 2.5rem)', // Responsive sizing
+                        color: '#00ff88', // Neon cyan matching robot eyes
+                        textShadow: '0 0 20px #00ff88, 0 0 40px rgba(0, 255, 136, 0.5), 0 0 60px rgba(0, 255, 136, 0.3)',
+                        fontSize: 'clamp(1.75rem, 5vw, 2.75rem)', // Slightly larger for impact
                         lineHeight: '1.4',
                     }}
                     initial={{ y: -20, opacity: 0 }}
@@ -39,9 +39,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <motion.p
                     style={{
                         fontFamily: "'Press Start 2P', cursive",
-                        fontSize: 'clamp(0.625rem, 2vw, 0.875rem)',
-                        color: '#5A5A5A',
+                        fontSize: 'clamp(0.75rem, 2vw, 1rem)', // Increased size
+                        color: 'rgba(0, 255, 136, 0.8)', // Softer cyan for subtitle
                         lineHeight: '1.8',
+                        textShadow: '0 0 10px rgba(0, 255, 136, 0.5)', // Subtle glow
                     }}
                     initial={{ y: -10, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}

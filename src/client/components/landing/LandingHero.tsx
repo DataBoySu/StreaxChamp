@@ -82,7 +82,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
             {/* Actions & Stats Container */}
             <div className="relative z-10 w-full flex flex-col items-center gap-8">
 
-                {/* Topic Select & Daily Quiz Buttons - NES Style */}
+                {/* Topic Select & Daily Quiz Buttons - Cyberpunk Style */}
                 <motion.div
                     className="flex justify-center gap-6 items-center flex-wrap"
                     initial={{ opacity: 0, y: 10 }}
@@ -91,11 +91,12 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                 >
                     <button
                         onClick={onOpenTopicMenu}
-                        className="nes-btn is-primary"
+                        className="nes-btn is-error" // Red accent matching robot
                         style={{
                             fontFamily: "'Press Start 2P', cursive",
                             fontSize: 'clamp(0.5rem, 2vw, 0.75rem)',
                             padding: '1rem 1.5rem',
+                            boxShadow: '0 0 20px rgba(220, 38, 38, 0.3)',
                         }}
                     >
                         {selectedTopic ? `Topic: ${selectedTopic.title}` : 'Topic Select'}
@@ -105,31 +106,32 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             if (onClearTopic) onClearTopic();
                             if (onBrowseArchive) onBrowseArchive();
                         }}
-                        className="nes-btn"
+                        className="nes-btn is-primary" // Cyan accent
                         style={{
                             fontFamily: "'Press Start 2P', cursive",
                             fontSize: 'clamp(0.5rem, 2vw, 0.75rem)',
                             padding: '1rem 1.5rem',
+                            boxShadow: '0 0 20px rgba(0, 255, 136, 0.3)',
                         }}
                     >
                         Daily Quiz
                     </button>
                 </motion.div>
 
-                {/* Stats Display - NES Containers with depth */}
+                {/* Stats Display - Cyberpunk Dark Containers */}
                 <motion.div
                     className="grid grid-cols-3 gap-4 max-w-lg w-full px-4"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
                 >
-                    {/* Questions */}
+                    {/* Questions - Cyan Neon */}
                     <div
-                        className="nes-container is-rounded flex flex-col items-center justify-center"
+                        className="nes-container is-dark is-rounded flex flex-col items-center justify-center"
                         style={{
-                            backgroundColor: '#FFEBE6',
-                            border: '4px solid #FF4500',
-                            boxShadow: '4px 4px 0px rgba(255, 69, 0, 0.3)',
+                            backgroundColor: 'rgba(0, 255, 136, 0.05)',
+                            border: '3px solid #00ff88',
+                            boxShadow: '0 0 20px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(0, 255, 136, 0.1)',
                             padding: '1rem 0.5rem',
                             minHeight: '90px',
                         }}
@@ -137,9 +139,9 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         <motion.div
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',
-                                color: '#FF4500',
-                                textShadow: '2px 2px 0px rgba(0, 0, 0, 0.1)',
+                                fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+                                color: '#00ff88',
+                                textShadow: '0 0 15px #00ff88, 0 0 30px rgba(0, 255, 136, 0.5)',
                             }}
                             animate={{ scale: [1, 1.05, 1] }}
                             transition={{ duration: 2, repeat: Infinity }}
@@ -149,8 +151,8 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         <div
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(0.45rem, 1.5vw, 0.55rem)',
-                                color: '#666',
+                                fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
+                                color: 'rgba(0, 255, 136, 0.7)',
                                 marginTop: '0.5rem',
                             }}
                         >
@@ -158,13 +160,13 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         </div>
                     </div>
 
-                    {/* Timer */}
+                    {/* Timer - Purple/Violet Neon */}
                     <div
-                        className="nes-container is-rounded flex flex-col items-center justify-center"
+                        className="nes-container is-dark is-rounded flex flex-col items-center justify-center"
                         style={{
-                            backgroundColor: '#FFF9E6',
-                            border: '4px solid #F59E0B',
-                            boxShadow: '4px 4px 0px rgba(245, 158, 11, 0.3)',
+                            backgroundColor: 'rgba(124, 58, 237, 0.05)',
+                            border: '3px solid #7c3aed',
+                            boxShadow: '0 0 20px rgba(124, 58, 237, 0.4), inset 0 0 20px rgba(124, 58, 237, 0.1)',
                             padding: '1rem 0.5rem',
                             minHeight: '90px',
                         }}
@@ -172,9 +174,9 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         <motion.div
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',
-                                color: '#F59E0B',
-                                textShadow: '2px 2px 0px rgba(0, 0, 0, 0.1)',
+                                fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+                                color: '#a78bfa',
+                                textShadow: '0 0 15px #7c3aed, 0 0 30px rgba(124, 58, 237, 0.5)',
                             }}
                             animate={{ scale: [1, 1.05, 1] }}
                             transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
@@ -184,8 +186,8 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         <div
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(0.45rem, 1.5vw, 0.55rem)',
-                                color: '#666',
+                                fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
+                                color: 'rgba(167, 139, 250, 0.7)',
                                 marginTop: '0.5rem',
                             }}
                         >
@@ -193,13 +195,13 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         </div>
                     </div>
 
-                    {/* Rank */}
+                    {/* Rank - Hot Pink Neon */}
                     <div
-                        className="nes-container is-rounded flex flex-col items-center justify-center"
+                        className="nes-container is-dark is-rounded flex flex-col items-center justify-center"
                         style={{
-                            backgroundColor: '#E6FFF0',
-                            border: '4px solid #22C55E',
-                            boxShadow: '4px 4px 0px rgba(34, 197, 94, 0.3)',
+                            backgroundColor: 'rgba(255, 105, 180, 0.05)',
+                            border: '3px solid #ff69b4',
+                            boxShadow: '0 0 20px rgba(255, 105, 180, 0.4), inset 0 0 20px rgba(255, 105, 180, 0.1)',
                             padding: '1rem 0.5rem',
                             minHeight: '90px',
                         }}
@@ -207,9 +209,9 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         <motion.div
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',
-                                color: '#22C55E',
-                                textShadow: '2px 2px 0px rgba(0, 0, 0, 0.1)',
+                                fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+                                color: '#ff69b4',
+                                textShadow: '0 0 15px #ff69b4, 0 0 30px rgba(255, 105, 180, 0.5)',
                             }}
                             animate={{ scale: [1, 1.05, 1] }}
                             transition={{ duration: 2, repeat: Infinity, delay: 1 }}
@@ -219,8 +221,8 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                         <div
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(0.45rem, 1.5vw, 0.55rem)',
-                                color: '#666',
+                                fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
+                                color: 'rgba(255, 105, 180, 0.7)',
                                 marginTop: '0.5rem',
                             }}
                         >
@@ -229,7 +231,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                     </div>
                 </motion.div>
 
-                {/* START QUIZ Button - NES Style */}
+                {/* START QUIZ Button - Cyberpunk Red */}
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -243,15 +245,12 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             onStartQuiz();
                         }}
                         disabled={(!!selectedTopic && topicQuizStatus !== 'ready') || (!selectedTopic && dailyQuizLoading)}
-                        className={`nes-btn is-warning ${(!!selectedTopic && topicQuizStatus !== 'ready') || (!selectedTopic && dailyQuizLoading) ? 'is-disabled' : ''}`}
+                        className={`nes-btn is-error ${(!!selectedTopic && topicQuizStatus !== 'ready') || (!selectedTopic && dailyQuizLoading) ? 'is-disabled' : ''}`}
                         style={{
                             fontFamily: "'Press Start 2P', cursive",
                             fontSize: 'clamp(0.75rem, 3vw, 1.25rem)',
                             padding: '1.5rem 3rem',
-                            boxShadow: '8px 8px 0px rgba(0, 0, 0, 0.2)',
-                            backgroundColor: '#FF4500',
-                            borderColor: '#212529',
-                            color: '#FFF',
+                            boxShadow: '0 0 30px rgba(220, 38, 38, 0.5), 8px 8px 0px rgba(0, 0, 0, 0.3)',
                         }}
                     >
                         {selectedTopic
