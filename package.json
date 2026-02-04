@@ -42,7 +42,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@supabase/supabase-js": "^2.91.1",
     "clsx": "^2.1.1",
-    "devvit": "0.12.10",
+    "devvit": "^0.12.10",
     "express": "5.1.0",
     "firebase": "^12.2.1",
     "firebase-admin": "^12.7.0",

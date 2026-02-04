@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 interface GeneratorShellProps {
     children: React.ReactNode;
-    className?: string; // Allow extra styling hooks if needed
+    className?: string;
 }
 
 export const GeneratorShell: React.FC<GeneratorShellProps> = ({ children, className = '' }) => {
@@ -12,18 +12,23 @@ export const GeneratorShell: React.FC<GeneratorShellProps> = ({ children, classN
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`min-h-full w-full bg-primary text-primary generator-theme-locked relative flex flex-col items-center py-8 px-4 md:px-6 lg:px-8 ${className}`}
+            // THEME LOCK: Force warm parchment background regardless of Reddit theme
+            style={{
+                backgroundColor: '#F3EFE0', // Warm parchment
+                minHeight: '100%',
+            }}
+            className={`w-full relative flex flex-col items-center py-6 px-4 md:px-8 lg:px-12 ${className}`}
         >
-            {/* Background Pattern/Texture - kept subtle to match "Warm Parchment" or "Cyber Slate" */}
-            <div className="absolute inset-0 opacity-10 pointer-events-none"
+            {/* NES-style main container with subtle shadow for depth */}
+            <div
+                className="nes-container is-rounded w-full max-w-4xl relative z-10 flex flex-col gap-8 md:gap-12"
                 style={{
-                    backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)',
-                    backgroundSize: '24px 24px'
+                    backgroundColor: '#FFFEF9', // Off-white surface
+                    border: '4px solid #212529', // High-contrast NES border
+                    boxShadow: '8px 8px 0px rgba(0, 0, 0, 0.15)', // Fake 3D depth
+                    padding: '2rem',
                 }}
-            />
-
-            {/* Main Content Container - Centered and constrained */}
-            <div className="w-full max-w-4xl relative z-10 flex flex-col gap-6 md:gap-10">
+            >
                 {children}
             </div>
         </motion.div>

@@ -82,16 +82,21 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
             {/* Actions & Stats Container */}
             <div className="relative z-10 w-full flex flex-col items-center gap-8">
 
-                {/* Topic Select & Daily Quiz Buttons */}
+                {/* Topic Select & Daily Quiz Buttons - NES Style */}
                 <motion.div
-                    className="flex justify-center gap-4 items-center"
+                    className="flex justify-center gap-6 items-center flex-wrap"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
                 >
                     <button
                         onClick={onOpenTopicMenu}
-                        className="pixel-btn pixel-btn-primary"
+                        className="nes-btn is-primary"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.5rem, 2vw, 0.75rem)',
+                            padding: '1rem 1.5rem',
+                        }}
                     >
                         {selectedTopic ? `Topic: ${selectedTopic.title}` : 'Topic Select'}
                     </button>
@@ -100,143 +105,239 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             if (onClearTopic) onClearTopic();
                             if (onBrowseArchive) onBrowseArchive();
                         }}
-                        className="pixel-btn pixel-btn-secondary"
+                        className="nes-btn"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.5rem, 2vw, 0.75rem)',
+                            padding: '1rem 1.5rem',
+                        }}
                     >
                         Daily Quiz
                     </button>
                 </motion.div>
 
-                {/* Stats Display */}
+                {/* Stats Display - NES Containers with depth */}
                 <motion.div
-                    className="grid grid-cols-3 gap-4 max-w-lg w-full"
+                    className="grid grid-cols-3 gap-4 max-w-lg w-full px-4"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
                 >
-                    <div className="modern-card p-4 bg-gradient-to-br from-accent/10 to-transparent border border-accent/20 flex flex-col items-center backdrop-blur-sm">
+                    {/* Questions */}
+                    <div
+                        className="nes-container is-rounded flex flex-col items-center justify-center"
+                        style={{
+                            backgroundColor: '#FFEBE6',
+                            border: '4px solid #FF4500',
+                            boxShadow: '4px 4px 0px rgba(255, 69, 0, 0.3)',
+                            padding: '1rem 0.5rem',
+                            minHeight: '90px',
+                        }}
+                    >
                         <motion.div
-                            className="text-2xl font-black text-accent font-pixel"
-                            animate={{ scale: [1, 1.1, 1] }}
+                            style={{
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',
+                                color: '#FF4500',
+                                textShadow: '2px 2px 0px rgba(0, 0, 0, 0.1)',
+                            }}
+                            animate={{ scale: [1, 1.05, 1] }}
                             transition={{ duration: 2, repeat: Infinity }}
                         >
                             {totalQuestions}
                         </motion.div>
-                        <div className="text-[10px] uppercase tracking-wider text-secondary font-bold mt-1">Questions</div>
+                        <div
+                            style={{
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(0.45rem, 1.5vw, 0.55rem)',
+                                color: '#666',
+                                marginTop: '0.5rem',
+                            }}
+                        >
+                            QUESTIONS
+                        </div>
                     </div>
-                    <div className="modern-card p-4 bg-gradient-to-br from-warning/10 to-transparent border border-warning/20 flex flex-col items-center backdrop-blur-sm">
+
+                    {/* Timer */}
+                    <div
+                        className="nes-container is-rounded flex flex-col items-center justify-center"
+                        style={{
+                            backgroundColor: '#FFF9E6',
+                            border: '4px solid #F59E0B',
+                            boxShadow: '4px 4px 0px rgba(245, 158, 11, 0.3)',
+                            padding: '1rem 0.5rem',
+                            minHeight: '90px',
+                        }}
+                    >
                         <motion.div
-                            className="text-2xl font-black text-warning font-pixel"
-                            animate={{ scale: [1, 1.1, 1] }}
+                            style={{
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',
+                                color: '#F59E0B',
+                                textShadow: '2px 2px 0px rgba(0, 0, 0, 0.1)',
+                            }}
+                            animate={{ scale: [1, 1.05, 1] }}
                             transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
                         >
                             {timerDuration}s
                         </motion.div>
-                        <div className="text-[10px] uppercase tracking-wider text-secondary font-bold mt-1">Timer</div>
+                        <div
+                            style={{
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(0.45rem, 1.5vw, 0.55rem)',
+                                color: '#666',
+                                marginTop: '0.5rem',
+                            }}
+                        >
+                            TIMER
+                        </div>
                     </div>
-                    <div className="modern-card p-4 bg-gradient-to-br from-success/10 to-transparent border border-success/20 flex flex-col items-center backdrop-blur-sm">
+
+                    {/* Rank */}
+                    <div
+                        className="nes-container is-rounded flex flex-col items-center justify-center"
+                        style={{
+                            backgroundColor: '#E6FFF0',
+                            border: '4px solid #22C55E',
+                            boxShadow: '4px 4px 0px rgba(34, 197, 94, 0.3)',
+                            padding: '1rem 0.5rem',
+                            minHeight: '90px',
+                        }}
+                    >
                         <motion.div
-                            className="text-2xl font-black text-success font-pixel"
-                            animate={{ scale: [1, 1.1, 1] }}
+                            style={{
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',
+                                color: '#22C55E',
+                                textShadow: '2px 2px 0px rgba(0, 0, 0, 0.1)',
+                            }}
+                            animate={{ scale: [1, 1.05, 1] }}
                             transition={{ duration: 2, repeat: Infinity, delay: 1 }}
                         >
                             {userRank ? (userRank <= 3 ? ['1st', '2nd', '3rd'][userRank - 1] : `#${userRank}`) : '-'}
                         </motion.div>
-                        <div className="text-[10px] uppercase tracking-wider text-secondary font-bold mt-1">Rank</div>
+                        <div
+                            style={{
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(0.45rem, 1.5vw, 0.55rem)',
+                                color: '#666',
+                                marginTop: '0.5rem',
+                            }}
+                        >
+                            RANK
+                        </div>
                     </div>
                 </motion.div>
 
-                {/* Epic Start Button */}
+                {/* START QUIZ Button - NES Style */}
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.5, type: 'spring', stiffness: 200 }}
-                    className="w-full flex justify-center pb-8"
+                    className="w-full flex flex-col items-center gap-4 pb-8 px-4"
                 >
-                    <motion.button
+                    <button
                         onClick={() => {
                             if (selectedTopic && (!topicQuizStatus || topicQuizStatus !== 'ready')) return;
-                            if (!selectedTopic && dailyQuizLoading) return; // Prevent start if loading daily
+                            if (!selectedTopic && dailyQuizLoading) return;
                             onStartQuiz();
                         }}
                         disabled={(!!selectedTopic && topicQuizStatus !== 'ready') || (!selectedTopic && dailyQuizLoading)}
-                        className={`relative px-8 py-4 text-xl font-black text-white rounded-xl overflow-hidden group transform transition-all duration-200 ${((selectedTopic && topicQuizStatus !== 'ready') || (!selectedTopic && dailyQuizLoading)) ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
+                        className={`nes-btn is-warning ${(!!selectedTopic && topicQuizStatus !== 'ready') || (!selectedTopic && dailyQuizLoading) ? 'is-disabled' : ''}`}
                         style={{
-                            background:
-                                'linear-gradient(45deg, #ff4500, #ff6b35, #ff8c00, #ffa500, #ff4500)',
-                            backgroundSize: '300% 300%',
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.75rem, 3vw, 1.25rem)',
+                            padding: '1.5rem 3rem',
+                            boxShadow: '8px 8px 0px rgba(0, 0, 0, 0.2)',
+                            backgroundColor: '#FF4500',
+                            borderColor: '#212529',
+                            color: '#FFF',
                         }}
-                        animate={{
-                            backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-                        }}
-                        transition={{
-                            duration: 3,
-                            repeat: Infinity,
-                            ease: 'linear',
-                        }}
-                        whileHover={{
-                            boxShadow: [
-                                '0 10px 30px rgba(255, 69, 0, 0.4)',
-                                '0 10px 30px rgba(255, 107, 53, 0.4)',
-                                '0 10px 30px rgba(255, 140, 0, 0.4)',
-                            ],
-                        }}
-                        whileTap={{ scale: 0.95 }}
                     >
-                        <span className="relative z-10 flex items-center gap-3">
-                            <motion.span
-                                animate={{ rotate: [0, 360] }}
-                                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                        {selectedTopic
+                            ? topicQuizStatus === 'error'
+                                ? 'GENERATION FAILED'
+                                : 'START QUIZ'
+                            : dailyQuizLoading
+                                ? 'LOADING...'
+                                : 'START QUIZ'}
+                    </button>
+
+                    {/* Status indicators */}
+                    {selectedTopic && (
+                        <div className="text-center">
+                            {topicQuizStatus === 'idle' && (
+                                <span
+                                    style={{
+                                        fontFamily: "'Press Start 2P', cursive",
+                                        fontSize: '0.625rem',
+                                        color: '#666',
+                                    }}
+                                >
+                                    Select a topic to start.
+                                </span>
+                            )}
+                            {topicQuizStatus === 'loading' && (
+                                <div className="flex flex-col items-center gap-2">
+                                    <LoadingDots text="Thinking" />
+                                    <span
+                                        style={{
+                                            fontFamily: "'Press Start 2P', cursive",
+                                            fontSize: '0.5rem',
+                                            color: '#666',
+                                        }}
+                                        className="animate-pulse"
+                                    >
+                                        Gemini is researching and drafting questions...
+                                    </span>
+                                </div>
+                            )}
+                            {topicQuizStatus === 'ready' && (
+                                <span
+                                    style={{
+                                        fontFamily: "'Press Start 2P', cursive",
+                                        fontSize: '0.625rem',
+                                        color: '#22C55E',
+                                        fontWeight: 'bold',
+                                    }}
+                                >
+                                    ✓ Quiz Loaded
+                                </span>
+                            )}
+                            {topicQuizStatus === 'error' && (
+                                <span
+                                    style={{
+                                        fontFamily: "'Press Start 2P', cursive",
+                                        fontSize: '0.625rem',
+                                        color: '#EF4444',
+                                    }}
+                                >
+                                    Failed to load quiz. Try another topic.
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    {!selectedTopic && dailyQuizLoading && (
+                        <div className="text-center flex flex-col items-center gap-2">
+                            <LoadingDots text="Fetching Daily Quiz" />
+                        </div>
+                    )}
+
+                    {!selectedTopic && !dailyQuizLoading && dailyCompleted && (
+                        <div className="text-center flex flex-col items-center gap-2">
+                            <span
+                                style={{
+                                    fontFamily: "'Press Start 2P', cursive",
+                                    fontSize: '0.625rem',
+                                    color: '#22C55E',
+                                    fontWeight: 'bold',
+                                }}
                             >
-                                _
-                            </motion.span>
-                            {selectedTopic
-                                ? topicQuizStatus === 'error'
-                                    ? 'GENERATION FAILED'
-                                    : 'START QUIZ'
-                                : dailyQuizLoading
-                                    ? 'LOADING...'
-                                    : 'START QUIZ'}
-                            <motion.span
-                                animate={{ rotate: [0, -360] }}
-                                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                            >
-                                _
-                            </motion.span>
-                        </span>
-
-                        {selectedTopic && (
-                            <div className="mt-4 text-center">
-                                {topicQuizStatus === 'idle' && <span className="text-secondary text-sm">Select a topic to start.</span>}
-                                {topicQuizStatus === 'loading' && (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <LoadingDots text="Thinking" />
-                                        <span className="text-xs text-secondary animate-pulse">Gemini is researching and drafting questions...</span>
-                                    </div>
-                                )}
-                                {topicQuizStatus === 'ready' && <span className="text-success text-sm font-bold">✓ Quiz Loaded</span>}
-                                {topicQuizStatus === 'error' && <span className="text-error text-sm">Failed to load quiz. Try another topic.</span>}
-                            </div>
-                        )}
-
-                        {!selectedTopic && dailyQuizLoading && (
-                            <div className="mt-4 text-center flex flex-col items-center gap-2">
-                                <LoadingDots text="Fetching Daily Quiz" />
-                            </div>
-                        )}
-
-                        {!selectedTopic && !dailyQuizLoading && dailyCompleted && (
-                            <div className="mt-2 text-center flex flex-col items-center gap-2">
-                                <span className="text-success text-sm font-bold">✓ Has Played Today</span>
-                            </div>
-                        )}
-
-                        {/* Button shine effect */}
-                        <motion.div
-                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                            animate={{ x: ['-100%', '100%'] }}
-                            transition={{ duration: 2, repeat: Infinity, delay: 1 }}
-                        />
-                    </motion.button>
+                                ✓ Has Played Today
+                            </span>
+                        </div>
+                    )}
                 </motion.div>
             </div>
         </GeneratorShell>
