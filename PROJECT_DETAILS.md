@@ -1,56 +1,121 @@
-TASK: Topic Leaderboard Data Loss Audit & Fix
+TASK: Landing Page & Topic Selector UI Refinement (STRICT SCOPE)
 
-IMPORTANT:
-Before proceeding, read:
-- agents.md
-- devvit_web_knowledge_base.md
+I need you to refine and visually overhaul ONLY the following areas:
 
----
+Landing Page (Infinity Quiz Generator)
 
-PROBLEM:
-The Topic Leaderboard is NOT recording scores for all players
-who have completed a topic quiz.
+Topic Selector UI
 
-Some scores are missing or overwritten.
+🚫 DO NOT TOUCH:
 
----
+Interactive Robot logic or visuals (position/scale may be adjusted ONLY to prevent overflow)
 
-INVESTIGATION SCOPE:
-- Client submission flow
-- Server controllers handling topic quiz completion
-- Firestore write paths
-- Replay mode logic
-- Leaderboard query logic
+Topic buttons themselves (their labels, colors, click logic)
 
----
+Quiz gameplay UI
 
-REQUIRED ANALYSIS:
-1. Identify EXACTLY where topic leaderboard writes occur
-2. Verify:
-   - Document paths
-   - Document IDs
-   - Whether writes overwrite previous players
-3. Confirm:
-   - Replay mode does NOT write leaderboard entries
-   - First-time plays ALWAYS write leaderboard entries
-4. Check whether leaderboard is:
-   - Per topic
-   - Per quiz instance
-   - Per date
-   (and whether this is consistent across code)
+Creator Studio
 
----
+Any server-side logic or data flow
 
-EXPECTED OUTPUT:
-- Root cause(s) of missing leaderboard entries
-- Whether data is overwritten or skipped
-- A corrected Firestore schema (if needed)
-- Minimal code changes to fix the issue
-- NO UI changes
+1️⃣ Scroll & Layout Bug (Critical – Must Fix First)
 
----
+The Landing Page currently has two scrollbars (outer + inner container).
 
-DO NOT:
-- Change leaderboard UI
-- Add new features
-- Modify unrelated stats or XP logic
+Remove the inner scrollbar entirely.
+
+The page must support single-swipe vertical scrolling on mobile.
+
+Use natural document flow instead of fixed-height + overflow containers wherever possible.
+
+2️⃣ Visual Direction (Non-Negotiable)
+
+Transform existing components (do not replace functionality) to follow this style:
+
+Aesthetic:
+
+Kawaii + Cyber
+
+2D pixel art with fake 3D depth (shadows, offsets, NES-style borders)
+
+Libraries to Prefer:
+
+nes.css (buttons, containers, borders, UI affordances)
+
+Press Start 2P font (headings, buttons, labels)
+
+Framer Motion (subtle, low-cost animations only)
+
+Feel free to install external css and frontend frameworks if you believe existing tech stack is insufficient for the task.
+
+Theme Lock:
+
+The Landing Page and Topic Selector must look identical whether Reddit is in light mode or dark mode.
+
+Ignore Reddit theme signals.
+
+Explicitly set background, text, and surface colors.
+
+3️⃣ Color & Contrast Rules
+
+The Interactive Robot is the visual anchor — all colors must complement it.
+
+Avoid pure black backgrounds (they kill NES-style depth).
+
+Prefer:
+
+Warm parchment / soft neutral backgrounds
+
+High-contrast borders
+
+Clear separation between layers (background → surface → interactive)
+
+4️⃣ Space-Aware Design (Very Important)
+
+Rework spacing so content breathes on mobile:
+
+No text hugging borders
+
+No stacked elements colliding when the robot dialogue appears or disappears
+
+Robot dialogue must never clip or push content off-screen.
+
+If needed, reserve vertical “safe space” above or below the robot without changing its logic.
+
+5️⃣ Topic Selector UI
+
+Restyle the Topic Selector container using the same NES + pixel + cyber aesthetic.
+
+Improve readability and spacing.
+
+Keep it scrollable if needed, but do not nest scrollbars.
+
+Topic buttons themselves must remain untouched.
+
+6️⃣ Performance Constraints
+
+Animations must be cheap (opacity, translate, scale only).
+
+No continuous animations, no heavy blur filters, no large shadow stacks.
+
+The app currently slows down during play — do not add anything that increases runtime cost.
+
+7️⃣ Deliverables
+
+Refactor or restyle existing components only.
+
+No visual regressions compared to the current Landing Page.
+
+The end result should feel:
+
+Gamer-grade
+
+Intentional
+
+Consistent
+
+NES-inspired without parody
+
+❗If a requested change risks breaking other screens, do not implement it — instead, leave a comment explaining why.
+
+Do not proceed beyond Landing Page & Topic Selector.

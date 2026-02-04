@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import TopicButtonNew from './TopicButton';
 import './animations.css';
-import { RefreshCw } from 'lucide-react';
 import FirebaseTopics, { TopicDoc } from '../../services/FirebaseTopics';
 import { firebaseQuizService } from '../../services/FirebaseQuizService';
 import { useBackoffPolling } from '../../hooks/useBackoffPolling';
-import { KawaiiLoader } from '../ui/KawaiiLoader'; // [NEW] Import
+import { KawaiiLoader } from '../ui/KawaiiLoader';
 
 // Utility function to slugify a title (kept local)
 const slugify = (s: string) =>
@@ -43,7 +42,6 @@ export const TopicSelector: React.FC<{
   const [generatingSlug, setGeneratingSlug] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [exclusiveSlug, setExclusiveSlug] = useState<string | null>(null);
-  const [inlineSuggestion] = useState('');
   const [highlightedTopic] = useState('');
   const [loading] = useState(false);
   const [popularSlugs] = useState<string[]>(['science', 'technology', 'history', 'movies', 'sports']);
@@ -284,87 +282,148 @@ export const TopicSelector: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col w-full bg-gradient-to-b from-slate-950 via-slate-900 to-black text-white overflow-hidden"
-      style={{ height: '100dvh' }}
+      // THEME LOCK: Force light warm parchment, ignore Reddit theme
+      style={{
+        backgroundColor: '#F3EFE0',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100dvh',
+        overflow: 'hidden',
+      }}
     >
 
-      {/* Search Bar Header */}
-      <div className="flex-none z-10 w-full bg-slate-900/95 backdrop-blur-sm border-b border-white/10 shadow-lg px-4 py-4">
-        <div className="max-w-[90%] mx-auto flex gap-2 items-center">
-          {/* Search Input */}
-          <div className="relative flex-[8]">
+      {/* Search Bar Header - NES Style */}
+      <div
+        className="flex-none z-10 w-full px-4 py-4"
+        style={{
+          backgroundColor: '#FFFEF9',
+          borderBottom: '4px solid #212529',
+          boxShadow: '0 4px 0px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <div className="max-w-[95%] mx-auto flex gap-3 items-center flex-wrap">
+          {/* Search Input - NES Style */}
+          <div className="relative flex-1 min-w-[200px]">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               placeholder="Search or add topics..."
-              className="w-full rounded-lg bg-slate-800/70 border border-slate-600/40 
-                      focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 
-                      outline-none px-4 py-3 text-lg placeholder-slate-400 font-mono tracking-wide"
+              className="nes-input w-full"
+              style={{
+                fontFamily: "'Press Start 2P', cursive",
+                fontSize: 'clamp(0.625rem, 2vw, 0.875rem)',
+                padding: '0.75rem 1rem',
+              }}
               aria-label="Search or add topics"
               autoComplete="off"
             />
-            {inlineSuggestion && inlineSuggestion.toLowerCase() !== query.toLowerCase() && (
-              <div className="pointer-events-none absolute inset-0 flex items-center px-4 text-lg font-mono tracking-wide select-none" style={{ color: 'rgba(255,255,255,0.25)' }} aria-hidden>
-                <span>{query}<span style={{ color: 'rgba(255,255,255,0.35)' }}>{inlineSuggestion.slice(query.length)}</span></span>
-              </div>
-            )}
           </div>
 
-          {/* Close/Refresh Action */}
-          <div className="flex-[1] flex justify-center items-center gap-2">
+          {/* Action Buttons - NES Style */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => fetchTopics(true)}
-              className="p-3 rounded-lg bg-slate-800/80 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition-all transform hover:rotate-180"
+              className="nes-btn"
+              style={{
+                fontFamily: "'Press Start 2P', cursive",
+                fontSize: '0.625rem',
+                padding: '0.75rem',
+              }}
               title="Refresh Topics"
             >
-              <RefreshCw size={20} />
+              ↻
             </button>
 
             <button
               onClick={handleClose}
-              className="p-3 rounded-lg bg-slate-800/80 border border-white/10 text-slate-300 hover:bg-red-500/20 hover:text-white transition-all transform hover:rotate-90"
+              className="nes-btn is-error"
+              style={{
+                fontFamily: "'Press Start 2P', cursive",
+                fontSize: '0.625rem',
+                padding: '0.75rem 1rem',
+              }}
               aria-label="Close"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
+              ✕
             </button>
           </div>
 
-          {/* Submit/Add Action */}
-          <div className="flex-[1] flex justify-end">
-            {query.trim().length > 0 && (
-              <button
-                disabled={addingTopic || !canAddNewTopic}
-                onClick={handleAddTopic}
-                className="w-full px-3 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 
-                        disabled:bg-slate-600 disabled:opacity-50 text-white font-semibold 
-                        transition-colors duration-200 whitespace-nowrap overflow-hidden text-ellipsis"
-              >
-                {addingTopic ? '...' : (topicExists ? 'Go' : 'Add')}
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Visible glowing red separator for clear header/content distinction */}
-        <div className="w-full mt-3">
-          <div
-            aria-hidden
-            className="mx-auto max-w-4xl h-1 rounded-md"
-            style={{
-              background: 'linear-gradient(90deg, rgba(255,69,0,0.05), rgba(255,0,0,0.9), rgba(255,69,0,0.05))',
-              boxShadow: '0 4px 18px rgba(255,0,0,0.35)',
-            }}
-          />
+          {/* Add Button */}
+          {query.trim().length > 0 && (
+            <button
+              disabled={addingTopic || !canAddNewTopic}
+              onClick={handleAddTopic}
+              className={`nes-btn ${canAddNewTopic ? 'is-primary' : ''}`}
+              style={{
+                fontFamily: "'Press Start 2P', cursive",
+                fontSize: '0.625rem',
+                padding: '0.75rem 1.5rem',
+              }}
+            >
+              {addingTopic ? '...' : (topicExists ? 'Go' : 'Add')}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main content area - flex-1 to take available space between header and footer */}
+      {/* Informational Banner - NES Container */}
+      <div
+        className="flex-none w-full py-4 px-6 z-20 flex flex-col items-center gap-2"
+        style={{
+          backgroundColor: '#F3EFE0',
+          borderBottom: '4px solid #212529',
+        }}
+      >
+        <div className="w-full flex justify-center">
+          <div
+            className="nes-container is-rounded"
+            style={{
+              backgroundColor: '#FFE6E6',
+              border: '4px solid #FF4500',
+              boxShadow: '4px 4px 0px rgba(255, 69, 0, 0.2)',
+              padding: '1rem 1.5rem',
+              maxWidth: '600px',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "'Press Start 2P', cursive",
+                fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
+                color: '#8B0000',
+                lineHeight: '1.6',
+                display: 'block',
+                textAlign: 'center',
+              }}
+            >
+              Custom topics take 1–3 minutes. Cached after first generation.
+            </span>
+          </div>
+        </div>
+        {generationError && (
+          <div className="flex justify-center">
+            <div
+              className="nes-container is-rounded is-dark"
+              style={{
+                backgroundColor: '#FFE6E6',
+                padding: '0.75rem 1rem',
+                fontSize: '0.625rem',
+              }}
+            >
+              {generationError}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main content area - flex-1 to take available space */}
       <div className="flex-1 w-full overflow-y-auto overscroll-contain min-h-0">
         {/* Content wrapper with INCREASED padding to avoid footer overlap */}
-        <div className="w-full px-4 sm:px-5 pt-6 pb-64">
+        <div className="w-full px-4 sm:px-5 pt-6 pb-20">
           <div className="w-full max-w-4xl mx-auto">
 
             {/* Loading State */}
@@ -424,31 +483,7 @@ export const TopicSelector: React.FC<{
         </div>
       </div>
 
-      {/* Fixed footer at bottom - Absolute within fixed container */}
-      <div className="absolute bottom-0 left-0 right-0 py-8 px-6 pointer-events-none z-20">
-        {/* Separation line with glow */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent shadow-lg shadow-red-500/20"></div>
 
-        {/* Centered content with more top space */}
-        <div className="w-full flex justify-center mt-2">
-          <div className="inline-block px-6 py-3 rounded-lg backdrop-blur-md 
-                         bg-gradient-to-r from-red-950/40 via-red-900/40 to-red-950/40
-                         shadow-lg shadow-red-500/20 border border-red-500/30
-                         animate-pulse-subtle" style={{ transform: 'translateY(20px)' }}>
-            <span className="text-sm text-red-100/90 font-medium tracking-wide
-                           drop-shadow-lg shadow-red-500">
-              Custom topics take 1–3 minutes. Cached after first generation.
-            </span>
-          </div>
-        </div>
-        {generationError && (
-          <div className="mt-4 flex justify-center">
-            <div className="px-4 py-2 rounded bg-red-900/60 border border-red-600 text-red-200 text-sm">
-              {generationError}
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* UNIVERSAL KAWAII LOADER */}
       {/* Shows for addingTopic (Add) OR generatingSlug (Quiz Gen) */}
@@ -458,7 +493,7 @@ export const TopicSelector: React.FC<{
         message={addingTopic ? "loading" : "generating quiz"}
       />
 
-    </div>
+    </div >
   );
 };
 

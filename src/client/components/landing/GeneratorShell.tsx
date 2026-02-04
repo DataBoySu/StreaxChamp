@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 interface GeneratorShellProps {
     children: React.ReactNode;
-    className?: string; // Allow extra styling hooks if needed
+    className?: string;
 }
 
 export const GeneratorShell: React.FC<GeneratorShellProps> = ({ children, className = '' }) => {
@@ -12,18 +12,28 @@ export const GeneratorShell: React.FC<GeneratorShellProps> = ({ children, classN
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`min-h-full w-full bg-primary text-primary generator-theme-locked relative flex flex-col items-center py-8 px-4 md:px-6 lg:px-8 ${className}`}
+            // CYBERPUNK THEME: Match robot's dark aesthetic (generate pipeline only)
+            style={{
+                backgroundColor: '#111827', // Dark slate from robot's gradient
+                minHeight: '100%',
+                backgroundImage: `
+                    repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(0, 255, 136, 0.03) 49px, rgba(0, 255, 136, 0.03) 50px),
+                    repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(220, 38, 38, 0.03) 49px, rgba(220, 38, 38, 0.03) 50px)
+                `,
+                backgroundSize: '50px 50px',
+            }}
+            className={`w-full relative flex flex-col items-center py-6 px-4 md:px-8 lg:px-12 ${className}`}
         >
-            {/* Background Pattern/Texture - kept subtle to match "Warm Parchment" or "Cyber Slate" */}
-            <div className="absolute inset-0 opacity-10 pointer-events-none"
+            {/* Dark cyberpunk container */}
+            <div
+                className="nes-container is-dark is-rounded w-full max-w-4xl relative z-10 flex flex-col gap-8 md:gap-12"
                 style={{
-                    backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)',
-                    backgroundSize: '24px 24px'
+                    backgroundColor: 'rgba(17, 24, 39, 0.95)', // Semi-transparent dark
+                    border: '4px solid #dc2626', // Red border matching robot
+                    boxShadow: '0 0 30px rgba(0, 255, 136, 0.15), 8px 8px 0px rgba(0, 0, 0, 0.3)', // Cyan glow + depth shadow
+                    padding: '2rem',
                 }}
-            />
-
-            {/* Main Content Container - Centered and constrained */}
-            <div className="w-full max-w-4xl relative z-10 flex flex-col gap-6 md:gap-10">
+            >
                 {children}
             </div>
         </motion.div>

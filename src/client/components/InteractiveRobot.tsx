@@ -650,7 +650,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
         />
       </motion.div>
 
-      {/* Username label */}
+      {/* Username label - Improved readability */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -658,18 +658,24 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, er
         style={{
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: '8px',
           marginTop: 12,
+          backgroundColor: 'rgba(17, 24, 39, 0.9)',
+          padding: '8px 16px',
+          borderRadius: '8px',
+          border: '2px solid rgba(0, 255, 136, 0.3)',
+          boxShadow: '0 0 15px rgba(0, 255, 136, 0.2)',
         }}
       >
-
         <span style={{
-          fontFamily: 'monospace',
-          fontSize: 11,
+          fontFamily: "'Press Start 2P', monospace",
+          fontSize: 13,
           color: '#00ff88',
-          textShadow: '0 0 5px #00ff88',
+          textShadow: '0 0 8px #00ff88, 0 0 12px rgba(0, 255, 136, 0.5)',
           whiteSpace: 'nowrap',
-          letterSpacing: '0.05em'
+          letterSpacing: '0.05em',
+          fontWeight: 'bold',
         }}>
           {username}: {totalPoints}
         </span>

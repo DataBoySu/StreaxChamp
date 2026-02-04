@@ -17,44 +17,51 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
     return (
         <div className="flex flex-col items-center w-full text-center">
-            {/* Title & Subtitle Group */}
-            <div className="mb-8 md:mb-12 relative z-20">
+            {/* Title & Subtitle Group with more breathing room */}
+            <div className="mb-12 md:mb-16 relative z-20 px-4">
                 <motion.h1
-                    className="text-3xl md:text-5xl font-black mb-3 text-gradient font-pixel tracking-tight"
+                    // Cyberpunk neon aesthetic with strong glow for readability
+                    style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        color: '#00ff88', // Neon cyan matching robot eyes
+                        textShadow: '0 0 20px #00ff88, 0 0 40px rgba(0, 255, 136, 0.5), 0 0 60px rgba(0, 255, 136, 0.3)',
+                        fontSize: 'clamp(1.75rem, 5vw, 2.75rem)', // Slightly larger for impact
+                        lineHeight: '1.4',
+                    }}
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ duration: 0.5 }}
+                    className="mb-6"
                 >
                     Infinity Quiz Generator
                 </motion.h1>
 
                 <motion.p
-                    className="text-sm md:text-base text-secondary font-medium font-pixel max-w-lg mx-auto leading-relaxed"
+                    style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        fontSize: 'clamp(0.75rem, 2vw, 1rem)', // Increased size
+                        color: 'rgba(0, 255, 136, 0.8)', // Softer cyan for subtitle
+                        lineHeight: '1.8',
+                        textShadow: '0 0 10px rgba(0, 255, 136, 0.5)', // Subtle glow
+                    }}
                     initial={{ y: -10, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.2, duration: 0.5 }}
+                    className="max-w-lg mx-auto px-2"
                 >
                     Test your knowledge and climb the leaderboard!
                 </motion.p>
             </div>
 
-            {/* Mascot Container
-          - Fixed height container to prevent layout shifts.
-          - Padding top reserved for the speech bubble (absolute positioned above head).
-          - 'pointer-events-none' on wrapper to prevent blocking, 'pointer-events-auto' on robot.
-      */}
+            {/* Robot Container - Increased safe space to prevent dialogue clipping */}
             <div
                 className="relative w-full flex justify-center items-end"
-                style={{ minHeight: '340px' }}
+                style={{ minHeight: '380px' }} // Increased from 340px for more vertical space
             >
-                {/* 
-             Robot wrapper:
-             - Ensures robot is centered.
-             - The Robot component itself is ~220px tall.
-             - The bubble pops up ~60px above the head.
-             - We rely on the margin from Title/Subtitle (mb-12 = ~48px) + Robot's own spacing.
-          */}
-                <div className="relative z-30 w-full flex justify-center pointer-events-auto" style={{ marginBottom: '-20px' }}>
+                <div
+                    className="relative z-30 w-full flex justify-center pointer-events-auto"
+                    style={{ marginBottom: '-20px' }}
+                >
                     <InteractiveRobot
                         username={username}
                         errorMessage={errorMessage}
