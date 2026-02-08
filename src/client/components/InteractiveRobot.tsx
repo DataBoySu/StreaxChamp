@@ -1,685 +1,310 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// --- UTILITY: Throttle function to limit re-renders ---
+const throttle = (func: Function, limit: number) => {
+  let inThrottle: boolean;
+  return function (this: any, ...args: any[]) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  }
+};
 
 interface InteractiveRobotProps {
   username: string;
   errorMessage?: string | undefined;
   hasPlayed?: boolean;
-  totalPoints?: number; // New prop for aggregated score
+  totalPoints?: number;
   forceState?: 'neutral' | 'happy' | 'angry' | 'dead' | 'surprised';
 }
 
-export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({ username, errorMessage, hasPlayed, totalPoints = 0, forceState }) => {
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
+  username, errorMessage, hasPlayed, totalPoints = 0, forceState
+}) => {
   const [isHovered, setIsHovered] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
-  const [lines] = useState<string[]>([]);
-  // Removed exhausted state, using time-based trigger
-  // Removed globalMousePosition state
-  const [progress, setProgress] = useState(0); // Progress bar (0-100)
-  const [systemStatus] = useState<{ ai: boolean; db: boolean }>({ ai: true, db: true });
-  const [healingActive] = useState(false);
-  const [blinkOpen, setBlinkOpen] = useState(true); // Control for eye blinking
-  const [timeOnPage, setTimeOnPage] = useState(0); // Track time for timeout message
-  const [isNear, setIsNear] = useState(false); // Proximity detection
-  const [isVisorHovered, setIsVisorHovered] = useState(false); // New specific hover state
-  const bubbleRef = useRef<HTMLDivElement | null>(null);
-  const headRef = useRef<HTMLDivElement | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [blinkOpen, setBlinkOpen] = useState(true);
+  const [timeOnPage, setTimeOnPage] = useState(0);
+  const [isNear, setIsNear] = useState(false);
 
-  const TIMEOUT_LIMIT = 20; // Seconds before "Inside with you" message
+  // Specific Visor States
+  const [isVisorHovered, setIsVisorHovered] = useState(false);
+  const [isVisorCenter, setIsVisorCenter] = useState(false); // New state for exact middle
+  const [tempEmote, setTempEmote] = useState<string | null>(null);
+
+  // Refs for direct DOM manipulation
+  const containerRef = useRef<HTMLDivElement>(null);
+  const eyesRef = useRef<HTMLDivElement>(null);
+  const visorRef = useRef<HTMLDivElement>(null);
+
+  const TIMEOUT_LIMIT = 20;
   const TIMEOUT_MSG = "That’s all you get. Inside with you. The real challenge awaits.";
 
-  // --- BLINKING LOGIC ---
-  // Only blink if there is NO error (circuits unbroken)
-  useEffect(() => {
-    if (errorMessage) {
-      setBlinkOpen(true); // Force eyes open on error
-      return;
+  // --- OPTIMIZED MOUSE TRACKING ---
+  const handleMouseMove = useCallback(throttle((event: MouseEvent) => {
+    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !errorMessage && !isVisorHovered) return;
+
+    // 1. Calculate Global Eye Tracking (Robot looking at cursor)
+    const { innerWidth, innerHeight } = window;
+    const x = (event.clientX - innerWidth / 2) / 30;
+    const y = (event.clientY - innerHeight / 2) / 30;
+
+    // Update CSS Variable on the Eyes Container directly
+    if (eyesRef.current) {
+      eyesRef.current.style.transform = `translate(${x}px, ${y}px)`;
     }
 
+    // 2. Calculate Proximity for "Active" state
+    const centerX = innerWidth / 2;
+    const centerY = innerHeight / 2;
+    const relativeX = (event.clientX - centerX) / (centerX);
+    const relativeY = (event.clientY - centerY) / (centerY);
+    const dist = Math.sqrt(relativeX * relativeX + relativeY * relativeY);
+    setIsNear(dist < 0.15);
+
+    // 3. Calculate "Exact Middle" of Visor Logic
+    if (visorRef.current) {
+      const rect = visorRef.current.getBoundingClientRect();
+      const visorCenterX = rect.left + rect.width / 2;
+      const visorCenterY = rect.top + rect.height / 2;
+
+      // Distance from center of visor
+      const distFromVisorCenter = Math.sqrt(
+        Math.pow(event.clientX - visorCenterX, 2) +
+        Math.pow(event.clientY - visorCenterY, 2)
+      );
+
+      // If within 15px radius of center -> Happy. Else -> Surprised (if hovered)
+      setIsVisorCenter(distFromVisorCenter < 15);
+    }
+
+  }, 16), [timeOnPage, hasPlayed, errorMessage, isVisorHovered]);
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [handleMouseMove]);
+
+  // --- BLINKING LOGIC ---
+  useEffect(() => {
+    if (errorMessage) { setBlinkOpen(true); return; }
     let timeoutId: number;
     const triggerBlink = () => {
-      setBlinkOpen(false); // Close eyes
+      setBlinkOpen(false);
       setTimeout(() => {
-        setBlinkOpen(true); // Open eyes after short duration
-        // Schedule next blink randomly between 2.5s and 6s
+        setBlinkOpen(true);
         timeoutId = window.setTimeout(triggerBlink, Math.random() * 3500 + 2500);
-      }, 150); // Blink duration
+      }, 150);
     };
-
-    // Initial blink schedule
     timeoutId = window.setTimeout(triggerBlink, Math.random() * 3000 + 1000);
-
     return () => clearTimeout(timeoutId);
   }, [errorMessage]);
 
-  // Robot dialogues are now hardcoded - no need to fetch from API
-  // Disabled API polling to reduce unnecessary requests - > lines for future implementation
-  /*
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const r = await fetch('/api/robot/dialogues/today');
-        const data = await r.json();
-        const fetched: string[] = Array.isArray(data?.lines) ? data.lines.slice(0, 20) : [];
-        if (!cancelled) {
-          setLines(fetched);
-          if (data.systemStatus) setSystemStatus(data.systemStatus);
-          setHealingActive(!!data.healingInProgress);
-        }
-      } catch {
-        // noop; keep default fallback below
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-  */
-
+  // --- MESSAGE ROTATION ---
   const messages = useMemo(() => {
-    // PRIORITY: If an error message is provided, show only that
-    if (errorMessage) {
-      return [errorMessage];
-    }
-
-    const statusLines: string[] = [];
-    if (healingActive) {
-      statusLines.push('STAND BY. REPAIRING DATA-STREAM...');
-    } else if (!systemStatus.ai) {
-      statusLines.push('Critical Anomaly: Gemini connection severed.');
-      statusLines.push('I am currently out of juice. Try again in 2... if I heal.');
-      statusLines.push('Quota Exhausted. The Great Eye is resting.');
-    }
-    if (!systemStatus.db) {
-      statusLines.push('Firestore core offline. Memories... fading.');
-    }
-
-    const fallback = [
+    if (errorMessage) return [errorMessage];
+    return [
       `Halt, ${username}. Enjoy your experience.`,
       'New comer? Keep moving, we have a lot to show.',
       'This page is not everything we have to offer.',
       'Still lingering? Hmph.',
       'Enough gawking. Inside.'
     ];
-    const base = lines.length ? lines : fallback;
-    return [...statusLines, ...base.slice(0, 20)];
-  }, [lines, username, systemStatus, errorMessage, healingActive]);
+  }, [username, errorMessage]);
 
-  // Track global mouse position for robot following AND proximity
   useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      const centerX = window.innerWidth / 2;
-      const centerY = window.innerHeight / 2;
-
-      // Calculate relative position from center (-1 to 1)
-      const relativeX = (event.clientX - centerX) / (window.innerWidth / 2);
-      const relativeY = (event.clientY - centerY) / (window.innerHeight / 2);
-
-      // setGlobalMousePosition({ x: relativeX, y: relativeY }); // Removed
-
-      // Proximity Check (using headRef if available, or just center screen)
-      // Check if mouse is within a certain radius of the center (roughly where robot is)
-      const dist = Math.sqrt(relativeX * relativeX + relativeY * relativeY);
-      // Threshold: 0.15 means very close to the screen center (precise visor focus)
-      setIsNear(dist < 0.15);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  // Timer for "Timeout" state
-  useEffect(() => {
-    if (hasPlayed) return; // Don't run timer if user has played
-
-    const timer = setInterval(() => {
-      setTimeOnPage(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [hasPlayed]);
-
-  // Calculate robot position (parallax effect)
-  const robotHorizontalOffset = useMemo(() => {
-    // Strict Focus: If Timeout is active AND Visor NOT hovered -> Robot stays center (0)
-    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !errorMessage && !isVisorHovered) {
-      return 0;
-    }
-
-    if (isNear || isHovered) {
-      return (mousePos.x / window.innerWidth - 0.5) * 20; // Reverted centering
-    }
-    return 0; // Default center
-  }, [mousePos.x, isNear, isHovered, timeOnPage, hasPlayed, errorMessage, isVisorHovered]);
-
-  // Handle mouse movement for local eye tracking
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Handle global mouse movement for eye tracking
-  useEffect(() => {
-    const handleWindowMouseMove = (event: MouseEvent) => {
-      // If we have a ref to the container, calculate relative position
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        setMousePos({
-          x: event.clientX - centerX,
-          y: event.clientY - centerY
-        });
-      }
-    };
-
-    window.addEventListener('mousemove', handleWindowMouseMove);
-    return () => window.removeEventListener('mousemove', handleWindowMouseMove);
-  }, []);
-
-  // Calculate eye position for the visor display
-  const getEyeOffset = () => {
-    // If Timeout Active -> Look down strictly
-    // EXCEPTION: If user hovers VISOR, we allow tracking/interaction
-    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !errorMessage && !isVisorHovered) {
-      return { x: 0, y: 15 }; // Look down at the CTA, ignore cursor
-    }
-
-    if (isNear || isHovered) {
-      const x = (mousePos.x - window.innerWidth / 2) / 30;
-      const y = (mousePos.y - window.innerHeight / 2) / 30;
-      return { x, y };
-    }
-    return { x: 0, y: 0 };
-  };
-
-  const eyeOffset = getEyeOffset();
-
-  // Speech bubble is visually attached above the robot head.
-
-  // Cycle through messages when hovered
-  useEffect(() => {
-    // Stop cycling if timeout reached
     if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed) return;
-
     if (isHovered) {
       const interval = window.setInterval(() => {
-        setCurrentMessage((prev) => {
-          const next = prev + 1;
-          if (next >= messages.length) return 0; // Loop or stay? User said "never finish". Let's loop.
-          setProgress(0); // Reset progress when advancing
-          return next;
-        });
+        setCurrentMessage(p => (p + 1) >= messages.length ? 0 : p + 1);
+        setProgress(0);
       }, 3000);
-      return () => clearInterval(Number(interval));
+      return () => clearInterval(interval);
     }
   }, [isHovered, messages.length, timeOnPage, hasPlayed]);
 
-  // Progress bar animation (fills up to 100% over 3 seconds)
+  // --- PROGRESS BAR ---
   useEffect(() => {
-    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed) return;
+    if (!isHovered) { setProgress(0); return; }
+    let start = Date.now();
+    let frameId: number;
+    const animate = () => {
+      const p = Math.min(((Date.now() - start) / 3000) * 100, 100);
+      setProgress(p);
+      if (p < 100) frameId = requestAnimationFrame(animate);
+    };
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, [isHovered, currentMessage]);
 
-    if (isHovered) {
-      setProgress(0);
-      const startTime = Date.now();
-      const duration = 3000;
-      const frame = () => {
-        const elapsed = Date.now() - startTime;
-        const newProgress = Math.min((elapsed / duration) * 100, 100);
-        setProgress(newProgress);
-        if (elapsed < duration) {
-          requestAnimationFrame(frame);
-        }
-      };
-      requestAnimationFrame(frame);
-    }
-  }, [isHovered, currentMessage, timeOnPage, hasPlayed]);
-
-  // --- FACIAL EXPRESSION LOGIC ---
-  type FaceState = 'neutral' | 'happy' | 'angry' | 'dead' | 'surprised';
-
-  const currentFace: FaceState = useMemo(() => {
+  // --- FACE STATE LOGIC ---
+  const currentFace = useMemo(() => {
     if (forceState) return forceState;
-    if (errorMessage) return 'dead'; // Dead/Error takes priority
-    if (isVisorHovered) return 'happy'; // Direct interaction = Happy
-    if (isHovered) return 'surprised'; // General attention = Alert/Surprised
+    if (errorMessage) return 'dead';
+
+    // NEW LOGIC: 
+    if (isVisorCenter) return 'happy';    // Exact middle -> Happy
+    if (isVisorHovered) return 'surprised'; // On display but not middle -> Wide Eyed
+    if (isHovered) return 'surprised';      // Hovering robot generally -> Alert
+
     return 'neutral';
-  }, [errorMessage, isVisorHovered, isHovered, forceState]);
+  }, [errorMessage, isVisorHovered, isVisorCenter, isHovered, forceState]);
 
-  // Eye Variants for Morphing
-  const leftEyeVariant = {
-    neutral: { height: 10, width: 10, borderRadius: '50%', rotate: 0, scaleY: 1 }, // Default Circle
-    happy: { height: 6, width: 14, borderRadius: '4px', rotate: -15, scaleY: 1 }, // Inverse arch hint
-    angry: { height: 4, width: 14, borderRadius: '2px', rotate: 20, scaleY: 1 },
-    dead: { height: 2, width: 14, borderRadius: '0px', rotate: 45, scaleY: 1 }, // X shape part 1 (simulated with line)
-    surprised: { height: 16, width: 12, borderRadius: '50%', rotate: 0, scaleY: 1 },
-    blink: { scaleY: 0.1 },
-    active: { height: 12, width: 8, borderRadius: '50%', rotate: 0, scaleY: 1 } // Oval (Active)
-  };
-
-  const rightEyeVariant = {
-    neutral: { height: 10, width: 10, borderRadius: '50%', rotate: 0, scaleY: 1 }, // Default Circle
-    happy: { height: 6, width: 14, borderRadius: '4px', rotate: 15, scaleY: 1 },
-    angry: { height: 4, width: 14, borderRadius: '2px', rotate: -20, scaleY: 1 },
-    dead: { height: 2, width: 14, borderRadius: '0px', rotate: -45, scaleY: 1 },
-    surprised: { height: 16, width: 12, borderRadius: '50%', rotate: 0, scaleY: 1 },
-    blink: { scaleY: 0.1 },
-    active: { height: 12, width: 8, borderRadius: '50%', rotate: 0, scaleY: 1 } // Oval (Active)
-  };
-
-  // Determine current variant based on blink state
-  // If blinking (and not dead/angry which shouldn't blink usually, but logic marks blinking disabled on error)
-  const getEyeState = () => {
-    if (!blinkOpen && currentFace !== 'dead') return 'blink';
-    // If neutral (no specific face triggers), check if we should be in "Active" (Oval) or "Idle" (Circle/Neutral)
-    if (currentFace === 'neutral') {
-      // If Near OR Hovered -> Active (Oval)
-      if (isNear || isHovered) return 'active';
-      // Else -> Neutral (Circle)
-      return 'neutral';
-    }
-    return currentFace;
-  };
-
-  const [tempEmote, setTempEmote] = useState<string | null>(null);
-
-  // Trigger random emote on happy state (visor hover)
+  // --- EMOTE RANDOMIZER (Only when Happy/Center) ---
   useEffect(() => {
     if (currentFace === 'happy') {
-      const emotes = [':)', ':D', ':O', 'UwU', '^.^', '<3', 'xD'];
-      // Ensure we always fallback to a string if something goes wrong, though index is safe here
-      setTempEmote(emotes[Math.floor(Math.random() * emotes.length)] || ':)');
+      const emotes = [':)', ':D', '^.^', '<3', 'xD'];
+      setTempEmote(emotes[Math.floor(Math.random() * emotes.length)]);
     } else {
       setTempEmote(null);
     }
   }, [currentFace]);
 
+  // --- EYE STYLES ---
+  const getEyeStyles = (side: 'left' | 'right') => {
+    const isHappy = currentFace === 'happy';
+    const isDead = currentFace === 'dead';
+    const isSurprised = currentFace === 'surprised';
+    const isActive = isNear || isHovered;
+
+    const color = errorMessage ? '#ef4444' : (isHappy ? '#ff69b4' : '#00ff88');
+
+    // Base dimensions
+    let w = 10, h = 10, r = '50%', rot = 0;
+
+    if (!blinkOpen && !isDead) { h = 1; w = 10; r = '2px'; } // Blink
+    else if (isHappy) { w = 14; h = 6; r = '4px'; rot = side === 'left' ? -15 : 15; }
+    else if (isDead) { w = 14; h = 2; r = '0px'; rot = side === 'left' ? 45 : -45; }
+    else if (isSurprised) { w = 12; h = 16; r = '50%'; } // Wide eyes
+    else if (isActive) { w = 8; h = 12; } // Oval active state
+
+    return {
+      width: `${w}px`,
+      height: `${h}px`,
+      borderRadius: r,
+      transform: `rotate(${rot}deg)`,
+      backgroundColor: color,
+      boxShadow: `0 0 ${isHappy ? 10 : 8}px ${color}`,
+      transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+    };
+  };
+
   return (
-    <motion.div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        width: '100%',
-        minHeight: '220px',
-        position: 'relative',
-      }}
-      animate={{
-        x: robotHorizontalOffset
-      }}
-      transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+    <div
       ref={containerRef}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '20px', width: '100%', minHeight: '220px', position: 'relative'
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Robot Head - Futuristic Design */}
-      <div ref={headRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '140px' }}>
-        {/* Speech Bubble moved to the parent container so left:50% reliably centers over the head */}
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '140px' }}>
+
+        {/* MESSAGE BUBBLE */}
         <AnimatePresence>
           {(isHovered || errorMessage) && (
             <motion.div
-              ref={bubbleRef}
               initial={{ opacity: 0, scale: 0.8, y: 10, x: '-50%' }}
               animate={{ opacity: 1, scale: 1, y: 0, x: '-50%' }}
               exit={{ opacity: 0, scale: 0.8, y: 10, x: '-50%' }}
               style={{
-                position: 'absolute',
-                top: -55,
-                left: '50%',
-                backgroundColor: errorMessage ? 'rgba(239, 68, 68, 0.95)' : 'rgba(17, 24, 39, 0.95)', // Darker, more opaque
-                backdropFilter: 'blur(8px)',
+                position: 'absolute', top: -55, left: '50%',
+                backgroundColor: 'rgba(17, 24, 39, 0.95)',
                 border: errorMessage ? '1px solid #ef4444' : '1px solid #7c3aed',
-                color: 'white',
-                padding: '12px 18px',
-                borderRadius: '16px 16px 16px 0', // Chat bubble style
-                fontSize: 14,
-                fontWeight: 'bold',
-                fontFamily: '"Share Tech Mono", monospace', // Tech font feel
-                zIndex: 30,
-                whiteSpace: 'normal',
-                maxWidth: '260px',
-                width: 'max-content',
-                boxShadow: errorMessage
-                  ? '0 10px 25px rgba(239, 68, 68, 0.4), inset 0 0 0 1px rgba(255,255,255,0.1)'
-                  : '0 10px 25px rgba(124, 58, 237, 0.3), inset 0 0 0 1px rgba(255,255,255,0.1)',
-                textAlign: 'center',
-                overflow: 'hidden',
-                transformOrigin: 'bottom left'
+                color: 'white', padding: '12px 18px', borderRadius: '16px 16px 16px 0',
+                fontFamily: '"Share Tech Mono", monospace', fontSize: 14, zIndex: 30,
+                width: 'max-content', maxWidth: '260px', textAlign: 'center'
               }}
             >
-              {/* Top accent line */}
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: errorMessage ? '#ef4444' : '#a78bfa', opacity: 0.8 }} />
-              {/* Translucent progress bar */}
-              {!(timeOnPage > TIMEOUT_LIMIT && !hasPlayed) && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    height: '3px',
-                    width: `${progress}%`,
-                    background: 'rgba(255, 255, 255, 0.4)',
-                    transition: 'width 0.1s linear',
-                    borderRadius: '0 0 12px 12px'
-                  }}
-                />
-              )}
-              <span style={{ position: 'relative', zIndex: 1 }}>
-                {(timeOnPage > TIMEOUT_LIMIT && !hasPlayed)
-                  ? TIMEOUT_MSG
-                  : (tempEmote || messages[currentMessage])
-                }
-              </span>
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: 0,
-                  height: 0,
-                  borderLeft: '8px solid transparent',
-                  borderRight: '8px solid transparent',
-                  borderTop: errorMessage ? '8px solid #ef4444' : '8px solid #7c3aed', // Match bubble color
-                }}
-              />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', width: `${progress}%`, background: 'rgba(255,255,255,0.4)', transition: 'width 0.1s linear' }} />
+              {timeOnPage > TIMEOUT_LIMIT && !hasPlayed
+                ? TIMEOUT_MSG
+                : (tempEmote || messages[currentMessage])
+              }
             </motion.div>
           )}
         </AnimatePresence>
 
+        {/* HEAD COMPONENT (Restored Original Look) */}
         <motion.div
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
           whileHover={{ scale: 1.03 }}
           style={{
-            position: 'relative',
-            width: '140px',
-            height: '120px',
-            background: 'linear-gradient(135deg, #374151 0%, #111827 100%)',
-            borderRadius: '24px', // Slightly rounder
+            position: 'relative', width: '140px', height: '120px', marginTop: 30,
+            background: 'linear-gradient(135deg, #374151 0%, #111827 100%)', // Original Gradient
+            borderRadius: '24px',
             border: errorMessage ? '3px solid #ef4444' : '3px solid #dc2626',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: errorMessage
-              ? '0 0 30px rgba(239, 68, 68, 0.6), inset 0 1px 0 rgba(255,255,255,0.2), 0 10px 20px rgba(0,0,0,0.5)'
-              : '0 15px 35px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15), 0 0 0 1px rgba(0,0,0,0.5)', // Deep shadow + rim light
-            marginTop: 30,
-            overflow: 'visible',
-            filter: errorMessage ? 'grayscale(0.8) sepia(0.5) hue-rotate(-50deg)' : 'none'
+            boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
         >
-          {/* (speech bubble removed from here; parent now renders the bubble centered over the head) */}
-          {/* Top sensors/antennas */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '-8px',
-              left: '20px',
-              width: '12px',
-              height: '12px',
-              background: 'linear-gradient(45deg, #374151, #1f2937)',
-              border: '2px solid #dc2626',
-              borderRadius: '3px',
-              boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.8), 0 2px 5px rgba(0,0,0,0.3)'
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              top: '-8px',
-              right: '20px',
-              width: '12px',
-              height: '12px',
-              background: 'linear-gradient(45deg, #374151, #1f2937)',
-              border: '2px solid #dc2626',
-              borderRadius: '3px',
-              boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.8), 0 2px 5px rgba(0,0,0,0.3)'
-            }}
-          />
+          {/* Antennas & Ears (Restored) */}
+          <div style={{ position: 'absolute', top: '-8px', left: '20px', width: '12px', height: '12px', background: '#374151', border: '2px solid #dc2626', borderRadius: '3px' }} />
+          <div style={{ position: 'absolute', top: '-8px', right: '20px', width: '12px', height: '12px', background: '#374151', border: '2px solid #dc2626', borderRadius: '3px' }} />
+          <div style={{ position: 'absolute', left: '-8px', top: '30px', width: '12px', height: '25px', background: '#374151', border: '2px solid #dc2626', borderRadius: '0 3px 3px 0' }} />
+          <div style={{ position: 'absolute', right: '-8px', top: '30px', width: '12px', height: '25px', background: '#374151', border: '2px solid #dc2626', borderRadius: '3px 0 0 3px' }} />
 
-          {/* Side panels */}
+          {/* VISOR (The Screen) */}
           <div
+            ref={visorRef}
+            onMouseEnter={() => setIsVisorHovered(true)}
+            onMouseLeave={() => { setIsVisorHovered(false); setIsVisorCenter(false); }}
             style={{
-              position: 'absolute',
-              left: '-8px',
-              top: '30px',
-              width: '12px',
-              height: '25px',
-              background: 'linear-gradient(90deg, #374151, #1f2937)',
-              border: '2px solid #dc2626',
-              borderRadius: '0 3px 3px 0',
-              boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.8), 0 5px 10px rgba(0,0,0,0.4)'
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              right: '-8px',
-              top: '30px',
-              width: '12px',
-              height: '25px',
-              background: 'linear-gradient(90deg, #1f2937, #374151)',
-              border: '2px solid #dc2626',
-              borderRadius: '3px 0 0 3px',
-              boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.8), 0 5px 10px rgba(0,0,0,0.4)'
-            }}
-          />
-
-          {/* Main visor/screen */}
-          <div
-            onMouseEnter={() => setIsVisorHovered(true)} // DETECT VISOR HOVER
-            onMouseLeave={() => setIsVisorHovered(false)}
-            style={{
-              position: 'relative',
-              width: '110px',
-              height: '70px',
-              background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #000000 100%)',
-              border: '2px solid #dc2626',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-              boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)',
-              cursor: 'cell' // Indicate interaction
+              position: 'relative', width: '110px', height: '70px',
+              background: '#000', borderRadius: '8px', border: '2px solid #dc2626',
+              overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'crosshair'
             }}
           >
-            {/* Visor reflection effect */}
+            {/* Visor Glare/Reflection */}
+            <div style={{ position: 'absolute', top: '5px', left: '5px', right: '5px', height: '20px', background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%)', borderRadius: '4px' }} />
+
+            {/* EYES CONTAINER */}
             <div
-              style={{
-                position: 'absolute',
-                top: '5px',
-                left: '5px',
-                right: '5px',
-                height: '20px',
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%)',
-                borderRadius: '4px',
-              }}
-            />
-
-            {/* Eyes/tracking dots in the visor */}
-            <motion.div
-              animate={{
-                x: eyeOffset.x,
-                y: eyeOffset.y,
-              }}
-              transition={{ type: 'spring', stiffness: 150, damping: 15 }}
-              style={{
-                display: 'flex',
-                gap: '20px',
-                alignItems: 'center',
-              }}
+              ref={eyesRef}
+              style={{ display: 'flex', gap: '20px', alignItems: 'center', transition: 'transform 0.1s ease-out' }}
             >
-              {/* Left eye */}
-              <motion.div
-                variants={leftEyeVariant}
-                animate={getEyeState()}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                style={{
-                  backgroundColor: errorMessage ? '#ef4444' : (currentFace === 'happy' ? '#ff69b4' : '#00ff88'), // Pink for happy
-                  boxShadow: errorMessage ? '0 0 8px #ef4444' : (currentFace === 'happy' ? '0 0 10px #ff69b4' : '0 0 8px #00ff88'),
-                }}
-              />
-              {/* Right eye */}
-              <motion.div
-                variants={rightEyeVariant}
-                animate={getEyeState()}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                style={{
-                  backgroundColor: errorMessage ? '#ef4444' : (currentFace === 'happy' ? '#ff69b4' : '#00ff88'), // Pink for happy
-                  boxShadow: errorMessage ? '0 0 8px #ef4444' : (currentFace === 'happy' ? '0 0 10px #ff69b4' : '0 0 8px #00ff88'),
-                }}
-              />
-            </motion.div>
+              <div style={getEyeStyles('left')} />
+              <div style={getEyeStyles('right')} />
+            </div>
 
-            {/* Scanning line effect */}
-            <motion.div
-              animate={{
-                x: ['-100%', '100%'],
-                opacity: [0, 1, 0],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: 'linear',
-              }}
-              style={{
-                position: 'absolute',
-                top: '0',
-                bottom: '0',
-                width: '2px',
-                background: errorMessage
-                  ? 'linear-gradient(to bottom, transparent, #ef4444, transparent)' // Red scan line
-                  : 'linear-gradient(to bottom, transparent, #00ff88, transparent)',
-                boxShadow: errorMessage ? '0 0 10px #ef4444' : '0 0 10px #00ff88',
-              }}
-            />
+            {/* SCANLINE (Restored: Vertical line moving Left->Right) */}
+            <div className="scanline" style={{
+              position: 'absolute', top: 0, bottom: 0, width: '2px',
+              background: errorMessage
+                ? 'linear-gradient(to bottom, transparent, #ef4444, transparent)'
+                : 'linear-gradient(to bottom, transparent, #00ff88, transparent)',
+              animation: 'scan 2s linear infinite'
+            }} />
+            <style>{`@keyframes scan { 0% { left: -20%; opacity: 0; } 50% { opacity: 1; } 100% { left: 120%; opacity: 0; } }`}</style>
           </div>
 
-          {/* Bottom chin piece */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: -6,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 40,
-              height: 10,
-              background: 'linear-gradient(135deg, #374151, #1f2937)',
-              border: '2px solid #dc2626',
-              borderRadius: '0 0 8px 8px',
-            }}
-          />
+          {/* Chin Piece (Restored) */}
+          <div style={{ position: 'absolute', bottom: -6, width: 40, height: 10, background: 'linear-gradient(135deg, #374151, #1f2937)', border: '2px solid #dc2626', borderRadius: '0 0 8px 8px' }} />
         </motion.div>
       </div>
 
-      {/* Styled Call-to-Action Box (replaces exhausted message) */}
-      <AnimatePresence>
-        {timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !errorMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            style={{
-              marginTop: 20,
-              background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.8) 0%, rgba(45, 212, 191, 0.8) 100%)', // Red to Teal
-              padding: '2px', // Border gradient
-              borderRadius: '12px',
-              boxShadow: '0 0 20px rgba(45, 212, 191, 0.5)', // Teal glow
-              cursor: 'pointer'
-            }}
-          >
-            <div style={{
-              background: '#111827',
-              borderRadius: '10px',
-              padding: '12px 20px',
-              color: '#fff',
-              fontFamily: 'monospace',
-              textAlign: 'center',
-              textShadow: '0 0 5px rgba(255,255,255,0.5)'
-            }}>
-              Hey, it was real hard to build this app, please try it out!
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Robot Neck/Body */}
+      {/* BODY/NECK (Restored Original Logic & Look) */}
       <motion.div
-        animate={{
-          scale: isHovered ? 1.02 : 1,
-        }}
-        style={{
-          marginTop: '8px',
-          width: '50px',
-          height: '30px',
-          background: 'linear-gradient(135deg, #374151, #1f2937)',
-          border: '2px solid #dc2626',
-          borderRadius: '0 0 12px 12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '6px',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-        }}
+        animate={{ scale: isHovered ? 1.02 : 1 }}
+        style={{ marginTop: '8px', width: '50px', height: '30px', background: 'linear-gradient(135deg, #374151, #1f2937)', border: '2px solid #dc2626', borderRadius: '0 0 12px 12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
       >
-        {/* Status lights */}
-        <motion.div
-          animate={{
-            backgroundColor: isHovered ? '#00ff88' : '#22c55e',
-          }}
-          style={{
-            width: '4px',
-            height: '15px',
-            backgroundColor: '#22c55e',
-            borderRadius: '2px',
-            boxShadow: '0 0 4px currentColor',
-          }}
-        />
-        <motion.div
-          animate={{
-            backgroundColor: isHovered ? '#3b82f6' : '#60a5fa',
-          }}
-          style={{
-            width: '4px',
-            height: '15px',
-            backgroundColor: '#60a5fa',
-            borderRadius: '2px',
-            boxShadow: '0 0 4px currentColor',
-          }}
-        />
+        <div style={{ width: '4px', height: '15px', background: isHovered ? '#00ff88' : '#22c55e', borderRadius: '2px', transition: 'background 0.3s' }} />
+        <div style={{ width: '4px', height: '15px', background: isHovered ? '#3b82f6' : '#60a5fa', borderRadius: '2px', transition: 'background 0.3s' }} />
       </motion.div>
 
-      {/* Username label - Improved readability */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
-          marginTop: 12,
-          backgroundColor: 'rgba(17, 24, 39, 0.9)',
-          padding: '8px 16px',
-          borderRadius: '8px',
-          border: '2px solid rgba(0, 255, 136, 0.3)',
-          boxShadow: '0 0 15px rgba(0, 255, 136, 0.2)',
-        }}
-      >
-        <span style={{
-          fontFamily: "'Press Start 2P', monospace",
-          fontSize: 13,
-          color: '#00ff88',
-          textShadow: '0 0 8px #00ff88, 0 0 12px rgba(0, 255, 136, 0.5)',
-          whiteSpace: 'nowrap',
-          letterSpacing: '0.05em',
-          fontWeight: 'bold',
-        }}>
-          {username}: {totalPoints}
-        </span>
-      </motion.div>
-    </motion.div>
+      {/* USERNAME TAG */}
+      <div style={{
+        marginTop: 12, padding: '8px 16px', borderRadius: '8px',
+        background: 'rgba(17, 24, 39, 0.9)', border: '2px solid rgba(0, 255, 136, 0.3)',
+        fontFamily: "'Press Start 2P', monospace", fontSize: 13, color: '#00ff88', fontWeight: 'bold'
+      }}>
+        {username}: {totalPoints}
+      </div>
+    </div>
   );
 };

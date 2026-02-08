@@ -433,12 +433,20 @@
       'Segoe UI',
       sans-serif;
 
-    /* THEME LOCK: Force warm parchment background globally */
-    background-color: #F3EFE0;
-    /* Matches GeneratorShell */
+    /* THEME LOCK: Sacred Geometry Background */
+    background-color: #0B0E14;
+    /* Deep dark void base */
+    background-image:
+      radial-gradient(circle at 100% 100%, transparent 16px, #4c1d95 17px, #4c1d95 20px, transparent 21px),
+      radial-gradient(circle at 0% 100%, transparent 16px, #4c1d95 17px, #4c1d95 20px, transparent 21px),
+      radial-gradient(circle at 100% 0%, transparent 16px, #4c1d95 17px, #4c1d95 20px, transparent 21px),
+      radial-gradient(circle at 0% 0%, transparent 16px, #4c1d95 17px, #4c1d95 20px, transparent 21px),
+      radial-gradient(circle at 50% 50%, transparent 35px, #d8b4fe 36px, #d8b4fe 38px, transparent 39px);
+    background-size: 80px 80px;
+    /* Creates the repeating geometric lattice */
 
-    /* Dark text for contrast on light background */
-    color: #212529;
+    /* Dark text for contrast */
+    color: #f8fafc;
 
     font-feature-settings: 'cv11', 'ss01';
     font-variant-numeric: tabular-nums;
@@ -448,8 +456,23 @@
   }
 }
 
-/* ===== NO MORE ORANGE GRID ===== */
-/* .wiremesh-overlay removed */
+/* ===== SACRED GEOMETRY OVERLAY ===== */
+/* Adds the secondary complex layer for the "Flower of Life" effect */
+.sacred-geometry-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.15;
+  background-image:
+    radial-gradient(circle at 50% 50%, transparent 60%, #7c3aed 61%, #7c3aed 63%, transparent 64%),
+    radial-gradient(circle at 0% 50%, transparent 60%, #7c3aed 61%, #7c3aed 63%, transparent 64%),
+    radial-gradient(circle at 100% 50%, transparent 60%, #7c3aed 61%, #7c3aed 63%, transparent 64%);
+  background-size: 100px 100px;
+}
 
 /* ===== AESTHETIC GLASS BUTTONS ===== */
 .glass-button {

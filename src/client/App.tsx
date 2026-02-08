@@ -906,6 +906,7 @@ export const App = () => {
   if (isCreating) {
     return (
       <div className="min-h-screen relative overflow-x-hidden p-2 md:p-4 lg:p-6 transition-all duration-500">
+        <div className="sacred-geometry-overlay" aria-hidden="true" />
         <div className="max-w-7xl mx-auto relative z-10 w-full flex justify-center">
           <MessageDisplay message={message} />
           <div className="w-full">
@@ -924,6 +925,7 @@ export const App = () => {
   // Standard Player View
   return (
     <div className="relative overflow-x-hidden p-2 md:p-4 lg:p-6 transition-all duration-500">
+      <div className="sacred-geometry-overlay" aria-hidden="true" />
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="flex justify-between items-center mb-4 min-h-10 gap-2">
           <div className="flex items-center gap-2">
