@@ -433,17 +433,18 @@
       'Segoe UI',
       sans-serif;
 
-    /* THEME LOCK: Sacred Geometry Background */
+    /* THEME LOCK: Static Image Background */
     background-color: #0B0E14;
-    /* Deep dark void base */
-    background-image:
-      radial-gradient(circle at 100% 100%, transparent 16px, #4c1d95 17px, #4c1d95 20px, transparent 21px),
-      radial-gradient(circle at 0% 100%, transparent 16px, #4c1d95 17px, #4c1d95 20px, transparent 21px),
-      radial-gradient(circle at 100% 0%, transparent 16px, #4c1d95 17px, #4c1d95 20px, transparent 21px),
-      radial-gradient(circle at 0% 0%, transparent 16px, #4c1d95 17px, #4c1d95 20px, transparent 21px),
-      radial-gradient(circle at 50% 50%, transparent 35px, #d8b4fe 36px, #d8b4fe 38px, transparent 39px);
-    background-size: 80px 80px;
-    /* Creates the repeating geometric lattice */
+    background-image: url('./public/assets/bg.jpg');
+    /* Adjust path as needed based on build tool */
+    /* If Vite handles assets, use relative path or align with public dir */
+    /* Assuming public/assets/bg.jpg is served at /assets/bg.jpg if in public, OR imported if in src */
+    /* Let's try root relative assuming public folder structure */
+    background-image: url('/assets/bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
 
     /* Dark text for contrast */
     color: #f8fafc;
@@ -456,23 +457,7 @@
   }
 }
 
-/* ===== SACRED GEOMETRY OVERLAY ===== */
-/* Adds the secondary complex layer for the "Flower of Life" effect */
-.sacred-geometry-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: -1;
-  opacity: 0.15;
-  background-image:
-    radial-gradient(circle at 50% 50%, transparent 60%, #7c3aed 61%, #7c3aed 63%, transparent 64%),
-    radial-gradient(circle at 0% 50%, transparent 60%, #7c3aed 61%, #7c3aed 63%, transparent 64%),
-    radial-gradient(circle at 100% 50%, transparent 60%, #7c3aed 61%, #7c3aed 63%, transparent 64%);
-  background-size: 100px 100px;
-}
+/* Sacred Geometry Overlay Removed */
 
 /* ===== AESTHETIC GLASS BUTTONS ===== */
 .glass-button {

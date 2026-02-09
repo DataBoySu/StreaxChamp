@@ -45,6 +45,7 @@ export const TopicSelector: React.FC<{
   const [highlightedTopic] = useState('');
   const [loading] = useState(false);
   const [popularSlugs] = useState<string[]>(['science', 'technology', 'history', 'movies', 'sports']);
+  const [limitReached, setLimitReached] = useState(false);
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
 
@@ -229,6 +230,9 @@ export const TopicSelector: React.FC<{
             if (errorData.code && errorData.robotDialogue) {
               onError?.(errorData.code, errorData.robotDialogue);
             }
+            if (errorData.limitReached || errorData.code === 'LIMIT_REACHED') {
+              setLimitReached(true);
+            }
             throw new Error(errorData.message || 'Generate failed');
           } catch (parseErr) {
             throw new Error('Generate failed');
@@ -312,15 +316,18 @@ export const TopicSelector: React.FC<{
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Search or add topics..."
-              className="nes-input w-full"
+              placeholder={limitReached ? "Daily Limit Reached (20/20)" : "Search or add topics..."}
+              className={`nes-input w-full ${limitReached ? 'is-disabled' : ''}`}
               style={{
                 fontFamily: "'Press Start 2P', cursive",
                 fontSize: 'clamp(0.625rem, 2vw, 0.875rem)',
                 padding: '0.75rem 1rem',
+                opacity: limitReached ? 0.7 : 1,
+                cursor: limitReached ? 'not-allowed' : 'text'
               }}
               aria-label="Search or add topics"
               autoComplete="off"
+              disabled={limitReached}
             />
           </div>
 
@@ -354,7 +361,20 @@ export const TopicSelector: React.FC<{
           </div>
 
           {/* Add Button */}
-          {query.trim().length > 0 && (
+          {limitReached ? (
+            <button
+              disabled
+              className="nes-btn is-disabled"
+              style={{
+                fontFamily: "'Press Start 2P', cursive",
+                fontSize: '0.625rem',
+                padding: '0.75rem 1.5rem',
+                opacity: 0.8
+              }}
+            >
+              MAX
+            </button>
+          ) : (query.trim().length > 0 && (
             <button
               disabled={addingTopic || !canAddNewTopic}
               onClick={handleAddTopic}
@@ -367,7 +387,7 @@ export const TopicSelector: React.FC<{
             >
               {addingTopic ? '...' : (topicExists ? 'Go' : 'Add')}
             </button>
-          )}
+          ))}
         </div>
       </div>
 

@@ -1,160 +1,156 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-
-// --- UTILITY: Throttle function to limit re-renders ---
-const throttle = (func: Function, limit: number) => {
-  let inThrottle: boolean;
-  return function (this: any, ...args: any[]) {
-    if (!inThrottle) {
-      func.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
-    }
-  }
-};
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
+import { CONFIG } from '../../shared/constants';
 
 interface InteractiveRobotProps {
   username: string;
   errorMessage?: string | undefined;
   hasPlayed?: boolean;
   totalPoints?: number;
-  forceState?: 'neutral' | 'happy' | 'angry' | 'dead' | 'surprised';
+  forceState?: 'neutral' | 'scoff' | 'angry' | 'dead' | 'surprised';
 }
 
 export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
   username, errorMessage, hasPlayed, totalPoints = 0, forceState
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [currentMessage, setCurrentMessage] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [blinkOpen, setBlinkOpen] = useState(true);
   const [timeOnPage, setTimeOnPage] = useState(0);
-  const [isNear, setIsNear] = useState(false);
 
-  // Specific Visor States
+  // Interaction States
   const [isVisorHovered, setIsVisorHovered] = useState(false);
-  const [isVisorCenter, setIsVisorCenter] = useState(false); // New state for exact middle
-  const [tempEmote, setTempEmote] = useState<string | null>(null);
+  const [isVisorCenter, setIsVisorCenter] = useState(false);
+  // const [tempEmote, setTempEmote] = useState<string | null>(null);
+  const tempEmote = null; // Emotes disabled per user request
 
-  // Refs for direct DOM manipulation
+  // Mouse Tracking Motion Values (Smooth Physics)
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  const springConfig = { damping: 25, stiffness: 120 }; // Smooth but responsive
+  const smoothX = useSpring(mouseX, springConfig);
+  const smoothY = useSpring(mouseY, springConfig);
+
+  // Eye movement range (divide by factor to limit range)
+  const eyeX = useTransform(smoothX, (v) => v / 25);
+  const eyeY = useTransform(smoothY, (v) => v / 25);
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const eyesRef = useRef<HTMLDivElement>(null);
   const visorRef = useRef<HTMLDivElement>(null);
 
-  const TIMEOUT_LIMIT = 20;
-  const TIMEOUT_MSG = "That’s all you get. Inside with you. The real challenge awaits.";
+  const TIMEOUT_LIMIT = CONFIG.ROBOT.INTERACTIVE.TIMEOUT_LIMIT;
+  const ANGER_LIMIT = CONFIG.ROBOT.INTERACTIVE.ANGER_LIMIT;
+  const TIMEOUT_MSG = CONFIG.ROBOT.INTERACTIVE.TIMEOUT_MSG;
+  const ANGER_MSG = CONFIG.ROBOT.INTERACTIVE.ANGER_MSG;
 
-  // --- OPTIMIZED MOUSE TRACKING ---
-  const handleMouseMove = useCallback(throttle((event: MouseEvent) => {
-    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed && !errorMessage && !isVisorHovered) return;
-
-    // 1. Calculate Global Eye Tracking (Robot looking at cursor)
-    const { innerWidth, innerHeight } = window;
-    const x = (event.clientX - innerWidth / 2) / 30;
-    const y = (event.clientY - innerHeight / 2) / 30;
-
-    // Update CSS Variable on the Eyes Container directly
-    if (eyesRef.current) {
-      eyesRef.current.style.transform = `translate(${x}px, ${y}px)`;
-    }
-
-    // 2. Calculate Proximity for "Active" state
-    const centerX = innerWidth / 2;
-    const centerY = innerHeight / 2;
-    const relativeX = (event.clientX - centerX) / (centerX);
-    const relativeY = (event.clientY - centerY) / (centerY);
-    const dist = Math.sqrt(relativeX * relativeX + relativeY * relativeY);
-    setIsNear(dist < 0.15);
-
-    // 3. Calculate "Exact Middle" of Visor Logic
-    if (visorRef.current) {
-      const rect = visorRef.current.getBoundingClientRect();
-      const visorCenterX = rect.left + rect.width / 2;
-      const visorCenterY = rect.top + rect.height / 2;
-
-      // Distance from center of visor
-      const distFromVisorCenter = Math.sqrt(
-        Math.pow(event.clientX - visorCenterX, 2) +
-        Math.pow(event.clientY - visorCenterY, 2)
-      );
-
-      // If within 15px radius of center -> Happy. Else -> Surprised (if hovered)
-      setIsVisorCenter(distFromVisorCenter < 15);
-    }
-
-  }, 16), [timeOnPage, hasPlayed, errorMessage, isVisorHovered]);
-
+  // --- MOUSE TRACKING ---
   useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      // 1. Update Motion Values relative to center of screen
+      const { innerWidth, innerHeight } = window;
+      const x = event.clientX - innerWidth / 2;
+      const y = event.clientY - innerHeight / 2;
+
+      // Update spring targets
+      mouseX.set(x);
+      mouseY.set(y);
+
+      // 2. Calculate "Exact Middle" Visor Logic
+      if (visorRef.current) {
+        const rect = visorRef.current.getBoundingClientRect();
+        const visorCenterX = rect.left + rect.width / 2;
+        const visorCenterY = rect.top + rect.height / 2;
+
+        const distFromVisorCenter = Math.sqrt(
+          Math.pow(event.clientX - visorCenterX, 2) +
+          Math.pow(event.clientY - visorCenterY, 2)
+        );
+
+        // If within 20px -> Happy Center
+        const isCenter = distFromVisorCenter < 20;
+        if (isCenter !== isVisorCenter) setIsVisorCenter(isCenter);
+      }
+    };
+
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [handleMouseMove]);
+  }, [mouseX, mouseY, isVisorCenter]);
 
   // --- BLINKING LOGIC ---
   useEffect(() => {
     if (errorMessage) { setBlinkOpen(true); return; }
+
+    // Recursive timeout for random blinking
     let timeoutId: number;
-    const triggerBlink = () => {
-      setBlinkOpen(false);
+    const blink = () => {
+      setBlinkOpen(false); // Close
       setTimeout(() => {
-        setBlinkOpen(true);
-        timeoutId = window.setTimeout(triggerBlink, Math.random() * 3500 + 2500);
+        setBlinkOpen(true); // Open
+        // Schedule next blink
+        timeoutId = window.setTimeout(blink, Math.random() * 3000 + 2000);
       }, 150);
     };
-    timeoutId = window.setTimeout(triggerBlink, Math.random() * 3000 + 1000);
+
+    // Start initial blink
+    timeoutId = window.setTimeout(blink, 2000);
     return () => clearTimeout(timeoutId);
   }, [errorMessage]);
 
-  // --- MESSAGE ROTATION ---
+  // --- TIMER ---
+  useEffect(() => {
+    if (hasPlayed) return;
+    const timer = setInterval(() => setTimeOnPage(t => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, [hasPlayed]);
+
+  // --- MESSAGE LOGIC ---
   const messages = useMemo(() => {
     if (errorMessage) return [errorMessage];
-    return [
-      `Halt, ${username}. Enjoy your experience.`,
-      'New comer? Keep moving, we have a lot to show.',
-      'This page is not everything we have to offer.',
-      'Still lingering? Hmph.',
-      'Enough gawking. Inside.'
-    ];
+    return CONFIG.ROBOT.INTERACTIVE.IDLE_MESSAGES.map(msg =>
+      msg.replace('{{username}}', username)
+    );
   }, [username, errorMessage]);
 
+  // --- MESSAGE CYCLE LOGIC ---
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Trigger Play
   useEffect(() => {
-    if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed) return;
-    if (isHovered) {
-      const interval = window.setInterval(() => {
-        setCurrentMessage(p => (p + 1) >= messages.length ? 0 : p + 1);
-        setProgress(0);
-      }, 3000);
-      return () => clearInterval(interval);
+    // If hovered, not currently playing, and not in timeout/angry mode
+    if (isHovered && !isPlaying && !(timeOnPage > TIMEOUT_LIMIT && !hasPlayed)) {
+      setIsPlaying(true);
     }
-  }, [isHovered, messages.length, timeOnPage, hasPlayed]);
+  }, [isHovered, isPlaying, timeOnPage, hasPlayed]);
 
-  // --- PROGRESS BAR ---
+  // Handle Play Duration
   useEffect(() => {
-    if (!isHovered) { setProgress(0); return; }
-    let start = Date.now();
-    let frameId: number;
-    const animate = () => {
-      const p = Math.min(((Date.now() - start) / 3000) * 100, 100);
-      setProgress(p);
-      if (p < 100) frameId = requestAnimationFrame(animate);
-    };
-    frameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameId);
-  }, [isHovered, currentMessage]);
+    if (isPlaying) {
+      const timer = setTimeout(() => {
+        setIsPlaying(false);
+        setCurrentMessageIndex(prev => (prev + 1) % messages.length);
+      }, 4000); // 4 seconds per message
+      return () => clearTimeout(timer);
+    }
+  }, [isPlaying, messages.length]);
 
-  // --- FACE STATE LOGIC ---
+  // --- FACE STATE DETERMINATION ---
   const currentFace = useMemo(() => {
     if (forceState) return forceState;
     if (errorMessage) return 'dead';
+    // If user has waited too long (Angry Mode)
+    if (timeOnPage > ANGER_LIMIT && !hasPlayed) return 'angry';
 
-    // NEW LOGIC: 
-    if (isVisorCenter) return 'happy';    // Exact middle -> Happy
-    if (isVisorHovered) return 'surprised'; // On display but not middle -> Wide Eyed
-    if (isHovered) return 'surprised';      // Hovering robot generally -> Alert
-
+    if (isVisorCenter) return 'scoff'; // Middle = Scoff (Unamused)
+    if (isVisorHovered) return 'surprised';
+    if (isHovered) return 'surprised';
     return 'neutral';
-  }, [errorMessage, isVisorHovered, isVisorCenter, isHovered, forceState]);
+  }, [forceState, errorMessage, isVisorCenter, isVisorHovered, isHovered, timeOnPage, hasPlayed, ANGER_LIMIT]);
 
-  // --- EMOTE RANDOMIZER (Only when Happy/Center) ---
+  /* 
+  // --- EMOTE (On Happy) ---
+  // DISABLED: User requested to disable emote injections (:) etc) for now.
+  // Preserved for future improvements.
   useEffect(() => {
     if (currentFace === 'happy') {
       const emotes = [':)', ':D', '^.^', '<3', 'xD'];
@@ -163,35 +159,38 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
       setTempEmote(null);
     }
   }, [currentFace]);
+  */
 
-  // --- EYE STYLES ---
-  const getEyeStyles = (side: 'left' | 'right') => {
-    const isHappy = currentFace === 'happy';
-    const isDead = currentFace === 'dead';
-    const isSurprised = currentFace === 'surprised';
-    const isActive = isNear || isHovered;
-
-    const color = errorMessage ? '#ef4444' : (isHappy ? '#ff69b4' : '#00ff88');
-
-    // Base dimensions
-    let w = 10, h = 10, r = '50%', rot = 0;
-
-    if (!blinkOpen && !isDead) { h = 1; w = 10; r = '2px'; } // Blink
-    else if (isHappy) { w = 14; h = 6; r = '4px'; rot = side === 'left' ? -15 : 15; }
-    else if (isDead) { w = 14; h = 2; r = '0px'; rot = side === 'left' ? 45 : -45; }
-    else if (isSurprised) { w = 12; h = 16; r = '50%'; } // Wide eyes
-    else if (isActive) { w = 8; h = 12; } // Oval active state
-
-    return {
-      width: `${w}px`,
-      height: `${h}px`,
-      borderRadius: r,
-      transform: `rotate(${rot}deg)`,
-      backgroundColor: color,
-      boxShadow: `0 0 ${isHappy ? 10 : 8}px ${color}`,
-      transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-    };
+  // --- EYE VARIANTS (Framer Motion) ---
+  const eyeVariants = {
+    neutral: { height: 10, width: 10, borderRadius: '50%', rotate: 0 },
+    blink: { height: 2, width: 10, borderRadius: '1px', rotate: 0 },
+    scoff: { height: 4, width: 14, borderRadius: '1px', rotate: 0 }, // Flat, unamused (- -)
+    dead: { height: 4, width: 14, borderRadius: '2px', rotate: 0 },
+    surprised: { height: 16, width: 12, borderRadius: '50%', rotate: 0 },
+    angry: { height: 4, width: 14, borderRadius: '2px', rotate: 0 }, // Rotation handled in render
   };
+
+  const getEyeState = () => {
+    if (!blinkOpen && currentFace !== 'dead') return 'blink';
+    return currentFace;
+  };
+
+  const getEyeColor = () => {
+    if (errorMessage) return '#ef4444'; // Red (Error)
+    if (currentFace === 'angry') return '#ef4444'; // Red (Angry)
+    if (currentFace === 'scoff') return '#00ff88'; // Green (Neutral/Annoyed) - user said "scoff is something else", keeping green makes it distinct from red angry
+    return '#00ff88'; // Green (Neutral)
+  };
+  const eyeColor = getEyeColor();
+  const eyeShadow = `0 0 10px ${eyeColor}`;
+
+  // Determine Active Message
+  let activeMessage = (tempEmote || messages[currentMessageIndex]);
+  // Override if timed out
+  if (timeOnPage > TIMEOUT_LIMIT && !hasPlayed) activeMessage = TIMEOUT_MSG;
+  // Override if angery
+  if (timeOnPage > ANGER_LIMIT && !hasPlayed) activeMessage = ANGER_MSG;
 
   return (
     <div
@@ -206,9 +205,10 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '140px' }}>
 
         {/* MESSAGE BUBBLE */}
-        <AnimatePresence>
-          {(isHovered || errorMessage) && (
+        <AnimatePresence mode='wait'>
+          {(isHovered || isPlaying || errorMessage || (timeOnPage > TIMEOUT_LIMIT && !hasPlayed && isHovered)) && (
             <motion.div
+              key="bubble"
               initial={{ opacity: 0, scale: 0.8, y: 10, x: '-50%' }}
               animate={{ opacity: 1, scale: 1, y: 0, x: '-50%' }}
               exit={{ opacity: 0, scale: 0.8, y: 10, x: '-50%' }}
@@ -218,37 +218,51 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
                 border: errorMessage ? '1px solid #ef4444' : '1px solid #7c3aed',
                 color: 'white', padding: '12px 18px', borderRadius: '16px 16px 16px 0',
                 fontFamily: '"Share Tech Mono", monospace', fontSize: 14, zIndex: 30,
-                width: 'max-content', maxWidth: '260px', textAlign: 'center'
+                width: 'max-content', maxWidth: '260px', textAlign: 'center',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
               }}
             >
-              <div style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', width: `${progress}%`, background: 'rgba(255,255,255,0.4)', transition: 'width 0.1s linear' }} />
-              {timeOnPage > TIMEOUT_LIMIT && !hasPlayed
-                ? TIMEOUT_MSG
-                : (tempEmote || messages[currentMessage])
-              }
+              {/* Progress Bar (Only show if cycling messages and not timed out) */}
+              {!(timeOnPage > TIMEOUT_LIMIT && !hasPlayed) && !errorMessage && !tempEmote && (
+                <motion.div
+                  // Key changes when message index changes -> restarts animation automatically
+                  key={currentMessageIndex}
+                  initial={{ width: '0%' }}
+                  animate={{ width: '100%' }}
+                  transition={{ duration: 4, ease: "linear" }}
+                  style={{
+                    position: 'absolute', bottom: 0, left: 0, height: '3px',
+                    background: 'rgba(255,255,255,0.4)', borderRadius: '0 0 0 4px'
+                  }}
+                />
+              )}
+
+              <span style={{ position: 'relative', zIndex: 1 }}>
+                {activeMessage}
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* HEAD COMPONENT (Restored Original Look) */}
+        {/* ROBOT HEAD */}
         <motion.div
           whileHover={{ scale: 1.03 }}
           style={{
             position: 'relative', width: '140px', height: '120px', marginTop: 30,
-            background: 'linear-gradient(135deg, #374151 0%, #111827 100%)', // Original Gradient
+            background: 'linear-gradient(135deg, #374151 0%, #111827 100%)',
             borderRadius: '24px',
             border: errorMessage ? '3px solid #ef4444' : '3px solid #dc2626',
             boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
         >
-          {/* Antennas & Ears (Restored) */}
+          {/* Antennas */}
           <div style={{ position: 'absolute', top: '-8px', left: '20px', width: '12px', height: '12px', background: '#374151', border: '2px solid #dc2626', borderRadius: '3px' }} />
           <div style={{ position: 'absolute', top: '-8px', right: '20px', width: '12px', height: '12px', background: '#374151', border: '2px solid #dc2626', borderRadius: '3px' }} />
           <div style={{ position: 'absolute', left: '-8px', top: '30px', width: '12px', height: '25px', background: '#374151', border: '2px solid #dc2626', borderRadius: '0 3px 3px 0' }} />
           <div style={{ position: 'absolute', right: '-8px', top: '30px', width: '12px', height: '25px', background: '#374151', border: '2px solid #dc2626', borderRadius: '3px 0 0 3px' }} />
 
-          {/* VISOR (The Screen) */}
+          {/* VISOR */}
           <div
             ref={visorRef}
             onMouseEnter={() => setIsVisorHovered(true)}
@@ -260,51 +274,75 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
               cursor: 'crosshair'
             }}
           >
-            {/* Visor Glare/Reflection */}
-            <div style={{ position: 'absolute', top: '5px', left: '5px', right: '5px', height: '20px', background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%)', borderRadius: '4px' }} />
+            {/* Glare */}
+            <div style={{ position: 'absolute', top: '5px', left: '5px', right: '5px', height: '20px', background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%)', borderRadius: '4px', zIndex: 10, pointerEvents: 'none' }} />
 
-            {/* EYES CONTAINER */}
-            <div
-              ref={eyesRef}
-              style={{ display: 'flex', gap: '20px', alignItems: 'center', transition: 'transform 0.1s ease-out' }}
+            {/* EYES */}
+            <motion.div
+              style={{ x: eyeX, y: eyeY, display: 'flex', gap: '20px', alignItems: 'center' }}
             >
-              <div style={getEyeStyles('left')} />
-              <div style={getEyeStyles('right')} />
-            </div>
+              {/* Left Eye */}
+              <motion.div
+                variants={eyeVariants}
+                animate={getEyeState()}
+                // Override rotation for happy/dead/angry states
+                style={{
+                  rotate: (currentFace === 'dead' || currentFace === 'angry') ? 20 : 0,
+                  backgroundColor: eyeColor,
+                  boxShadow: eyeShadow
+                }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              />
+              {/* Right Eye */}
+              <motion.div
+                variants={eyeVariants}
+                animate={getEyeState()}
+                style={{
+                  rotate: (currentFace === 'dead' || currentFace === 'angry') ? -20 : 0,
+                  backgroundColor: eyeColor,
+                  boxShadow: eyeShadow
+                }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              />
+            </motion.div>
 
-            {/* SCANLINE (Restored: Vertical line moving Left->Right) */}
+            {/* Scanline */}
             <div className="scanline" style={{
               position: 'absolute', top: 0, bottom: 0, width: '2px',
               background: errorMessage
                 ? 'linear-gradient(to bottom, transparent, #ef4444, transparent)'
                 : 'linear-gradient(to bottom, transparent, #00ff88, transparent)',
-              animation: 'scan 2s linear infinite'
+              animation: 'scan 2.5s linear infinite',
+              opacity: 0.5,
+              pointerEvents: 'none'
             }} />
-            <style>{`@keyframes scan { 0% { left: -20%; opacity: 0; } 50% { opacity: 1; } 100% { left: 120%; opacity: 0; } }`}</style>
           </div>
 
-          {/* Chin Piece (Restored) */}
+          {/* Chin */}
           <div style={{ position: 'absolute', bottom: -6, width: 40, height: 10, background: 'linear-gradient(135deg, #374151, #1f2937)', border: '2px solid #dc2626', borderRadius: '0 0 8px 8px' }} />
         </motion.div>
       </div>
 
-      {/* BODY/NECK (Restored Original Logic & Look) */}
+      {/* BODY */}
       <motion.div
-        animate={{ scale: isHovered ? 1.02 : 1 }}
+        animate={{ scale: isHovered ? 1.05 : 1 }}
         style={{ marginTop: '8px', width: '50px', height: '30px', background: 'linear-gradient(135deg, #374151, #1f2937)', border: '2px solid #dc2626', borderRadius: '0 0 12px 12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
       >
         <div style={{ width: '4px', height: '15px', background: isHovered ? '#00ff88' : '#22c55e', borderRadius: '2px', transition: 'background 0.3s' }} />
         <div style={{ width: '4px', height: '15px', background: isHovered ? '#3b82f6' : '#60a5fa', borderRadius: '2px', transition: 'background 0.3s' }} />
       </motion.div>
 
-      {/* USERNAME TAG */}
+      {/* USERNAME */}
       <div style={{
         marginTop: 12, padding: '8px 16px', borderRadius: '8px',
         background: 'rgba(17, 24, 39, 0.9)', border: '2px solid rgba(0, 255, 136, 0.3)',
-        fontFamily: "'Press Start 2P', monospace", fontSize: 13, color: '#00ff88', fontWeight: 'bold'
+        fontFamily: "'Press Start 2P', monospace", fontSize: 13, color: '#00ff88', fontWeight: 'bold',
+        textShadow: '0 0 5px rgba(0,255,136, 0.5)'
       }}>
         {username}: {totalPoints}
       </div>
+
+      <style>{`@keyframes scan { 0% { left: -20%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { left: 120%; opacity: 0; } }`}</style>
     </div>
   );
 };

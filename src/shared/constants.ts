@@ -74,7 +74,20 @@ export const CONFIG = {
                     Write 5 new standalone lines suitable for a landing page mascot. 
                     Keep them varied: greetings for new players, snark when hovered too long, and a final push to enter the app.
                     Return STRICT JSON: { "lines": ["...","...","...","...","..."] } and NOTHING else.`
-        }
+        },
+        INTERACTIVE: {
+            TIMEOUT_LIMIT: 30, // seconds
+            ANGER_LIMIT: 60, // 2x TIMEOUT_LIMIT
+            TIMEOUT_MSG: "That’s all you get. Inside with you. The real challenge awaits.",
+            ANGER_MSG: "I SAID MOVE ALONG!",
+            IDLE_MESSAGES: [
+                "Halt, {{username}}. Enjoy your experience.",
+                "New comer? Keep moving, we have a lot to show.",
+                "This page is not everything we have to offer.",
+                "Still lingering? Hmph.",
+                "Enough gawking. Inside."
+            ]
+        },
     },
     BROWSERLESS: {
         DEFAULT_REGION: 'production-sfo',
@@ -189,7 +202,7 @@ export const CONFIG = {
         API_ENDPOINT_TEMPLATE: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
     },
     LIMITS: {
-        DAILY_TOPIC_GEN: 1,
+        DAILY_TOPIC_GEN: 20,
     },
     DEV: {
         // [MASTER TOGGLE] If true, users in USERNAMES list are "invisible" (no scores/history saved)

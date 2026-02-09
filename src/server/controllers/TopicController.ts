@@ -126,7 +126,9 @@ export class TopicController {
                     Logger.warn(`[Generate] 🚫 Rate limit hit for ${username}`);
                     return res.status(429).json({
                         error: 'Daily generation limit reached. Come back tomorrow!',
-                        limitReached: true
+                        limitReached: true,
+                        code: 'LIMIT_REACHED',
+                        robotDialogue: "Rest now, adventurer. The forges need to cool down. You've forged enough today."
                     });
                 }
 
