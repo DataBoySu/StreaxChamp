@@ -1,121 +1,228 @@
-TASK: Landing Page & Topic Selector UI Refinement (STRICT SCOPE)
+READ THIS FIRST (MANDATORY):
+Before making ANY code changes, you must analyze and explain the current data flow end-to-end.
+This task is READ-ONLY ANALYSIS ONLY.
+❌ Do NOT refactor
+❌ Do NOT optimize
+❌ Do NOT add features
+❌ Do NOT fix bugs yet
 
-I need you to refine and visually overhaul ONLY the following areas:
+The goal is complete situational awareness so we can fix Firestore misuse safely.
 
-Landing Page (Infinity Quiz Generator)
+🎯 Objective
 
-Topic Selector UI
+Produce a forensic reconstruction of how quiz data, score data, and user state move through the system today.
 
-🚫 DO NOT TOUCH:
+This must answer:
 
-Interactive Robot logic or visuals (position/scale may be adjusted ONLY to prevent overflow)
+What data exists
 
-Topic buttons themselves (their labels, colors, click logic)
+Where it lives
 
-Quiz gameplay UI
+When it is read
 
-Creator Studio
+When it is written
 
-Any server-side logic or data flow
+Why it is written
 
-1️⃣ Scroll & Layout Bug (Critical – Must Fix First)
+What breaks if it is removed
 
-The Landing Page currently has two scrollbars (outer + inner container).
+📂 Mandatory Files to Read First
 
-Remove the inner scrollbar entirely.
+Before responding, you MUST scan these files fully:
 
-The page must support single-swipe vertical scrolling on mobile.
+agents.md
 
-Use natural document flow instead of fixed-height + overflow containers wherever possible.
+devvit_web_knowledge_base.md
 
-2️⃣ Visual Direction (Non-Negotiable)
+src/server/controllers/*
 
-Transform existing components (do not replace functionality) to follow this style:
+src/server/services/FirestoreRestService.ts
 
-Aesthetic:
+src/server/services/LeaderboardService.ts
 
-Kawaii + Cyber
+src/server/services/CacheService.ts
 
-2D pixel art with fake 3D depth (shadows, offsets, NES-style borders)
+src/client/App.tsx
 
-Libraries to Prefer:
+src/client/hooks/useQuizData.ts
 
-nes.css (buttons, containers, borders, UI affordances)
+src/client/hooks/useHistory.ts
 
-Press Start 2P font (headings, buttons, labels)
+src/client/splash.tsx
 
-Framer Motion (subtle, low-cost animations only)
+Any Redis usage (redis, ioredis, upstash, etc.)
 
-Feel free to install external css and frontend frameworks if you believe existing tech stack is insufficient for the task.
+🧠 Deliverable Format (STRICT)
 
-Theme Lock:
+You MUST output only analysis, in the following structure:
 
-The Landing Page and Topic Selector must look identical whether Reddit is in light mode or dark mode.
+1️⃣ Data Entities Inventory
 
-Ignore Reddit theme signals.
+List every logical data entity in the app, including but not limited to:
 
-Explicitly set background, text, and surface colors.
+Daily quiz
 
-3️⃣ Color & Contrast Rules
+Topic quiz
 
-The Interactive Robot is the visual anchor — all colors must complement it.
+Custom quiz
 
-Avoid pure black backgrounds (they kill NES-style depth).
+Leaderboard entry
 
-Prefer:
+User play record
 
-Warm parchment / soft neutral backgrounds
+Replay detection state
 
-High-contrast borders
+Splash metadata
 
-Clear separation between layers (background → surface → interactive)
+Redis keys
 
-4️⃣ Space-Aware Design (Very Important)
+For EACH entity, specify:
 
-Rework spacing so content breathes on mobile:
+Entity Name:
+Source of Truth:
+Stored In (Memory / Firestore / Redis / Client State):
+Mutability (Immutable / Append-only / Mutable):
+Expected Lifetime:
 
-No text hugging borders
+2️⃣ Read Path Timeline (Critical)
 
-No stacked elements colliding when the robot dialogue appears or disappears
+For each of these user actions, trace the exact data reads:
 
-Robot dialogue must never clip or push content off-screen.
+User opens app
 
-If needed, reserve vertical “safe space” above or below the robot without changing its logic.
+User sees splash
 
-5️⃣ Topic Selector UI
+User starts quiz
 
-Restyle the Topic Selector container using the same NES + pixel + cyber aesthetic.
+User answers a question
 
-Improve readability and spacing.
+User finishes quiz
 
-Keep it scrollable if needed, but do not nest scrollbars.
+User replays quiz
 
-Topic buttons themselves must remain untouched.
+User returns to splash
 
-6️⃣ Performance Constraints
+For each step:
 
-Animations must be cheap (opacity, translate, scale only).
+What data is read?
+From where?
+Why?
+Is it redundant?
 
-No continuous animations, no heavy blur filters, no large shadow stacks.
+3️⃣ Write Path Timeline (Critical)
 
-The app currently slows down during play — do not add anything that increases runtime cost.
+Trace every write triggered by:
 
-7️⃣ Deliverables
+Quiz generation
 
-Refactor or restyle existing components only.
+Quiz completion
 
-No visual regressions compared to the current Landing Page.
+Replay
 
-The end result should feel:
+Leaderboard update
 
-Gamer-grade
+Comment posting
 
-Intentional
+Stats aggregation
 
-Consistent
+For each write:
 
-NES-inspired without parody
+What is written?
+Why is it written?
+Is it idempotent?
+Can it be delayed or removed?
 
-❗If a requested change risks breaking other screens, do not implement it — instead, leave a comment explaining why.
+4️⃣ Firestore Usage Audit (Red Flag Section)
 
-Do not proceed beyond Landing Page & Topic Selector.
+Create a table:
+
+Collection	Written By	Read By	Frequency	Required?
+
+Then answer:
+
+Which Firestore reads happen on every splash
+
+Which writes happen on every play
+
+Which ones are purely defensive / legacy
+
+Which ones cause duplicate or conflicting state
+
+5️⃣ Cache & Memory Reality Check
+
+Explain:
+
+What data is cached in memory
+
+What data is cached in Redis
+
+What data is not cached at all
+
+What breaks if the server restarts
+
+What is incorrectly treated as stateless
+
+6️⃣ Replay & Duplication Analysis
+
+Explain how the system currently decides:
+
+Is this a replay?
+
+Should a score be recorded?
+
+Should a leaderboard entry be overwritten or appended?
+
+Identify all places where replay logic is inferred indirectly (dangerous).
+
+7️⃣ Single Biggest Design Mismatch
+
+Answer plainly:
+
+“The system currently behaves like ________,
+but the intended design is ________.”
+
+8️⃣ Safe Fix Zones (NO CODE)
+
+Without writing code, list:
+
+What can be safely removed
+
+What must remain for correctness
+
+What must be centralized into memory
+
+What must never be fetched on splash again
+
+9️⃣ Final Verdict
+
+Conclude with:
+
+Is Firestore currently overused, misused, or correctly used?
+
+Is the app behaving like a game server or a CRUD app?
+
+What one principle should guide the rewrite?
+
+⛔ HARD RULES
+
+❌ Do NOT propose solutions yet
+
+❌ Do NOT suggest architecture changes
+
+❌ Do NOT touch UI
+
+❌ Do NOT refactor code
+
+This is pure forensic analysis.
+
+✅ Success Criteria
+
+A good answer will make it possible to:
+
+Delete 30–50% of Firestore reads
+
+Move critical state to memory confidently
+
+Prevent duplicate leaderboard writes permanently
+
+Design the next system without guessing

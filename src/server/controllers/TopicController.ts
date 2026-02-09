@@ -99,7 +99,7 @@ export class TopicController {
             }
 
             // 0. CHECK RATE LIMITS
-            const { redis } = await import('@devvit/web/server');
+            const { RateLimitService } = await import('../services/RateLimitService');
 
             // Resolve username: try context first, then userKey, then 'anon'
             let username = 'anon';
@@ -118,23 +118,20 @@ export class TopicController {
             const isDev = CONFIG.DEV.USERNAMES.includes(username);
 
             if (!isDev) {
-                const today = new Date().toISOString().slice(0, 10);
-                const limitKey = `limit:topic_gen:${username}:${today}`;
-                const currentCount = Number((await redis.get(limitKey)) ?? 0);
+                const limitCheck = await RateLimitService.checkLimit(username);
 
-                if (currentCount >= CONFIG.LIMITS.DAILY_TOPIC_GEN) {
-                    Logger.warn(`[Generate] 🚫 Rate limit hit for ${username}`);
+                if (!limitCheck.allowed) {
+                    const isGlobal = limitCheck.reason === 'global';
+                    const message = isGlobal ? CONFIG.ERRORS.LIMIT_REACHED.GLOBAL : CONFIG.ERRORS.LIMIT_REACHED.USER;
+
                     return res.status(429).json({
-                        error: 'Daily generation limit reached. Come back tomorrow!',
+                        error: message,
                         limitReached: true,
+                        reason: limitCheck.reason, // 'user' or 'global'
                         code: 'LIMIT_REACHED',
                         robotDialogue: "Rest now, adventurer. The forges need to cool down. You've forged enough today."
                     });
                 }
-
-                // Increment limit (expiry 24h)
-                await redis.incrBy(limitKey, 1);
-                await redis.expire(limitKey, 60 * 60 * 24);
             } else {
                 Logger.info(`[Generate] 🛡️ Dev bypass active for ${username}`);
             }
@@ -148,7 +145,7 @@ export class TopicController {
 
             let topicData: any, quizData: any, model: string, latencyMs: number;
             try {
-                const generated = await generateUnifiedContent(topic);
+                const generated = await generateUnifiedContent(topic, { isDev });
                 topicData = generated.topic;
                 quizData = generated.quiz;
                 model = generated.model;
@@ -320,6 +317,12 @@ export class TopicController {
             await cache.del('topics_list');
             await cache.del('landing_summary');
             Logger.info('[Generate] ✓ Caches invalidated', { keys: ['topics_list', 'landing_summary'] });
+
+            // Increment Rate Limit Counters (Only on success)
+            if (!isDev) {
+                const { RateLimitService } = await import('../services/RateLimitService');
+                await RateLimitService.increment(username);
+            }
 
             res.status(200).json({
                 title,

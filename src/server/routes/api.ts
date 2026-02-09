@@ -7,10 +7,14 @@ import { LeaderboardController } from '../controllers/LeaderboardController';
 import { LandingController } from '../controllers/LandingController';
 import { HistoryController } from '../controllers/HistoryController'; // Added import
 import { FirestoreRestService } from '../services/FirestoreRestService';
+import { LimitController } from '../controllers/LimitController';
 import { context } from '@devvit/web/server';
 import { reddit, redis } from '@devvit/web/server';
 
 const router = Router();
+
+// --- Limits ---
+router.get('/limits', LimitController.getLimits); // NEW: Frontend blocking
 
 // --- Topics ---
 router.get('/topics', TopicController.listTopics);

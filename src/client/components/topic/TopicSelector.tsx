@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import TopicButtonNew from './TopicButton';
 import './animations.css';
 import FirebaseTopics, { TopicDoc } from '../../services/FirebaseTopics';
@@ -28,15 +29,16 @@ const toTitleCase = (s: string) =>
     .filter(Boolean)
     .join(' ');
 
+import { useSystemStatus } from '../../hooks/useSystemStatus'; // NEW
+
 export const TopicSelector: React.FC<{
   onClose?: () => void;
-  initialQuery?: string; // NEW: Pre-fill search box with this value
-  // onTopicReady now provides the generated quiz (if successful) so parent can gate UI
+  initialQuery?: string;
   onTopicReady?: (topic: { title: string; slug: string; quizId?: string; quiz?: { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[] }; bonus?: { question: string; options: string[]; correctIndex: number } | null }) => void;
-  onError?: (code: string, robotDialogue: string) => void; // NEW: Callback for robot errors
+  onError?: (code: string, robotDialogue: string, persistent?: boolean) => void;
 }> = ({ onClose, initialQuery, onTopicReady, onError }) => {
   const [topics, setTopics] = useState<TopicDoc[]>([]);
-  const [query, setQuery] = useState(initialQuery || ''); // Initialize with initialQuery
+  const [query, setQuery] = useState(initialQuery || '');
   const [addingTopic, setAddingTopic] = useState(false);
   const [progress, setProgress] = useState(0);
   const [generatingSlug, setGeneratingSlug] = useState<string | null>(null);
@@ -45,8 +47,31 @@ export const TopicSelector: React.FC<{
   const [highlightedTopic] = useState('');
   const [loading] = useState(false);
   const [popularSlugs] = useState<string[]>(['science', 'technology', 'history', 'movies', 'sports']);
-  const [limitReached, setLimitReached] = useState(false);
+  const [popupMessage, setPopupMessage] = useState<string | null>(null);
+
+  // Auto-dismiss popup after 3s
+  useEffect(() => {
+    if (popupMessage) {
+      const timer = setTimeout(() => setPopupMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [popupMessage]);
+
+  // REFACTORED: Use centralized hook
+  const { status, limits, checkSystem } = useSystemStatus();
+  const limitReached = status === 'limit_reached' || status === 'maintenance';
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Effect to trigger error message and popup on limit reached
+  useEffect(() => {
+    if (limitReached && limits) {
+      const msg = limits.global.remaining <= 0
+        ? "Global system capacity reached. Generation is currently paused."
+        : "Daily generation limit reached for your account. Please return tomorrow.";
+      onError?.(limits.global.remaining <= 0 ? 'GLOBAL_LIMIT' : 'GEN_LIMIT', msg, true);
+      setPopupMessage(msg); // Show popup instead of redirecting
+    }
+  }, [limitReached, limits, onError]);
 
 
   // Fetch topics from REST API with client-side caching
@@ -106,7 +131,10 @@ export const TopicSelector: React.FC<{
 
   useEffect(() => {
     void fetchTopics();
+    // void checkLimits(); // REMOVED: Handled by hook
   }, []);
+
+  // checkLimits removed
 
   // Backoff polling for topic refresh
   const { reset: resetTopicPolling } = useBackoffPolling(
@@ -231,7 +259,7 @@ export const TopicSelector: React.FC<{
               onError?.(errorData.code, errorData.robotDialogue);
             }
             if (errorData.limitReached || errorData.code === 'LIMIT_REACHED') {
-              setLimitReached(true);
+              void checkSystem(); // Force refresh status
             }
             throw new Error(errorData.message || 'Generate failed');
           } catch (parseErr) {
@@ -513,7 +541,46 @@ export const TopicSelector: React.FC<{
         message={addingTopic ? "loading" : "generating quiz"}
       />
 
-    </div >
+      {/* Popup Toast - Auto-dismissing Limit Alert */}
+      <AnimatePresence>
+        {popupMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            style={{
+              position: 'fixed',
+              bottom: '32px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 100,
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              className="nes-container is-dark is-rounded"
+              style={{
+                padding: '1rem 1.5rem',
+                border: '4px solid #ef4444',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
+                maxWidth: '400px',
+              }}
+            >
+              <p style={{
+                margin: 0,
+                color: 'white',
+                fontFamily: "'Press Start 2P', cursive",
+                fontSize: '0.7rem',
+                lineHeight: '1.6',
+                textAlign: 'center',
+              }}>
+                {popupMessage}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 

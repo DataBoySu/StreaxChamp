@@ -222,9 +222,16 @@ function validateQuizPayload(quiz: any): { valid: boolean; errors: string[] } {
  * Atomic pipeline to generate both topic metadata and a quiz in a single LLM pass.
  * Uses strict JSON response schema and atomic persistence.
  */
-export async function generateUnifiedContent(rawTopic: string): Promise<{ topic: any, quiz: any, model: string, latencyMs: number }> {
+export async function generateUnifiedContent(rawTopic: string, options: { isDev?: boolean } = {}): Promise<{ topic: any, quiz: any, model: string, latencyMs: number }> {
     await validateGeminiKey();
     if (!GEMINI_API_KEY) throw AppError.aiFailure('NO_API_KEY');
+
+    // KILL SWITCH: If global cap is 0, disable ALL generation (System & User)
+    // BYPASS: Allowed for Developers
+    if (CONFIG.LIMITS.dailyGlobalGen === 0 && !options.isDev) {
+        Logger.warn('[UnifiedGen] 🛑 Kill Switch Active (Global Limit 0)');
+        throw new AppError('AI_KILL_SWITCH_ACTIVE', 503);
+    }
 
     const model = (CONFIG.GEMINI.BACKUP_CONTENT_MODELS[0] || CONFIG.GEMINI.BACKUP_CONTENT_MODELS[1]) as string;
     const start = Date.now();

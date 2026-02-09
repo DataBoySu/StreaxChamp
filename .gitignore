@@ -17,6 +17,10 @@ yarn-error.log*
 dist/
 dist-*/
 .devvit-debug.log*
+project_details.md
+forensic_snapshot.md
+learnings.md
+devvit_web_knowledge_base.md
 
 # Build and IDE
 .agent/

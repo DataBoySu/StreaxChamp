@@ -7,17 +7,9 @@ interface RobotError {
     code: string;
     robotDialogue: string;
     timestamp: number;
+    persistent?: boolean; // New flag
 }
 
-/**
- * Custom hook for managing robot error messages with deduplication and queueing.
- * 
- * Features:
- * - Deduplicates same error codes (only shown once)
- * - Queues different errors to show sequentially
- * - Auto-clears after 3s (matches robot dialogue timeout)
- * - Returns current error being displayed
- */
 export const useRobotError = () => {
     const [errorQueue, setErrorQueue] = useState<RobotError[]>([]);
     const [currentError, setCurrentError] = useState<RobotError | null>(null);
@@ -26,19 +18,26 @@ export const useRobotError = () => {
     /**
      * Add an error to the queue (with deduplication)
      */
-    const addError = useCallback((code: string, robotDialogue: string) => {
+    const addError = useCallback((code: string, robotDialogue: string, persistent: boolean = false) => {
         setErrorQueue(prev => {
-            // Check if same error code already in queue
-            const exists = prev.find(e => e.code === code);
+            // Check if same error code already in queue or currently displayed
+            const exists = prev.find(e => e.code === code) || (currentError?.code === code);
             if (exists) {
+                // If existing error is not persistent but new one IS, upgrade it? 
+                // For simplicity, just ignore duplicates for now.
+                // But if we want to force a persistent error that was previously transient, we might need logic.
+                // Leaning towards: if it matches current error and is persistent, update current.
+                if (currentError?.code === code && persistent && !currentError.persistent) {
+                    setCurrentError({ ...currentError, persistent: true });
+                }
                 console.log(`[RobotError] Duplicate error ${code} ignored`);
-                return prev; // Skip duplicate
+                return prev;
             }
 
-            console.log(`[RobotError] Queueing error: ${code}`);
-            return [...prev, { code, robotDialogue, timestamp: Date.now() }];
+            console.log(`[RobotError] Queueing error: ${code} (persistent=${persistent})`);
+            return [...prev, { code, robotDialogue, timestamp: Date.now(), persistent }];
         });
-    }, []);
+    }, [currentError]);
 
     /**
      * Clear current error and queue (for manual reset)
@@ -55,21 +54,26 @@ export const useRobotError = () => {
             const next = errorQueue[0];
             const rest = errorQueue.slice(1);
 
-            if (!next) return; // Type guard
+            if (!next) return;
 
             console.log(`[RobotError] Displaying: ${next.code} - "${next.robotDialogue}"`);
 
             setCurrentError(next);
-            setErrorQueue(rest); setIsDisplaying(true);
+            setErrorQueue(rest);
+            setIsDisplaying(true);
 
-            // Auto-clear after 3s (matches robot dialogue timeout)
-            const timeout = setTimeout(() => {
-                console.log(`[RobotError] Cleared: ${next.code}`);
-                setIsDisplaying(false);
-                setCurrentError(null);
-            }, 3000);
+            // Auto-clear ONLY if not persistent
+            if (!next.persistent) {
+                const timeout = setTimeout(() => {
+                    console.log(`[RobotError] Cleared: ${next.code}`);
+                    setIsDisplaying(false);
+                    setCurrentError(null);
+                }, 3000); // 3s for normal errors
 
-            return () => clearTimeout(timeout);
+                return () => clearTimeout(timeout);
+            } else {
+                console.log(`[RobotError] Persistent error set: ${next.code}. Waiting for manual clear.`);
+            }
         }
     }, [errorQueue, isDisplaying]);
 

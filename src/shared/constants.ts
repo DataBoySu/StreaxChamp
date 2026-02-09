@@ -202,11 +202,19 @@ export const CONFIG = {
         API_ENDPOINT_TEMPLATE: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
     },
     LIMITS: {
-        DAILY_TOPIC_GEN: 20,
+        dailyUserGen: 1, // Max topics a single user can generate per day
+        dailyGlobalGen: 20, // Max topics the entire platform can generate per day
+    },
+    ERRORS: {
+        LIMIT_REACHED: {
+            USER: "Daily generation limit reached for your account. Please return tomorrow.",
+            GLOBAL: "Global system capacity reached. Generation is currently paused."
+        },
+        CIRCUIT_BROKEN: "System offline. Maintenance in progress."
     },
     DEV: {
         // [MASTER TOGGLE] If true, users in USERNAMES list are "invisible" (no scores/history saved)
-        SAFE_MODE: true,
+        SAFE_MODE: false,
         USERNAMES: ['Pretend-Pangolin-846'],
     }
 };

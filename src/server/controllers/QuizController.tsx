@@ -6,6 +6,7 @@ import { generateUnifiedContent, validateGeminiKey } from '../services/GeminiSer
 import { CacheService } from '../services/CacheService';
 import { LeaderboardService } from '../services/LeaderboardService'; // NEW
 import { reddit, redis } from '@devvit/web/server';
+import { CONFIG } from '../../shared/constants';
 
 /**
  * Controller for managing quizzes, including daily bonus questions and full daily/topic quizzes.
@@ -31,8 +32,16 @@ export class QuizController {
                 });
             }
 
+            // Resolve username for dev bypass
+            let username = 'anon';
+            try {
+                const curr = await reddit.getCurrentUsername();
+                if (curr) username = curr;
+            } catch { /* ignore */ }
+            const isDev = CONFIG.DEV.USERNAMES.includes(username);
+
             // Generate if missing
-            const gen = await generateUnifiedContent('Ultra Obscure Interdisciplinary Trivia');
+            const gen = await generateUnifiedContent('Ultra Obscure Interdisciplinary Trivia', { isDev });
             const q = gen.quiz?.questions?.[0];
 
             if (!q) return res.json(null);
@@ -55,7 +64,7 @@ export class QuizController {
                 });
             }
             return res.json(null);
-        } catch (e) {
+        } catch (e: any) {
             Logger.error('[QuizBonus] Failed', e);
             res.status(500).json({ error: 'BONUS_FAIL' });
         }
@@ -115,8 +124,16 @@ export class QuizController {
                     ];
                     const dailyTopic = topicRotation[dayOfWeek];
 
+                    // Resolve username for dev bypass
+                    let username = 'anon';
+                    try {
+                        const curr = await reddit.getCurrentUsername();
+                        if (curr) username = curr;
+                    } catch { /* ignore */ }
+                    const isDev = CONFIG.DEV.USERNAMES.includes(username);
+
                     Logger.db('[DailyQuiz] Generating new quiz for today', { date: todayStr, topic: dailyTopic, dayOfWeek });
-                    const generated = await generateUnifiedContent(dailyTopic || 'General Knowledge');
+                    const generated = await generateUnifiedContent(dailyTopic || 'General Knowledge', { isDev });
                     const questions = generated.quiz.questions.map((q: any) => ({
                         id: `q${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                         question: q.question,
@@ -373,11 +390,14 @@ export class QuizController {
                 return res.json({ id: quizToServe.id, date: quizToServe.date, topicSlug: slug, ...quizToServe });
             }
 
+            // Dev Bypass check
+            const isDev = CONFIG.DEV.USERNAMES.includes(effectiveUserId || '');
+
             // Generation logic
             const topicBase = await fs.getTopic(slug);
             if (!topicBase) return res.status(404).json({ error: 'TOPIC_NOT_FOUND' });
 
-            const generated = await generateUnifiedContent(String(topicBase.title || 'General Knowledge'));
+            const generated = await generateUnifiedContent(String(topicBase.title || 'General Knowledge'), { isDev });
 
             const questions = generated.quiz.questions.map((q: any) => ({
                 id: `q${Date.now()}`,

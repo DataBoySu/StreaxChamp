@@ -21,7 +21,6 @@ import { GapView } from './components/quiz/GapView';
 import { BonusQuestionView } from './components/quiz/BonusQuestionView';
 import { NoTopicPrompt } from './components/modals/NoTopicPrompt';
 import { GameSidebar } from './components/dashboard/GameSidebar';
-import { GlobalDashboard } from './components/dashboard/GlobalDashboard';
 import { MessageDisplay } from './components/ui/MessageDisplay';
 import { KawaiiLoader } from './components/loading/KawaiiLoader';
 import { ExplanationScreen } from './components/quiz/ExplanationScreen';
@@ -244,7 +243,7 @@ export const App = () => {
   const { history: globalHistory, loading: globalHistoryLoading, savePlay, hasPlayed } = useHistory(!quizStarted && !isCreating, pollingEnabled && !isCreating);
 
   // Robot error message queue (for user-friendly error feedback)
-  const { currentError, addError } = useRobotError();
+  const { currentError, addError, queueLength, clearErrors } = useRobotError();
 
   // Check for start_mode from Splash (passed via localStorage)
   useEffect(() => {
@@ -869,10 +868,10 @@ export const App = () => {
           addError('quiz_load_failed', "I couldn't load that quiz. Please try again.");
           // Do NOT close menu so user can retry
         }}
-        onError={(code, robotDialogue) => {
+        onError={(code, robotDialogue, persistent) => {
           setShowTopicMenu(false);
           setHotTopicQuery(''); // Clear the query
-          addError(code, robotDialogue);
+          addError(code, robotDialogue, persistent);
         }}
       />
     );
@@ -1090,6 +1089,18 @@ export const App = () => {
                     onClearTopic={() => setSelectedTopic(null)}
                     userRank={userGlobalRank}
                     timerDuration={CONFIG.GAME.TIMER_DURATION}
+                    currentError={currentError}
+                    queueLength={queueLength}
+                    clearErrors={clearErrors}
+                    landingSummary={landingSummary}
+                    landingSummaryLoading={landingSummaryLoading}
+                    onSelectTopic={(_slug, title) => {
+                      setHotTopicQuery(title);
+                      setShowTopicMenu(true);
+                    }}
+                    authUser={authUser}
+                    history={globalHistory}
+                    historyLoading={globalHistoryLoading}
                   />
                 ) : showExplanation && explanationData ? (
                   <ExplanationScreen
@@ -1136,8 +1147,8 @@ export const App = () => {
             </div>
           </div>
 
-          {/* Sidebar (Leaderboard) */}
-          {(!quizStarted || showScore) && !isCreating && (
+          {/* Sidebar (Leaderboard) - Only show when quiz is active/finished, not on landing page */}
+          {(quizStarted || showScore) && !isCreating && (
             <GameSidebar
               showScore={showScore}
               selectedTopicTitle={selectedTopic ? selectedTopic.title : 'Daily Quiz'}
@@ -1149,19 +1160,8 @@ export const App = () => {
           )}
         </div>
       </div>
-      {/* Leaderboard + Hot Topics */}
-      {!quizStarted && !isCreating && (
-        <GlobalDashboard
-          landingSummaryLoading={landingSummaryLoading}
-          landingSummary={landingSummary}
-          authUser={authUser}
-          onSelectTopic={(_slug, title) => {
-            // Open TopicSelector with this topic pre-filled in search
-            setHotTopicQuery(title); // Store the query to pass to TopicSelector
-            setShowTopicMenu(true); // Open the selector
-          }}
-        />
-      )}
+      {/* Leaderboard + Hot Topics - Now integrated into LandingHero */}
+      {/* Removed separate GlobalDashboard rendering */}
 
       {showArchive && (
         <DailyQuizArchive

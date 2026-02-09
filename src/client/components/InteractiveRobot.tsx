@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
 import { CONFIG } from '../../shared/constants';
 
+import { useSystemStatus } from '../hooks/useSystemStatus'; // NEW
+
 interface InteractiveRobotProps {
   username: string;
   errorMessage?: string | undefined;
@@ -17,6 +19,9 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [blinkOpen, setBlinkOpen] = useState(true);
   const [timeOnPage, setTimeOnPage] = useState(0);
+
+  // REFACTORED: Autonomous System Check
+  const { status: systemStatus } = useSystemStatus();
 
   // Interaction States
   const [isVisorHovered, setIsVisorHovered] = useState(false);
@@ -79,6 +84,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
 
   // --- BLINKING LOGIC ---
   useEffect(() => {
+    // errorMessage is temporary, so it's okay to stay open during its display
     if (errorMessage) { setBlinkOpen(true); return; }
 
     // Recursive timeout for random blinking
@@ -105,12 +111,30 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
   }, [hasPlayed]);
 
   // --- MESSAGE LOGIC ---
+  const [tempSystemMessage, setTempSystemMessage] = useState<string | null>(null);
+  const lastSystemStatus = useRef(systemStatus);
+
+  useEffect(() => {
+    // If status changed to a "bad" state, show a temporary message
+    if (systemStatus !== lastSystemStatus.current && systemStatus !== 'ok' && systemStatus !== 'offline') {
+      const msg = systemStatus === 'maintenance' ? "System is in maintenance mode!" : "We've hit our generation limit!";
+      setTempSystemMessage(msg);
+      // Clean up after 6 seconds (1.5 cycles)
+      const timer = setTimeout(() => setTempSystemMessage(null), 6000);
+      lastSystemStatus.current = systemStatus;
+      return () => clearTimeout(timer);
+    }
+    lastSystemStatus.current = systemStatus;
+  }, [systemStatus]);
+
   const messages = useMemo(() => {
     if (errorMessage) return [errorMessage];
+    if (tempSystemMessage) return [tempSystemMessage];
+
     return CONFIG.ROBOT.INTERACTIVE.IDLE_MESSAGES.map(msg =>
       msg.replace('{{username}}', username)
     );
-  }, [username, errorMessage]);
+  }, [username, errorMessage, tempSystemMessage]);
 
   // --- MESSAGE CYCLE LOGIC ---
   const [isPlaying, setIsPlaying] = useState(false);
@@ -138,6 +162,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
   const currentFace = useMemo(() => {
     if (forceState) return forceState;
     if (errorMessage) return 'dead';
+
     // If user has waited too long (Angry Mode)
     if (timeOnPage > ANGER_LIMIT && !hasPlayed) return 'angry';
 
@@ -197,7 +222,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
       ref={containerRef}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        padding: '20px', width: '100%', minHeight: '220px', position: 'relative'
+        padding: '0px', width: '100%', minHeight: '180px', position: 'relative'
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -248,7 +273,7 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
         <motion.div
           whileHover={{ scale: 1.03 }}
           style={{
-            position: 'relative', width: '140px', height: '120px', marginTop: 30,
+            position: 'relative', width: '140px', height: '120px', marginTop: 10,
             background: 'linear-gradient(135deg, #374151 0%, #111827 100%)',
             borderRadius: '24px',
             border: errorMessage ? '3px solid #ef4444' : '3px solid #dc2626',
