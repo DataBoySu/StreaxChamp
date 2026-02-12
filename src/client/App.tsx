@@ -928,10 +928,10 @@ export const App = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={toggleMute}
-              className={`nes-btn ${!isMuted ? 'is-success' : ''}`}
+              className={`nes-btn ${!isMuted ? 'is-warning' : ''}`}
               style={{
                 fontFamily: "'Press Start 2P', cursive",
-                fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
+                fontSize: 'clamp(0.6rem, 1.8vw, 0.75rem)',
                 borderRadius: 0,
               }}
               aria-label={isMuted ? 'Unmute music' : 'Mute music'}

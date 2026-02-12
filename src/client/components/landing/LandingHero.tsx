@@ -259,14 +259,14 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                                 backgroundColor: 'rgba(255, 105, 180, 0.05)',
                                 border: '3px solid #ff69b4',
                                 boxShadow: '0 0 15px rgba(255, 105, 180, 0.3)',
-                                padding: '1rem 0.5rem',
-                                minHeight: '100px',
+                                padding: '0.75rem 0.5rem',
+                                minHeight: '80px',
                             }}
                         >
                             <motion.div
                                 style={{
                                     fontFamily: "'Press Start 2P', cursive",
-                                    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+                                    fontSize: 'clamp(2rem, 5vw, 2.5rem)',
                                     color: '#ff69b4',
                                     textShadow: '0 0 10px #ff69b4',
                                 }}

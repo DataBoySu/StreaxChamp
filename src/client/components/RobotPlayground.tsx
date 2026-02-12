@@ -133,16 +133,16 @@ export const RobotPlayground: React.FC<RobotPlaygroundProps> = ({
                             className="nes-container is-dark"
                             style={{
                                 position: 'absolute',
-                                top: 0,
+                                top: '-10%',
                                 right: 0,
                                 bottom: 0,
-                                width: '50%',
-                                minWidth: '280px',
+                                width: '60%',
+                                minWidth: '320px',
                                 zIndex: 60,
                                 background: '#212529',
                                 border: '4px solid #dc2626',
                                 borderRadius: 0,
-                                boxShadow: 'none',
+                                boxShadow: '-8px 8px 0px rgba(0, 0, 0, 0.5)',
                                 overflowY: 'auto',
                                 padding: '1.5rem',
                             }}
