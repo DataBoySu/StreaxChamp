@@ -62,9 +62,15 @@ export const TopicSelector: React.FC<{
   const limitReached = status === 'limit_reached' || status === 'maintenance';
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // REMOVED: Effect that was blocking topic selector access when limits reached
-  // Users should be able to browse and play existing quizzes even at limit
-  // Limit enforcement is handled by disabled "Add" button (lines 392-404)
+  // Show notification when limit reached, but DON'T close selector
+  // Users can browse and play existing quizzes, just can't generate new ones
+  useEffect(() => {
+    if (limitReached) {
+      // Trigger notification/robot dialogue without closing selector
+      const msg = "Daily generation limit reached. You can still play existing quizzes!";
+      onError?.('GEN_LIMIT', msg, false); // false = don't close selector
+    }
+  }, [limitReached, onError]);
 
 
   // Fetch topics from REST API with client-side caching
@@ -339,18 +345,15 @@ export const TopicSelector: React.FC<{
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder={limitReached ? "Daily Limit Reached (20/20)" : "Search or add topics..."}
-              className={`nes-input w-full ${limitReached ? 'is-disabled' : ''}`}
+              placeholder={limitReached ? "Search existing topics (limit reached)" : "Search or add topics..."}
+              className="nes-input w-full"
               style={{
                 fontFamily: "'Press Start 2P', cursive",
                 fontSize: 'clamp(0.625rem, 2vw, 0.875rem)',
                 padding: '0.75rem 1rem',
-                opacity: limitReached ? 0.7 : 1,
-                cursor: limitReached ? 'not-allowed' : 'text'
               }}
               aria-label="Search or add topics"
               autoComplete="off"
-              disabled={limitReached}
             />
           </div>
 
