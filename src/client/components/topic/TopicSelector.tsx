@@ -58,20 +58,13 @@ export const TopicSelector: React.FC<{
   }, [popupMessage]);
 
   // REFACTORED: Use centralized hook
-  const { status, limits, checkSystem } = useSystemStatus();
+  const { status, checkSystem } = useSystemStatus();
   const limitReached = status === 'limit_reached' || status === 'maintenance';
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Effect to trigger error message and popup on limit reached
-  useEffect(() => {
-    if (limitReached && limits) {
-      const msg = limits.global.remaining <= 0
-        ? "Global system capacity reached. Generation is currently paused."
-        : "Daily generation limit reached for your account. Please return tomorrow.";
-      onError?.(limits.global.remaining <= 0 ? 'GLOBAL_LIMIT' : 'GEN_LIMIT', msg, true);
-      setPopupMessage(msg); // Show popup instead of redirecting
-    }
-  }, [limitReached, limits, onError]);
+  // REMOVED: Effect that was blocking topic selector access when limits reached
+  // Users should be able to browse and play existing quizzes even at limit
+  // Limit enforcement is handled by disabled "Add" button (lines 392-404)
 
 
   // Fetch topics from REST API with client-side caching
