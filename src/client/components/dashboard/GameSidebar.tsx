@@ -13,7 +13,7 @@ interface HistoryEntry {
     slug: string;
     title: string;
     score?: number;
-    ts: number;
+    timestamp: number; // Changed from ts to match server response
     nickname?: string;
 }
 
@@ -112,9 +112,7 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
                                         </div>
                                     )}
                                     {history.map((h, i) => {
-                                        // Convert timestamp to milliseconds if it's in seconds
-                                        const timestamp = h.ts < 10000000000 ? h.ts * 1000 : h.ts;
-                                        const timeAgo = getTimeAgo(timestamp);
+                                        const timeAgo = getTimeAgo(h.timestamp || Date.now());
                                         return (
                                             <div
                                                 key={h.id || i}
