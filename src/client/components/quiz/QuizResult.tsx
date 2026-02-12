@@ -2,8 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { CelebrationBackground } from './CelebrationBackground';
 import { ScoreFace } from './ScoreFace';
-// import { HotTopics } from '../../HotTopics'; // HotTopics is separate in the grid layout, not inside QuizResult card usually.
-// In App.tsx, HotTopics was below the card. QuizResult replaces the card content.
 
 interface QuizResultProps {
     score: number;
@@ -18,10 +16,14 @@ export const QuizResult: React.FC<QuizResultProps> = ({
     onPlayAgain,
     onReset,
 }) => {
+    const percentage = (score / totalQuestions) * 100;
+    const isExcellent = percentage >= 80;
+    const isGood = percentage >= 60;
+
     return (
         <motion.div
             key="score"
-            className="text-center py-12"
+            className="text-center py-8"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
@@ -31,7 +33,17 @@ export const QuizResult: React.FC<QuizResultProps> = ({
             {/* Celebration Background Animation */}
             <CelebrationBackground score={score} />
 
-            <div className="mb-8 relative z-20">
+            {/* Main Result Card - NES.css Dark Container */}
+            <div
+                className="nes-container is-dark relative z-20 mx-auto max-w-2xl"
+                style={{
+                    borderRadius: 0,
+                    background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(31, 41, 55, 0.95))',
+                    border: '4px solid #dc2626',
+                    boxShadow: '0 0 30px rgba(220, 38, 38, 0.4), 8px 8px 0px rgba(0, 0, 0, 0.5)',
+                }}
+            >
+                {/* Robot/Score Face */}
                 <motion.div
                     className="mb-6"
                     initial={{ scale: 0 }}
@@ -40,136 +52,117 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                 >
                     <ScoreFace score={score} totalQuestions={totalQuestions} />
                 </motion.div>
-                <h2 className="text-4xl md:text-5xl font-bold mb-6 text-center">
+
+                {/* Title */}
+                <h2
+                    style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+                        color: '#00ff88',
+                        textShadow: '0 0 20px rgba(0, 255, 136, 0.5)',
+                        marginBottom: '1.5rem',
+                    }}
+                >
                     Quiz Complete!
                 </h2>
-                <div className="text-center mb-6">
-                    <motion.p
-                        className="text-2xl md:text-3xl mb-4 font-semibold"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
+
+                {/* Score Display */}
+                <div className="mb-6">
+                    <p
+                        style={{
+                            fontFamily: "'VT323', monospace",
+                            fontSize: 'clamp(1rem, 2.5vw, 1.25rem)',
+                            color: '#9ca3af',
+                            marginBottom: '1rem',
+                        }}
                     >
                         Your Final Score:
-                    </motion.p>
+                    </p>
+
                     <motion.div
-                        className="relative inline-block"
+                        className="nes-container is-dark inline-block"
+                        style={{
+                            borderRadius: 0,
+                            background: isExcellent
+                                ? 'linear-gradient(135deg, rgba(220, 38, 38, 0.2), rgba(239, 68, 68, 0.2))'
+                                : isGood
+                                    ? 'linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(167, 139, 250, 0.2))'
+                                    : 'linear-gradient(135deg, rgba(107, 114, 128, 0.2), rgba(156, 163, 175, 0.2))',
+                            border: `4px solid ${isExcellent ? '#dc2626' : isGood ? '#7c3aed' : '#6b7280'}`,
+                            boxShadow: isExcellent
+                                ? '0 0 25px rgba(220, 38, 38, 0.4)'
+                                : isGood
+                                    ? '0 0 25px rgba(124, 58, 237, 0.4)'
+                                    : '0 0 15px rgba(107, 114, 128, 0.3)',
+                            padding: '1.5rem 2.5rem',
+                        }}
                         initial={{ scale: 0, rotate: -180 }}
                         animate={{ scale: 1, rotate: 0 }}
                         transition={{ delay: 0.3, type: 'spring', damping: 8 }}
-                        style={{
-                            background:
-                                score >= 4
-                                    ? 'linear-gradient(45deg, #FFD700, #FFA500, #FF6B6B)'
-                                    : score >= 3
-                                        ? 'linear-gradient(45deg, #4ECDC4, #45B7D1, #96CEB4)'
-                                        : 'linear-gradient(45deg, #6B7280, #9CA3AF, #D1D5DB)',
-                            padding: '20px 40px',
-                            borderRadius: '20px',
-                            border: '4px solid rgba(255,255,255,0.3)',
-                            boxShadow:
-                                '0 10px 30px rgba(0,0,0,0.3), inset 0 0 20px rgba(255,255,255,0.1)',
-                            position: 'relative',
-                            overflow: 'hidden',
-                        }}
                     >
-                        {/* Animated background sparkles */}
-                        {score >= 3 && (
-                            <>
-                                <motion.div
-                                    className="absolute"
-                                    style={{
-                                        top: '10px',
-                                        left: '10px',
-                                        width: '6px',
-                                        height: '6px',
-                                        backgroundColor: 'rgba(255,255,255,0.8)',
-                                        borderRadius: '50%',
-                                    }}
-                                    animate={{ opacity: [0, 1, 0], scale: [0.5, 1.2, 0.5] }}
-                                    transition={{ duration: 2, repeat: Infinity, delay: 0 }}
-                                />
-                                <motion.div
-                                    className="absolute"
-                                    style={{
-                                        top: '30px',
-                                        right: '15px',
-                                        width: '4px',
-                                        height: '4px',
-                                        backgroundColor: 'rgba(255,255,255,0.6)',
-                                        borderRadius: '50%',
-                                    }}
-                                    animate={{ opacity: [0, 1, 0], scale: [0.5, 1.2, 0.5] }}
-                                    transition={{ duration: 2, repeat: Infinity, delay: 0.7 }}
-                                />
-                                <motion.div
-                                    className="absolute"
-                                    style={{
-                                        bottom: '10px',
-                                        left: '20px',
-                                        width: '5px',
-                                        height: '5px',
-                                        backgroundColor: 'rgba(255,255,255,0.7)',
-                                        borderRadius: '50%',
-                                    }}
-                                    animate={{ opacity: [0, 1, 0], scale: [0.5, 1.2, 0.5] }}
-                                    transition={{ duration: 2, repeat: Infinity, delay: 1.4 }}
-                                />
-                            </>
-                        )}
-
-                        <motion.span
-                            className="text-6xl md:text-8xl font-black text-white relative z-10"
+                        <span
                             style={{
-                                textShadow:
-                                    '2px 2px 4px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.3)',
-                                fontFamily: 'Impact, Arial Black, sans-serif',
-                                letterSpacing: '2px',
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(2.5rem, 6vw, 4rem)',
+                                color: isExcellent ? '#ff6b6b' : isGood ? '#a78bfa' : '#d1d5db',
+                                textShadow: `0 0 20px ${isExcellent ? 'rgba(255, 107, 107, 0.5)' : isGood ? 'rgba(167, 139, 250, 0.5)' : 'rgba(209, 213, 219, 0.3)'}`,
                             }}
-                            animate={{
-                                textShadow:
-                                    score >= 3
-                                        ? [
-                                            '2px 2px 4px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.3)',
-                                            '2px 2px 4px rgba(0,0,0,0.5), 0 0 30px rgba(255,255,255,0.5)',
-                                            '2px 2px 4px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.3)',
-                                        ]
-                                        : '2px 2px 4px rgba(0,0,0,0.5)',
-                            }}
-                            transition={{ duration: 2, repeat: score >= 3 ? Infinity : 0 }}
                         >
                             {score}/{totalQuestions}
-                        </motion.span>
+                        </span>
                     </motion.div>
                 </div>
+
+                {/* Feedback Message */}
                 <motion.p
-                    className="text-secondary mt-4 text-lg font-semibold"
+                    storage={{
+                        fontFamily: "'VT323', monospace",
+                        fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)',
+                        color: isExcellent ? '#ff69b4' : isGood ? '#00ff88' : '#9ca3af',
+                        marginBottom: '2rem',
+                        fontWeight: 'bold',
+                    }}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5 }}
                 >
-                    {score >= 4
-                        ? 'Outstanding Performance!'
-                        : score >= 3
-                            ? 'Great Job!'
-                            : 'Better Luck Next Time'}
+                    {isExcellent
+                        ? '🏆 Outstanding Performance!'
+                        : isGood
+                            ? '⭐ Great Job!'
+                            : '💪 Keep Practicing!'}
                 </motion.p>
-            </div>
-            <div className="flex gap-4 justify-center relative z-20">
-                <button
-                    onClick={onReset}
-                    className="modern-button modern-button-primary px-6 py-3"
-                >
-                    Explore More Quizzes
-                </button>
-                <button
-                    onClick={onPlayAgain}
-                    className="modern-button modern-button-secondary px-6 py-3"
-                >
-                    Play Again
-                </button>
-            </div>
 
+                {/* Action Buttons */}
+                <div className="flex gap-4 justify-center flex-wrap">
+                    <button
+                        onClick={onReset}
+                        className="nes-btn is-error"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
+                            padding: '1rem 1.5rem',
+                            borderRadius: 0,
+                            boxShadow: '0 0 15px rgba(220, 38, 38, 0.3)',
+                        }}
+                    >
+                        Explore More Quizzes
+                    </button>
+                    <button
+                        onClick={onPlayAgain}
+                        className="nes-btn is-primary"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
+                            padding: '1rem 1.5rem',
+                            borderRadius: 0,
+                            boxShadow: '0 0 15px rgba(0, 255, 136, 0.3)',
+                        }}
+                    >
+                        Play Again
+                    </button>
+                </div>
+            </div>
         </motion.div>
     );
 };
