@@ -61,15 +61,24 @@ export const TopicSelector: React.FC<{
   const { status, checkSystem } = useSystemStatus();
   const limitReached = status === 'limit_reached' || status === 'maintenance';
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const hasNotifiedRef = useRef(false);
+  const hasCalledOnErrorRef = useRef(false);
 
-  // Show local popup when limit reached - don't call onError which might close selector
+  // Smart notification: call onError ONCE to register in notification system,
+  // then use local popup for any subsequent triggers
   useEffect(() => {
-    if (limitReached && !hasNotifiedRef.current) {
-      hasNotifiedRef.current = true;
-      setPopupMessage("Daily generation limit reached. You can still play existing quizzes!");
+    if (limitReached) {
+      const msg = "Daily generation limit reached. You can still play existing quizzes!";
+
+      if (!hasCalledOnErrorRef.current) {
+        // First time: register in notification system (won't close selector with false flag)
+        hasCalledOnErrorRef.current = true;
+        onError?.('GEN_LIMIT', msg, false);
+      } else {
+        // Subsequent times: just show local popup
+        setPopupMessage(msg);
+      }
     }
-  }, [limitReached]);
+  }, [limitReached, onError]);
 
 
   // Fetch topics from REST API with client-side caching
