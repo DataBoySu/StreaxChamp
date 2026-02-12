@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { navigateTo } from '@devvit/web/client';
 import { CelebrationBackground } from './CelebrationBackground';
@@ -19,6 +19,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
     onReset,
     sources = []
 }) => {
+    const [subscribed, setSubscribed] = useState(false);
     const percentage = (score / totalQuestions) * 100;
     const isExcellent = percentage >= 80;
     const isGood = percentage >= 60;
@@ -137,20 +138,28 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                 </motion.p>
 
                 {/* Action Buttons */}
-                <div className="flex gap-4 justify-center flex-wrap">
+                <div
+                    className="flex flex-col gap-4 w-full max-w-md mx-auto"
+                    style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                    }}
+                >
+                    {/* Button 1: Explore More Quizzes (navigates to sub) */}
                     <button
-                        onClick={onReset}
-                        className="nes-btn is-error"
+                        onClick={() => navigateTo('https://reddit.com/r/streaxchamp')}
+                        className="nes-btn is-warning"
                         style={{
                             fontFamily: "'Press Start 2P', cursive",
                             fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
                             padding: '1rem 1.5rem',
                             borderRadius: 0,
-                            boxShadow: '0 0 15px rgba(220, 38, 38, 0.3)',
+                            boxShadow: '0 0 15px rgba(255, 165, 0, 0.3)',
                         }}
                     >
                         Explore More Quizzes
                     </button>
+
+                    {/* Button 2: Share Score (keep as is) */}
                     <button
                         onClick={onPlayAgain}
                         className="nes-btn is-success"
@@ -164,18 +173,31 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                     >
                         Share Score
                     </button>
+
+                    {/* Button 3: Join Sub (with subscribe functionality) */}
                     <button
-                        onClick={() => navigateTo('https://reddit.com/r/streaxchamp')}
-                        className="nes-btn is-warning"
+                        onClick={async () => {
+                            if (subscribed) return;
+                            try {
+                                const res = await fetch('/api/community/subscribe', { method: 'POST' });
+                                if (res.ok) {
+                                    setSubscribed(true);
+                                }
+                            } catch (err) {
+                                console.error('Subscribe failed', err);
+                            }
+                        }}
+                        className={`nes-btn ${subscribed ? 'is-disabled' : 'is-error'}`}
                         style={{
                             fontFamily: "'Press Start 2P', cursive",
                             fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
                             padding: '1rem 1.5rem',
                             borderRadius: 0,
-                            boxShadow: '0 0 15px rgba(255, 165, 0, 0.3)',
+                            boxShadow: subscribed ? 'none' : '0 0 15px rgba(220, 38, 38, 0.3)',
                         }}
+                        disabled={subscribed}
                     >
-                        r/StreaxChamp
+                        {subscribed ? 'r/StreaxChamp' : 'Join Sub'}
                     </button>
                 </div>
 

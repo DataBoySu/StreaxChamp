@@ -191,4 +191,22 @@ router.post('/share/comment', async (req, res) => {
     }
 });
 
+// --- Community ---
+router.post('/community/subscribe', async (_req, res) => {
+    try {
+        const username = await reddit.getCurrentUsername();
+        if (!username) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+
+        await reddit.subscribeToCurrentSubreddit();
+
+        console.log(`[SUBSCRIBE] User ${username} subscribed to subreddit`);
+        res.json({ success: true, subscribed: true });
+    } catch (error) {
+        console.error('[SUBSCRIBE] Failed to subscribe:', error);
+        res.status(500).json({ error: 'Failed to subscribe' });
+    }
+});
+
 export const apiRouter = router;

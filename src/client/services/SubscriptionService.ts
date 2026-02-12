@@ -1,42 +1,22 @@
-import { CONFIG } from '../../shared/constants';
 
-/**
- * Capability-gated function to trigger a native subreddit subscription.
- *
- * NOTE: This function is currently a no-op until NATIVE_SUBSCRIBE_ENABLED is set to true.
- * It is designed to safely fail silently or log intent in development.
- *
- * @returns {Promise<boolean>} true if subscription was attempted/simulated, false if disabled/failed.
- */
-export const requestCommunitySubscribe = async (): Promise<boolean> => {
-    // 1. Check capability flag
-    if (!CONFIG.FEATURES.NATIVE_SUBSCRIBE_ENABLED) {
-        if (CONFIG.INTERNAL.BUILD_ENV === 'development') {
-            console.log('[NativeSubscribe] Feature disabled. No-op intent logged.');
-        }
-        return false;
-    }
-
-    // 2. Attempt native subscribe
+export const requestCommunitySubscribe = async (): Promise<void> => {
     try {
-        if (CONFIG.INTERNAL.BUILD_ENV === 'development') {
-            console.log('[NativeSubscribe] Attempting native join for:', CONFIG.COMMUNITY.SUBREDDIT_NAME);
+        const response = await fetch('/api/reddit/subscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            console.log('Successfully subscribed to subreddit!');
+            // Optional: Show a toast or feedback?
+            // For now, console log is sufficient as the button text change will verify it provided we track state.
+            // But for this stateless call, we rely on the action completion.
+        } else {
+            console.error('Failed to subscribe to subreddit.');
         }
-
-        // TODO: UNCOMMENT WHEN PERMISSION GRANTED AND API AVAILABLE
-        // const { reddit } = window.devvit.context; 
-        // if (reddit && reddit.subscribeToCurrentSubreddit) {
-        //     await reddit.subscribeToCurrentSubreddit();
-        //     return true;
-        // }
-
-        // Fallback log if API missing at runtime even if enabled
-        console.warn('[NativeSubscribe] Native API not found in this context.');
-        return false;
-
     } catch (error) {
-        // 3. Catch and swallow permission/runtime errors
-        console.error('[NativeSubscribe] Silent failure:', error);
-        return false;
+        console.error('Error subscribing to subreddit:', error);
     }
 };
