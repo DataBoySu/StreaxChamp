@@ -63,16 +63,13 @@ export const TopicSelector: React.FC<{
   const topicRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const hasNotifiedRef = useRef(false);
 
-  // Show notification when limit reached, but DON'T close selector
-  // Users can browse and play existing quizzes, just can't generate new ones
+  // Show local popup when limit reached - don't call onError which might close selector
   useEffect(() => {
     if (limitReached && !hasNotifiedRef.current) {
-      hasNotifiedRef.current = true; // Mark as notified
-      // Trigger notification/robot dialogue without closing selector
-      const msg = "Daily generation limit reached. You can still play existing quizzes!";
-      onError?.('GEN_LIMIT', msg, false); // false = don't close selector
+      hasNotifiedRef.current = true;
+      setPopupMessage("Daily generation limit reached. You can still play existing quizzes!");
     }
-  }, [limitReached, onError]);
+  }, [limitReached]);
 
 
   // Fetch topics from REST API with client-side caching
