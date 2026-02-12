@@ -119,9 +119,9 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
 
                 {/* Actions & Stats Container - Reduced gap */}
                 <div className="relative z-10 w-full flex flex-col items-center gap-6 mt-4">
-                    {/* Topic Select & Daily Quiz Buttons - Resized for clarity */}
+                    {/* Topic Select & Daily Quiz Buttons */}
                     <motion.div
-                        className="flex justify-center gap-4 items-center flex-wrap"
+                        className="flex justify-center gap-4 items-center flex-wrap relative z-40"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.3 }}
@@ -131,8 +131,8 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             className="nes-btn is-error"
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(0.65rem, 2.5vw, 0.9rem)', // Increased font size
-                                padding: '1.25rem 2rem', // Increased padding
+                                fontSize: 'clamp(0.75rem, 2.8vw, 1rem)',
+                                padding: '1.25rem 2rem',
                                 boxShadow: '0 0 20px rgba(220, 38, 38, 0.3)',
                                 minWidth: '180px',
                             }}
@@ -147,10 +147,10 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             className="nes-btn is-primary"
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(0.65rem, 2.5vw, 0.9rem)', // Increased font size
-                                padding: '1.25rem 2rem', // Increased padding
-                                boxShadow: '0 0 20px rgba(0, 255, 136, 0.3)',
-                                minWidth: '180px',
+                                fontSize: 'clamp(0.7rem, 2.5vw, 0.9rem)',
+                                padding: '1rem 1.5rem',
+                                boxShadow: '0 0 15px rgba(0, 255, 136, 0.2)',
+                                minWidth: '160px',
                             }}
                         >
                             Daily Quiz
@@ -171,26 +171,27 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                                 backgroundColor: 'rgba(0, 255, 136, 0.05)',
                                 border: '3px solid #00ff88',
                                 boxShadow: '0 0 15px rgba(0, 255, 136, 0.3)',
-                                padding: '0.75rem 0.25rem',
-                                minHeight: '80px',
+                                padding: '1rem 0.5rem',
+                                minHeight: '100px',
                             }}
                         >
                             <motion.div
                                 style={{
                                     fontFamily: "'Press Start 2P', cursive",
-                                    fontSize: 'clamp(1.25rem, 3.5vw, 1.75rem)',
+                                    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
                                     color: '#00ff88',
                                     textShadow: '0 0 10px #00ff88',
                                 }}
-                                animate={{ scale: [1, 1.05, 1] }}
-                                transition={{ duration: 2, repeat: Infinity }}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.3 }}
                             >
                                 {totalQuestions}
                             </motion.div>
                             <div
                                 style={{
                                     fontFamily: "'Press Start 2P', cursive",
-                                    fontSize: 'clamp(0.4rem, 1.2vw, 0.55rem)',
+                                    fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
                                     color: 'rgba(0, 255, 136, 0.7)',
                                     marginTop: '0.4rem',
                                 }}
@@ -206,26 +207,27 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                                 backgroundColor: 'rgba(124, 58, 237, 0.05)',
                                 border: '3px solid #7c3aed',
                                 boxShadow: '0 0 15px rgba(124, 58, 237, 0.3)',
-                                padding: '0.75rem 0.25rem',
-                                minHeight: '80px',
+                                padding: '1rem 0.5rem',
+                                minHeight: '100px',
                             }}
                         >
                             <motion.div
                                 style={{
                                     fontFamily: "'Press Start 2P', cursive",
-                                    fontSize: 'clamp(1.25rem, 3.5vw, 1.75rem)',
+                                    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
                                     color: '#a78bfa',
                                     textShadow: '0 0 10px #7c3aed',
                                 }}
-                                animate={{ scale: [1, 1.05, 1] }}
-                                transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.3 }}
                             >
                                 {timerDuration}s
                             </motion.div>
                             <div
                                 style={{
                                     fontFamily: "'Press Start 2P', cursive",
-                                    fontSize: 'clamp(0.4rem, 1.2vw, 0.55rem)',
+                                    fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
                                     color: 'rgba(167, 139, 250, 0.7)',
                                     marginTop: '0.4rem',
                                 }}
@@ -241,26 +243,27 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                                 backgroundColor: 'rgba(255, 105, 180, 0.05)',
                                 border: '3px solid #ff69b4',
                                 boxShadow: '0 0 15px rgba(255, 105, 180, 0.3)',
-                                padding: '0.75rem 0.25rem',
-                                minHeight: '80px',
+                                padding: '1rem 0.5rem',
+                                minHeight: '100px',
                             }}
                         >
                             <motion.div
                                 style={{
                                     fontFamily: "'Press Start 2P', cursive",
-                                    fontSize: 'clamp(1.25rem, 3.5vw, 1.75rem)',
+                                    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
                                     color: '#ff69b4',
                                     textShadow: '0 0 10px #ff69b4',
                                 }}
-                                animate={{ scale: [1, 1.05, 1] }}
-                                transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.3 }}
                             >
                                 {userRank ? (userRank <= 3 ? ['1st', '2nd', '3rd'][userRank - 1] : `#${userRank}`) : '-'}
                             </motion.div>
                             <div
                                 style={{
                                     fontFamily: "'Press Start 2P', cursive",
-                                    fontSize: 'clamp(0.4rem, 1.2vw, 0.55rem)',
+                                    fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
                                     color: 'rgba(255, 105, 180, 0.7)',
                                     marginTop: '0.4rem',
                                 }}
@@ -287,11 +290,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                             className={`nes-btn is-error ${(!!selectedTopic && topicQuizStatus !== 'ready') || (!selectedTopic && dailyQuizLoading) ? 'is-disabled' : ''}`}
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(1rem, 4vw, 1.5rem)', // Significantly increased font size
-                                padding: '1.75rem 3.5rem', // Significantly increased padding
-                                width: '90%', // Larger button width
+                                fontSize: 'clamp(0.8rem, 2.5vw, 1rem)',
+                                padding: '0.875rem 1.75rem',
+                                width: '90%',
                                 maxWidth: '400px',
-                                boxShadow: '0 0 35px rgba(220, 38, 38, 0.6), 8px 8px 0px rgba(0, 0, 0, 0.3)',
+                                boxShadow: '0 0 25px rgba(220, 38, 38, 0.4), 6px 6px 0px rgba(0, 0, 0, 0.3)',
                             }}
                         >
                             {selectedTopic

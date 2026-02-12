@@ -42,7 +42,12 @@ export const QuizActiveView: React.FC<QuizActiveViewProps> = ({
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
                         <motion.div
-                            className="text-base font-semibold text-secondary"
+                            style={{
+                                fontFamily: "'VT323', monospace",
+                                fontSize: 'clamp(1rem, 2.5vw, 1.1rem)',
+                                color: '#9ca3af',
+                                fontWeight: 'bold',
+                            }}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.2 }}
@@ -53,12 +58,13 @@ export const QuizActiveView: React.FC<QuizActiveViewProps> = ({
                             {Array.from({ length: totalQuestions }).map((_, i) => (
                                 <motion.div
                                     key={i}
-                                    className={`w-2 h-2 rounded-full ${i < questionIndex
+                                    className={`w-2 h-2 ${i < questionIndex
                                         ? 'bg-success'
                                         : i === questionIndex
                                             ? 'bg-accent'
                                             : 'bg-border'
                                         }`}
+                                    style={{ borderRadius: 0 }}
                                     initial={{ scale: 0 }}
                                     animate={{ scale: 1 }}
                                     transition={{ delay: i * 0.05 }}
@@ -82,7 +88,16 @@ export const QuizActiveView: React.FC<QuizActiveViewProps> = ({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
-                <h4 className="text-lg md:text-xl font-semibold mb-4 leading-relaxed text-white">
+                <h4
+                    style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)',
+                        color: '#00ff88',
+                        textShadow: '0 0 10px rgba(0, 255, 136, 0.3)',
+                        marginBottom: '1rem',
+                        lineHeight: '1.6',
+                    }}
+                >
                     {question?.question}
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
@@ -97,6 +112,11 @@ export const QuizActiveView: React.FC<QuizActiveViewProps> = ({
                                     ? 'incorrect'
                                     : ''
                                 }`}
+                            style={{
+                                fontFamily: "'VT323', monospace",
+                                fontSize: 'clamp(1rem, 2.2vw, 1.15rem)',
+                                borderRadius: 0,
+                            }}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.1 }}
@@ -110,6 +130,6 @@ export const QuizActiveView: React.FC<QuizActiveViewProps> = ({
                     ))}
                 </div>
             </motion.div>
-        </motion.div>
+        </motion.div >
     );
 };

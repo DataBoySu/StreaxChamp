@@ -13,43 +13,85 @@ export const NoTopicPrompt: React.FC<NoTopicPromptProps> = ({
     onPlayDaily,
 }) => {
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.8, opacity: 0 }}
-                className="modern-card relative w-full max-w-md mx-auto p-6 pt-8 border-2 border-accent/40"
+                className="nes-container is-dark relative w-full max-w-md mx-auto p-6 pt-8"
                 style={{
-                    boxShadow: '0 0 25px rgba(255,69,0,0.35), 0 0 8px rgba(255,255,255,0.15)',
+                    backgroundColor: '#111827',
+                    border: '4px solid #dc2626',
+                    borderRadius: 0,
+                    boxShadow: '0 0 30px rgba(220, 38, 38, 0.4), 8px 8px 0px rgba(0, 0, 0, 0.5)',
                 }}
             >
                 <button
                     onClick={onClose}
-                    className="absolute top-2 right-2 text-secondary hover:text-primary transition-colors"
+                    className="nes-btn is-error"
+                    style={{
+                        position: 'absolute',
+                        top: '0.5rem',
+                        right: '0.5rem',
+                        fontFamily: "'Press Start 2P', cursive",
+                        fontSize: '0.625rem',
+                        padding: '0.5rem',
+                    }}
                     aria-label="Close"
                 >
                     ✕
                 </button>
-                <h3 className="text-2xl font-extrabold mb-3 text-gradient">Ready to Play?</h3>
-                <p className="text-secondary mb-6 leading-relaxed">
+                <h3
+                    style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        fontSize: 'clamp(1rem, 3vw, 1.25rem)',
+                        color: '#00ff88',
+                        textShadow: '0 0 15px rgba(0, 255, 136, 0.5)',
+                        marginBottom: '1rem',
+                        lineHeight: '1.6',
+                    }}
+                >
+                    Ready to Play?
+                </h3>
+                <p
+                    style={{
+                        fontFamily: "'VT323', monospace",
+                        fontSize: '1rem',
+                        color: '#9ca3af',
+                        marginBottom: '1.5rem',
+                        lineHeight: '1.6',
+                    }}
+                >
                     Start a generated quiz for a specific topic, or challenge yourself with the official Daily Quiz.
                 </p>
                 <div className="flex flex-col gap-3">
                     <button
                         onClick={onChooseTopic}
-                        className="modern-button modern-button-primary w-full py-3 font-bold"
+                        className="nes-btn is-error w-full"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.65rem, 2vw, 0.8rem)',
+                        }}
                     >
                         Choose Topic
                     </button>
                     <button
                         onClick={onPlayDaily}
-                        className="modern-button w-full py-3 font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-lg hover:shadow-purple-500/30 transition-all"
+                        className="nes-btn is-primary w-full"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.65rem, 2vw, 0.8rem)',
+                        }}
                     >
                         Play Daily Quiz
                     </button>
                     <button
                         onClick={onClose}
-                        className="modern-button modern-button-secondary w-full py-3 font-bold"
+                        className="nes-btn w-full"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.6rem, 1.8vw, 0.75rem)',
+                        }}
                     >
                         Cancel
                     </button>

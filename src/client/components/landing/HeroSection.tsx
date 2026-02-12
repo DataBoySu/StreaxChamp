@@ -28,8 +28,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
     return (
         <div className="flex flex-col items-center w-full text-center">
-            {/* Title & Subtitle Group - Reduced spacing to shift robot up */}
-            <div className="mb-6 md:mb-10 relative z-20 px-4">
+            {/* Title & Subtitle Group - Minimal spacing */}
+            <div className="mb-1 md:mb-3 relative z-20 px-4">
                 <motion.h1
                     style={{
                         fontFamily: "'Press Start 2P', cursive",
@@ -63,14 +63,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </motion.p>
             </div>
 
-            {/* Robot Container - Reduced safe space to shift up */}
+            {/* Robot Container - Reduced for tighter layout */}
             <div
                 className="relative w-full flex justify-center items-end"
-                style={{ minHeight: '340px' }} // Reduced from 380px
+                style={{ minHeight: '260px' }}
             >
                 <div
                     className="relative z-30 w-full flex justify-center pointer-events-auto"
-                    style={{ marginBottom: '-30px', marginTop: '-10px' }} // Shifting up further
+                    style={{ marginBottom: '-30px', marginTop: '-40px' }}
                 >
                     <RobotPlayground
                         username={username}

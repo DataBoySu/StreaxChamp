@@ -60,16 +60,30 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                         let rankClass = 'bg-base-200/40 border-base-300/40 text-base-content';
                         let rankNumberStyle = 'text-accent';
                         const rank = i + 1;
+                        let trophyIcon = '';
+                        let nameClass = 'font-semibold truncate text-white';
+                        let scoreClass = 'font-extrabold text-right text-success';
 
                         if (rank === 1) {
                             rankClass = 'bg-yellow-900/40 border-yellow-400 text-yellow-100 shadow-[0_0_20px_rgba(255,215,0,0.4)] scale-[1.03] z-10 border-2';
                             rankNumberStyle = 'text-yellow-400 text-2xl drop-shadow-[0_0_8px_rgba(255,215,0,0.8)] font-pixel';
+                            trophyIcon = '🥇';
+                            nameClass = 'font-black truncate text-yellow-100';
+                            scoreClass = 'font-black text-right text-yellow-400';
                         } else if (rank === 2) {
                             rankClass = 'bg-slate-700/40 border-slate-300 text-slate-100 shadow-[0_0_15px_rgba(192,192,192,0.3)] border-2';
                             rankNumberStyle = 'text-slate-300 text-xl drop-shadow-[0_0_6px_rgba(192,192,192,0.6)] font-pixel';
+                            trophyIcon = '🥈';
+                            nameClass = 'font-bold truncate text-slate-100';
+                            scoreClass = 'font-bold text-right text-slate-300';
                         } else if (rank === 3) {
                             rankClass = 'bg-orange-950/40 border-orange-700 text-orange-100 shadow-[0_0_12px_rgba(205,127,50,0.2)] border-2';
                             rankNumberStyle = 'text-orange-600 text-xl drop-shadow-[0_0_4px_rgba(205,127,50,0.5)] font-pixel';
+                            trophyIcon = '🥉';
+                            nameClass = 'font-bold truncate text-orange-100';
+                            scoreClass = 'font-bold text-right text-orange-600';
+                        } else {
+                            scoreClass = `font-extrabold text-right ${rank <= 3 ? 'text-white' : 'text-success'}`;
                         }
 
                         return (
@@ -77,18 +91,18 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                                 key={`${e.userKey}-${i}`}
                                 className={`grid items-center border px-3 py-2.5 transition-all ${rankClass} hover:bg-white/5`}
                                 style={{
-                                    gridTemplateColumns: '40px 1fr 60px',
+                                    gridTemplateColumns: rank <= 3 ? '50px 1fr 60px' : '40px 1fr 60px',
                                     gap: '0.75rem',
                                     borderRadius: 0
                                 }}
                             >
-                                <span className={`font-black text-center ${rankNumberStyle}`} style={{ fontSize: 'clamp(0.75rem, 2vw, 1rem)' }}>
-                                    {rank}
+                                <span className={`font-black text-center ${rankNumberStyle}`} style={{ fontSize: rank <= 3 ? 'clamp(0.9rem, 2.5vw, 1.2rem)' : 'clamp(0.75rem, 2vw, 1rem)' }}>
+                                    {trophyIcon ? `${trophyIcon} ${rank}` : rank}
                                 </span>
-                                <span className="font-semibold truncate text-white" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }} title={e.nickname}>
+                                <span className={nameClass} style={{ fontSize: rank <= 3 ? 'clamp(0.85rem, 2.2vw, 1rem)' : 'clamp(0.75rem, 2vw, 0.9rem)' }} title={e.nickname}>
                                     {e.nickname}
                                 </span>
-                                <span className={`font-extrabold text-right ${rank <= 3 ? 'text-white' : 'text-success'}`} style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
+                                <span className={scoreClass} style={{ fontSize: rank <= 3 ? 'clamp(0.85rem, 2.2vw, 1rem)' : 'clamp(0.75rem, 2vw, 0.9rem)' }}>
                                     {e.score}
                                 </span>
                             </div>

@@ -928,7 +928,12 @@ export const App = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={toggleMute}
-              className={`modern-button px-3 py-1 text-xs font-bold ${!isMuted ? 'modern-button-primary' : 'modern-button-secondary'}`}
+              className={`nes-btn ${!isMuted ? 'is-success' : ''}`}
+              style={{
+                fontFamily: "'Press Start 2P', cursive",
+                fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
+                borderRadius: 0,
+              }}
               aria-label={isMuted ? 'Unmute music' : 'Mute music'}
             >
               {isMuted ? '♪ Music Off' : '♪ Music On'}
@@ -1156,6 +1161,7 @@ export const App = () => {
               topicLeaderboard={selectedTopic ? topicLeaderboard : dailyLeaderboard}
               historyLoading={historyLoading}
               history={history}
+              hideRecentPlays={quizStarted && !showScore}
             />
           )}
         </div>

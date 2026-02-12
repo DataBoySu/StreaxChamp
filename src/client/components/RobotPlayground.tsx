@@ -136,12 +136,13 @@ export const RobotPlayground: React.FC<RobotPlaygroundProps> = ({
                                 top: 0,
                                 right: 0,
                                 bottom: 0,
-                                width: '50%', // User requested 50% of page width
-                                minWidth: '280px', // Safeguard for very small screens
+                                width: '50%',
+                                minWidth: '280px',
                                 zIndex: 60,
                                 background: '#212529',
                                 border: '4px solid #dc2626',
-                                boxShadow: '-10px 0 30px rgba(0, 0, 0, 0.5)',
+                                borderRadius: 0,
+                                boxShadow: 'none',
                                 overflowY: 'auto',
                                 padding: '1.5rem',
                             }}
@@ -151,7 +152,7 @@ export const RobotPlayground: React.FC<RobotPlaygroundProps> = ({
                                 <h2
                                     style={{
                                         fontFamily: "'Press Start 2P', cursive",
-                                        fontSize: '1rem',
+                                        fontSize: '0.8rem',
                                         color: '#ef4444',
                                         margin: 0,
                                     }}
@@ -174,10 +175,11 @@ export const RobotPlayground: React.FC<RobotPlaygroundProps> = ({
                             {/* Notifications List */}
                             {currentError ? (
                                 <div
-                                    className="nes-container is-rounded"
+                                    className="nes-container is-dark"
                                     style={{
                                         background: 'rgba(239, 68, 68, 0.1)',
                                         border: '3px solid #ef4444',
+                                        borderRadius: 0,
                                         padding: '1rem',
                                         marginBottom: '1rem',
                                     }}
@@ -194,11 +196,10 @@ export const RobotPlayground: React.FC<RobotPlaygroundProps> = ({
                                     </div>
                                     <div
                                         style={{
-                                            fontFamily: "'Share Tech Mono', monospace",
-                                            fontSize: '0.875rem',
+                                            fontFamily: "'VT323', monospace",
+                                            fontSize: '0.8rem',
                                             color: '#fff',
                                             lineHeight: '1.6',
-                                            fontWeight: 'bold',
                                         }}
                                     >
                                         {/* Formal messages for notifications */}

@@ -24,6 +24,7 @@ interface GameSidebarProps {
     topicLeaderboard: LeaderboardEntry[];
     historyLoading: boolean;
     history: HistoryEntry[];
+    hideRecentPlays?: boolean;
 }
 
 const getTimeAgo = (timestamp: number): string => {
@@ -44,6 +45,7 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
     topicLeaderboard,
     historyLoading,
     history,
+    hideRecentPlays = false,
 }) => {
     return (
         <div className="lg:col-span-1">
@@ -92,47 +94,49 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
                             </div>
                         </>
                     ) : (
-                        <>
-                            <div className="flex items-center gap-3 mb-6">
-                                <h2 className="text-2xl font-bold text-gradient">Recent Plays</h2>
-                            </div>
-                            <div className="relative min-h-[160px] max-h-[400px] overflow-y-auto space-y-2 pr-1">
-                                {historyLoading && (
-                                    <div className="text-center py-4 text-secondary text-xs">
-                                        <LoadingDots text="Loading" />
-                                    </div>
-                                )}
-
-                                {!historyLoading && history.length === 0 && (
-                                    <div className="text-center py-8 text-secondary text-sm">
-                                        No plays yet.
-                                    </div>
-                                )}
-                                {history.map((h, i) => {
-                                    const timeAgo = getTimeAgo(h.ts || Date.now());
-                                    return (
-                                        <div
-                                            key={h.id || i}
-                                            className="px-3 py-2 bg-base-200/40 border-b border-base-300/40 last:border-0 hover:bg-base-200/60 transition-colors"
-                                        >
-                                            <div className="flex items-center gap-3 text-xs w-full">
-                                                <span className="font-bold text-accent shrink-0 min-w-[1.2rem]">{i + 1}.</span>
-                                                <span className="font-semibold text-primary truncate min-w-0 flex-1" title={h.nickname}>
-                                                    {h.nickname || 'Player'}
-                                                </span>
-                                                <span className="opacity-60 text-[10px] whitespace-nowrap shrink-0">played</span>
-                                                <span className="font-medium text-secondary truncate max-w-[130px] shrink-0" title={h.title}>
-                                                    {h.title}
-                                                </span>
-                                                <span className="opacity-40 text-[9px] whitespace-nowrap shrink-0 ml-1 min-w-[35px] text-right">
-                                                    {timeAgo}
-                                                </span>
-                                            </div>
+                        !hideRecentPlays && (
+                            <>
+                                <div className="flex items-center gap-3 mb-6">
+                                    <h2 className="text-2xl font-bold text-gradient">Recent Plays</h2>
+                                </div>
+                                <div className="relative min-h-[160px] max-h-[400px] overflow-y-auto space-y-2 pr-1">
+                                    {historyLoading && (
+                                        <div className="text-center py-4 text-secondary text-xs">
+                                            <LoadingDots text="Loading" />
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </>
+                                    )}
+
+                                    {!historyLoading && history.length === 0 && (
+                                        <div className="text-center py-8 text-secondary text-sm">
+                                            No plays yet.
+                                        </div>
+                                    )}
+                                    {history.map((h, i) => {
+                                        const timeAgo = getTimeAgo(h.ts || Date.now());
+                                        return (
+                                            <div
+                                                key={h.id || i}
+                                                className="px-3 py-2 bg-base-200/40 border-b border-base-300/40 last:border-0 hover:bg-base-200/60 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-3 text-xs w-full">
+                                                    <span className="font-bold text-accent shrink-0 min-w-[1.2rem]">{i + 1}.</span>
+                                                    <span className="font-semibold text-primary truncate min-w-0 flex-1" title={h.nickname}>
+                                                        {h.nickname || 'Player'}
+                                                    </span>
+                                                    <span className="opacity-60 text-[10px] whitespace-nowrap shrink-0">played</span>
+                                                    <span className="font-medium text-secondary truncate max-w-[130px] shrink-0" title={h.title}>
+                                                        {h.title}
+                                                    </span>
+                                                    <span className="opacity-40 text-[9px] whitespace-nowrap shrink-0 ml-1 min-w-[35px] text-right">
+                                                        {timeAgo}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )
                     )}
                 </motion.div>
             </div>
