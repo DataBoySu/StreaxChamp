@@ -334,11 +334,12 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
             {/* Scanline */}
             <div className="scanline" style={{
               position: 'absolute', top: 0, bottom: 0, width: '2px',
+              left: '50%',
+              transform: 'translateX(-50%)',
               background: errorMessage
                 ? 'linear-gradient(to bottom, transparent, #ef4444, transparent)'
                 : 'linear-gradient(to bottom, transparent, #00ff88, transparent)',
-              animation: 'scan 2.5s linear infinite',
-              opacity: 0.5,
+              opacity: 0.8,
               pointerEvents: 'none'
             }} />
           </div>
@@ -360,14 +361,12 @@ export const InteractiveRobot: React.FC<InteractiveRobotProps> = ({
       {/* USERNAME */}
       <div style={{
         marginTop: 12, padding: '8px 16px', borderRadius: '8px',
-        background: 'rgba(17, 24, 39, 0.9)', border: '2px solid rgba(0, 255, 136, 0.3)',
+        background: 'rgba(17, 24, 39, 0.95)', border: '2px solid rgba(0, 255, 136, 0.3)',
         fontFamily: "'Press Start 2P', monospace", fontSize: 13, color: '#00ff88', fontWeight: 'bold',
         textShadow: '0 0 5px rgba(0,255,136, 0.5)'
       }}>
         {username}: {totalPoints}
       </div>
-
-      <style>{`@keyframes scan { 0% { left: -20%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { left: 120%; opacity: 0; } }`}</style>
     </div>
   );
 };

@@ -454,7 +454,47 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+
+    /* Crisp Pixel Art Rendering */
+    image-rendering: -webkit-optimize-contrast;
+    /* Webkit (Chrome/Safari) */
+    image-rendering: pixelated;
+    /* Chrome/Edge/Opera */
+    image-rendering: crisp-edges;
+    /* Firefox */
+    -ms-interpolation-mode: nearest-neighbor;
+    /* IE/Edge */
   }
+}
+
+/* ===== AESTHETIC SCROLLBARS ===== */
+/* Chromium/Webkit Browsers */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(11, 14, 20, 0.95);
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #ff4500, #dc2626);
+  border: 2px solid rgba(11, 14, 20, 0.95);
+  border-radius: 5px;
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #ff571a, #ff4500);
+  box-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ff4500 rgba(11, 14, 20, 0.95);
 }
 
 /* Sacred Geometry Overlay Removed */

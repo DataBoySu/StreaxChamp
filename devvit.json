@@ -41,7 +41,7 @@
   "menu": {
     "items": [
       {
-        "label": "Create Daily Quiz Post",
+        "label": "Create Streax Champ Post",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/create-post"
