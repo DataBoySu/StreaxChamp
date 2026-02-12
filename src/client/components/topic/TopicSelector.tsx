@@ -144,6 +144,8 @@ export const TopicSelector: React.FC<{
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      // Ignore Enter if limit reached - can only browse existing topics
+      if (limitReached) return;
       handleAddTopic();
     }
   };
