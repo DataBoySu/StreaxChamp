@@ -202,7 +202,7 @@ export const CONFIG = {
         API_ENDPOINT_TEMPLATE: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
     },
     LIMITS: {
-        dailyUserGen: 1, // Max topics a single user can generate per day
+        dailyUserGen: 0, // Max topics a single user can generate per day
         dailyGlobalGen: 20, // Max topics the entire platform can generate per day
     },
     ERRORS: {
@@ -214,7 +214,7 @@ export const CONFIG = {
     },
     DEV: {
         // [MASTER TOGGLE] If true, users in USERNAMES list are "invisible" (no scores/history saved)
-        SAFE_MODE: false,
+        SAFE_MODE: true,
         USERNAMES: ['Pretend-Pangolin-846'],
     }
 };

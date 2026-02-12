@@ -117,22 +117,25 @@ export const MultiplierPop: React.FC<{
     if (level >= 5)
       return {
         color: '#ff69b4',
-        textShadow: '0 0 20px rgba(255, 105, 180, 0.8)',
+        textShadow: '0 0 30px rgba(255, 105, 180, 1), 0 0 60px rgba(255, 105, 180, 0.8)',
         borderColor: '#ff69b4',
-        boxShadow: '0 0 30px rgba(255, 105, 180, 0.6)',
+        boxShadow: '0 0 40px rgba(255, 105, 180, 0.9), 8px 8px 0px rgba(0, 0, 0, 0.5)',
+        bgGradient: 'linear-gradient(135deg, rgba(255, 105, 180, 0.2), rgba(255, 105, 180, 0.1))',
       };
     if (level >= 3)
       return {
         color: '#a78bfa',
-        textShadow: '0 0 20px rgba(167, 139, 250, 0.8)',
+        textShadow: '0 0 30px rgba(167, 139, 250, 1), 0 0 60px rgba(167, 139, 250, 0.8)',
         borderColor: '#7c3aed',
-        boxShadow: '0 0 25px rgba(124, 58, 237, 0.6)',
+        boxShadow: '0 0 35px rgba(124, 58, 237, 0.9), 8px 8px 0px rgba(0, 0, 0, 0.5)',
+        bgGradient: 'linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(124, 58, 237, 0.1))',
       };
     return {
       color: '#00ff88',
-      textShadow: '0 0 20px rgba(0, 255, 136, 0.8)',
+      textShadow: '0 0 30px rgba(0, 255, 136, 1), 0 0 60px rgba(0, 255, 136, 0.8)',
       borderColor: '#00ff88',
-      boxShadow: '0 0 20px rgba(0, 255, 136, 0.6)',
+      boxShadow: '0 0 30px rgba(0, 255, 136, 0.9), 8px 8px 0px rgba(0, 0, 0, 0.5)',
+      bgGradient: 'linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 255, 136, 0.1))',
     };
   };
 
@@ -143,24 +146,28 @@ export const MultiplierPop: React.FC<{
       className="nes-container is-dark"
       style={{
         position: 'fixed',
-        top: '20%',
+        top: '25%',
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 9999,
+        zIndex: 10000,
         borderRadius: 0,
-        background: 'rgba(17, 24, 39, 0.95)',
-        border: `4px solid ${style.borderColor}`,
+        background: `rgba(17, 24, 39, 1)`,
+        backgroundImage: style.bgGradient,
+        border: `6px solid ${style.borderColor}`,
         boxShadow: style.boxShadow,
-        padding: '1.5rem 2rem',
+        padding: '2rem 3rem',
         fontFamily: "'Press Start 2P', cursive",
-        fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
+        fontSize: 'clamp(2rem, 6vw, 3.5rem)',
         color: style.color,
         textShadow: style.textShadow,
+        minWidth: '180px',
+        textAlign: 'center',
+        opacity: 1,
       }}
-      initial={{ scale: 0, opacity: 0, rotate: -10 }}
+      initial={{ scale: 0, opacity: 0, rotate: -15 }}
       animate={{ scale: 1, opacity: 1, rotate: 0 }}
-      exit={{ scale: 1.5, opacity: 0, rotate: 10 }}
-      transition={{ duration: 1.5 }}
+      exit={{ scale: 1.3, opacity: 0, rotate: 15 }}
+      transition={{ duration: 0.4, type: 'spring', bounce: 0.5 }}
     >
       ×{multiplier}
     </motion.div>
