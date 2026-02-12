@@ -66,11 +66,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             {/* Robot Container - Reduced for tighter layout */}
             <div
                 className="relative w-full flex justify-center items-end"
-                style={{ minHeight: '260px' }}
+                style={{ minHeight: '240px' }}
             >
                 <div
                     className="relative z-30 w-full flex justify-center pointer-events-auto"
-                    style={{ marginBottom: '-30px', marginTop: '-40px' }}
+                    style={{ marginBottom: '-30px', marginTop: '-60px' }}
                 >
                     <RobotPlayground
                         username={username}

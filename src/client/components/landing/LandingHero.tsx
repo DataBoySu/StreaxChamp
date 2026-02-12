@@ -119,42 +119,58 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
 
                 {/* Actions & Stats Container - Reduced gap */}
                 <div className="relative z-10 w-full flex flex-col items-center gap-6 mt-4">
-                    {/* Topic Select & Daily Quiz Buttons */}
+                    {/* Select Quiz Group */}
                     <motion.div
-                        className="flex justify-center gap-4 items-center flex-wrap relative z-40"
+                        className="flex flex-col items-center gap-3 relative z-40"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.3 }}
                     >
-                        <button
-                            onClick={onOpenTopicMenu}
-                            className="nes-btn is-error"
+                        {/* Group Header */}
+                        <h3
                             style={{
                                 fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(0.75rem, 2.8vw, 1rem)',
-                                padding: '1.25rem 2rem',
-                                boxShadow: '0 0 20px rgba(220, 38, 38, 0.3)',
-                                minWidth: '180px',
+                                fontSize: 'clamp(0.7rem, 2vw, 0.85rem)',
+                                color: '#9ca3af',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.1em',
                             }}
                         >
-                            {selectedTopic ? `${selectedTopic.title}` : 'Topic Select'}
-                        </button>
-                        <button
-                            onClick={() => {
-                                if (onClearTopic) onClearTopic();
-                                if (onBrowseArchive) onBrowseArchive();
-                            }}
-                            className="nes-btn is-primary"
-                            style={{
-                                fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(0.7rem, 2.5vw, 0.9rem)',
-                                padding: '1rem 1.5rem',
-                                boxShadow: '0 0 15px rgba(0, 255, 136, 0.2)',
-                                minWidth: '160px',
-                            }}
-                        >
-                            Daily Quiz
-                        </button>
+                            Select Quiz
+                        </h3>
+
+                        {/* Buttons in single row */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={onOpenTopicMenu}
+                                className="nes-btn is-error"
+                                style={{
+                                    fontFamily: "'Press Start 2P', cursive",
+                                    fontSize: 'clamp(0.75rem, 2.8vw, 1rem)',
+                                    padding: '1.25rem 2rem',
+                                    boxShadow: '0 0 20px rgba(220, 38, 38, 0.3)',
+                                    minWidth: '180px',
+                                }}
+                            >
+                                {selectedTopic ? `${selectedTopic.title}` : 'Topics'}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (onClearTopic) onClearTopic();
+                                    if (onBrowseArchive) onBrowseArchive();
+                                }}
+                                className="nes-btn is-primary"
+                                style={{
+                                    fontFamily: "'Press Start 2P', cursive",
+                                    fontSize: 'clamp(0.7rem, 2.5vw, 0.9rem)',
+                                    padding: '1rem 1.5rem',
+                                    boxShadow: '0 0 15px rgba(0, 255, 136, 0.2)',
+                                    minWidth: '160px',
+                                }}
+                            >
+                                Daily Quiz
+                            </button>
+                        </div>
                     </motion.div>
 
                     {/* Stats Display - Cyberpunk Dark Containers */}
@@ -171,14 +187,14 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                                 backgroundColor: 'rgba(0, 255, 136, 0.05)',
                                 border: '3px solid #00ff88',
                                 boxShadow: '0 0 15px rgba(0, 255, 136, 0.3)',
-                                padding: '1rem 0.5rem',
-                                minHeight: '100px',
+                                padding: '0.75rem 0.5rem',
+                                minHeight: '80px',
                             }}
                         >
                             <motion.div
                                 style={{
                                     fontFamily: "'Press Start 2P', cursive",
-                                    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+                                    fontSize: 'clamp(2rem, 5vw, 2.5rem)',
                                     color: '#00ff88',
                                     textShadow: '0 0 10px #00ff88',
                                 }}
@@ -207,14 +223,14 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                                 backgroundColor: 'rgba(124, 58, 237, 0.05)',
                                 border: '3px solid #7c3aed',
                                 boxShadow: '0 0 15px rgba(124, 58, 237, 0.3)',
-                                padding: '1rem 0.5rem',
-                                minHeight: '100px',
+                                padding: '0.75rem 0.5rem',
+                                minHeight: '80px',
                             }}
                         >
                             <motion.div
                                 style={{
                                     fontFamily: "'Press Start 2P', cursive",
-                                    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+                                    fontSize: 'clamp(2rem, 5vw, 2.5rem)',
                                     color: '#a78bfa',
                                     textShadow: '0 0 10px #7c3aed',
                                 }}
