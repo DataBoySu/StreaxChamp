@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { navigateTo } from '@devvit/web/client';
 import { CelebrationBackground } from './CelebrationBackground';
 import { ScoreFace } from './ScoreFace';
 
@@ -150,7 +151,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                     </button>
                     <button
                         onClick={onPlayAgain}
-                        className="nes-btn is-primary"
+                        className="nes-btn is-success"
                         style={{
                             fontFamily: "'Press Start 2P', cursive",
                             fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
@@ -159,7 +160,20 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                             boxShadow: '0 0 15px rgba(0, 255, 136, 0.3)',
                         }}
                     >
-                        Play Again
+                        Share Score
+                    </button>
+                    <button
+                        onClick={() => navigateTo('https://reddit.com/r/streaxchamp')}
+                        className="nes-btn is-warning"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
+                            padding: '1rem 1.5rem',
+                            borderRadius: 0,
+                            boxShadow: '0 0 15px rgba(255, 165, 0, 0.3)',
+                        }}
+                    >
+                        Join Community
                     </button>
                 </div>
             </div>

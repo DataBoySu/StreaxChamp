@@ -27,15 +27,38 @@ interface GameSidebarProps {
     hideRecentPlays?: boolean;
 }
 
-const getTimeAgo = (timestamp: number): string => {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+// Fresh robust timestamp formatting - handles seconds, milliseconds, and edge cases
+const formatRelativeTime = (timestamp: number | undefined): string => {
+    // console.log('[GameSidebar] Formatting timestamp:', timestamp); // Debug log
+    if (!timestamp || timestamp === 0) return 'just now';
+
+    // Auto-detect: if timestamp is < 10 billion, it's seconds, convert to ms
+    const timestampMs = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+
+    // Calculate difference
+    const nowMs = Date.now();
+    const diffMs = nowMs - timestampMs;
+
+    // Handle future timestamps or invalid
+    if (diffMs < 0) return 'just now';
+
+    const seconds = Math.floor(diffMs / 1000);
     if (seconds < 60) return 'just now';
+
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes} min ago`;
+
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h ago`;
+
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    if (days < 30) return `${days}d ago`;
+
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo ago`;
+
+    const years = Math.floor(months / 12);
+    return `${years}y ago`;
 };
 
 export const GameSidebar: React.FC<GameSidebarProps> = ({
@@ -112,7 +135,7 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
                                         </div>
                                     )}
                                     {history.map((h, i) => {
-                                        const timeAgo = getTimeAgo(h.timestamp || Date.now());
+                                        const timeAgo = formatRelativeTime(h.timestamp);
                                         return (
                                             <div
                                                 key={h.id || i}

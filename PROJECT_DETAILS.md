@@ -1,228 +1,156 @@
-READ THIS FIRST (MANDATORY):
-Before making ANY code changes, you must analyze and explain the current data flow end-to-end.
-This task is READ-ONLY ANALYSIS ONLY.
-❌ Do NOT refactor
-❌ Do NOT optimize
-❌ Do NOT add features
-❌ Do NOT fix bugs yet
+🔧 TASK: Remove Topic/Daily Leaderboards from Firestore and Replace with Comment-Driven System
 
-The goal is complete situational awareness so we can fix Firestore misuse safely.
+DO NOT TOUCH GLOBAL LEADERBOARD
 
-🎯 Objective
+You must analyze the entire leaderboard pipeline before modifying anything.
 
-Produce a forensic reconstruction of how quiz data, score data, and user state move through the system today.
+🔎 Phase 1 — Audit (Mandatory First Step)
 
-This must answer:
+Identify all code paths that:
 
-What data exists
+Write topic leaderboard data to Firestore
 
-Where it lives
+Write daily leaderboard data to Firestore
 
-When it is read
+Write custom quiz leaderboard data to Firestore
 
-When it is written
+Call submitLeaderboardScore
 
-Why it is written
+Update topic/daily leaderboard collections
 
-What breaks if it is removed
+Confirm that:
 
-📂 Mandatory Files to Read First
+Global leaderboard (XP / total score accumulation) is implemented separately.
 
-Before responding, you MUST scan these files fully:
+Global leaderboard logic does NOT depend on topic leaderboard collections.
 
-agents.md
+Print a summary before implementing changes.
 
-devvit_web_knowledge_base.md
+🚫 Phase 2 — Remove Firestore Writes (Topic/Daily/Custom Only)
 
-src/server/controllers/*
+Modify behavior so that:
 
-src/server/services/FirestoreRestService.ts
+On Quiz Completion:
 
-src/server/services/LeaderboardService.ts
+DO NOT write topic leaderboard entry to Firestore.
 
-src/server/services/CacheService.ts
+DO NOT write daily leaderboard entry to Firestore.
 
-src/client/App.tsx
+DO NOT write custom post leaderboard entry to Firestore.
 
-src/client/hooks/useQuizData.ts
+DO NOT block replay.
 
-src/client/hooks/useHistory.ts
+DO NOT alter Global XP accumulation.
 
-src/client/splash.tsx
+Instead:
 
-Any Redis usage (redis, ioredis, upstash, etc.)
+Only return quiz results to client.
 
-🧠 Deliverable Format (STRICT)
+Global XP update remains intact.
 
-You MUST output only analysis, in the following structure:
+🧠 Phase 3 — Introduce In-Memory Leaderboard Manager
 
-1️⃣ Data Entities Inventory
+Create a server-side singleton:
 
-List every logical data entity in the app, including but not limited to:
+LeaderboardMemoryService
 
-Daily quiz
 
-Topic quiz
+Behavior:
 
-Custom quiz
+Store only Top 10 entries per:
 
-Leaderboard entry
+Topic slug
 
-User play record
+Daily date
 
-Replay detection state
+Custom postId
 
-Splash metadata
+Data structure example:
 
-Redis keys
+{
+key: "topic:anime" | "daily:2026-02-02" | "post:t3_abc",
+entries: [
+{ username, score, timestamp }
+]
+}
 
-For EACH entity, specify:
+Rules:
 
-Entity Name:
-Source of Truth:
-Stored In (Memory / Firestore / Redis / Client State):
-Mutability (Immutable / Append-only / Mutable):
-Expected Lifetime:
+On "Share Score" button press:
 
-2️⃣ Read Path Timeline (Critical)
+Insert user score into memory
 
-For each of these user actions, trace the exact data reads:
+Sort descending by score
 
-User opens app
+Keep only top 10
 
-User sees splash
+Replace existing entry if user already exists
 
-User starts quiz
+No Firestore writes here.
 
-User answers a question
+📝 Phase 4 — Comment-Based Leaderboard (App Managed)
 
-User finishes quiz
+Implement:
 
-User replays quiz
+CommentLeaderboardService
 
-User returns to splash
 
-For each step:
+Behavior:
 
-What data is read?
-From where?
-Why?
-Is it redundant?
+For each postId:
 
-3️⃣ Write Path Timeline (Critical)
+Maintain lastUpdatedAt
 
-Trace every write triggered by:
+Maintain commentId (store in Redis or memory)
 
-Quiz generation
+Every 8 hours:
 
-Quiz completion
+If comment does not exist:
 
-Replay
+Create new comment under the post
 
-Leaderboard update
+If comment exists:
 
-Comment posting
+Edit existing comment
 
-Stats aggregation
+Comment format:
 
-For each write:
+🏆 TOP 10 — {Topic or Daily Date}
 
-What is written?
-Why is it written?
-Is it idempotent?
-Can it be delayed or removed?
+u/username — 5/5
 
-4️⃣ Firestore Usage Audit (Red Flag Section)
+...
 
-Create a table:
+...
 
-Collection	Written By	Read By	Frequency	Required?
+Last updated: {timestamp}
 
-Then answer:
+Only update if leaderboard changed since last edit.
 
-Which Firestore reads happen on every splash
+🔒 Constraints
 
-Which writes happen on every play
+DO NOT remove or modify Global Leaderboard logic.
 
-Which ones are purely defensive / legacy
+DO NOT modify XP accumulation.
 
-Which ones cause duplicate or conflicting state
+DO NOT modify user progression.
 
-5️⃣ Cache & Memory Reality Check
+DO NOT change unrelated UI.
 
-Explain:
+DO NOT introduce Firestore writes for topic/daily leaderboards.
 
-What data is cached in memory
+Keep global leaderboard untouched.
 
-What data is cached in Redis
+📦 Deliverables
 
-What data is not cached at all
+Before finishing, print:
 
-What breaks if the server restarts
+What Firestore writes were removed.
 
-What is incorrectly treated as stateless
+What new memory service was added.
 
-6️⃣ Replay & Duplication Analysis
+Confirmation that global leaderboard still works.
 
-Explain how the system currently decides:
+Where comment ID is stored.
 
-Is this a replay?
-
-Should a score be recorded?
-
-Should a leaderboard entry be overwritten or appended?
-
-Identify all places where replay logic is inferred indirectly (dangerous).
-
-7️⃣ Single Biggest Design Mismatch
-
-Answer plainly:
-
-“The system currently behaves like ________,
-but the intended design is ________.”
-
-8️⃣ Safe Fix Zones (NO CODE)
-
-Without writing code, list:
-
-What can be safely removed
-
-What must remain for correctness
-
-What must be centralized into memory
-
-What must never be fetched on splash again
-
-9️⃣ Final Verdict
-
-Conclude with:
-
-Is Firestore currently overused, misused, or correctly used?
-
-Is the app behaving like a game server or a CRUD app?
-
-What one principle should guide the rewrite?
-
-⛔ HARD RULES
-
-❌ Do NOT propose solutions yet
-
-❌ Do NOT suggest architecture changes
-
-❌ Do NOT touch UI
-
-❌ Do NOT refactor code
-
-This is pure forensic analysis.
-
-✅ Success Criteria
-
-A good answer will make it possible to:
-
-Delete 30–50% of Firestore reads
-
-Move critical state to memory confidently
-
-Prevent duplicate leaderboard writes permanently
-
-Design the next system without guessing
+How concurrent updates are handled.
