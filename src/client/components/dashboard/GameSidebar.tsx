@@ -112,7 +112,9 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
                                         </div>
                                     )}
                                     {history.map((h, i) => {
-                                        const timeAgo = getTimeAgo(h.ts || Date.now());
+                                        // Convert timestamp to milliseconds if it's in seconds
+                                        const timestamp = h.ts < 10000000000 ? h.ts * 1000 : h.ts;
+                                        const timeAgo = getTimeAgo(timestamp);
                                         return (
                                             <div
                                                 key={h.id || i}
