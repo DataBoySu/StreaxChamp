@@ -82,7 +82,7 @@ export const QuizActiveView: React.FC<QuizActiveViewProps> = ({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
-                <h4 className="text-lg md:text-xl font-semibold mb-4 leading-relaxed">
+                <h4 className="text-lg md:text-xl font-semibold mb-4 leading-relaxed text-white">
                     {question?.question}
                 </h4>
                 <div className="grid grid-cols-2 gap-4">

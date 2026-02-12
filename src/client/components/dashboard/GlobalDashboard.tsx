@@ -32,15 +32,17 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
     historyLoading,
 }) => {
     return (
-        <div className="grid gap-10 w-full">
+        <div className="grid gap-6 md:gap-10 w-full" style={{ marginRight: '0.5rem' }}>
             {/* Window 3: Global Leaderboard */}
             <div
-                className="nes-container is-dark with-title is-rounded w-full"
+                className="nes-container is-dark with-title w-full"
                 style={{
-                    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                    backgroundColor: '#111827',
                     border: '4px solid #dc2626',
-                    boxShadow: '0 0 30px rgba(220, 38, 38, 0.1), 8px 8px 0px rgba(0, 0, 0, 0.3)',
-                    padding: '1.5rem',
+                    borderRadius: 0,
+                    boxShadow: '8px 8px 0px rgba(0, 0, 0, 0.3)',
+                    padding: '1rem',
+                    boxSizing: 'border-box',
                 }}
             >
                 <p className="title" style={{ backgroundColor: '#dc2626', color: '#fff', fontSize: '0.75rem', padding: '0 10px' }}>
@@ -73,16 +75,21 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                         return (
                             <div
                                 key={`${e.userKey}-${i}`}
-                                className={`grid grid-cols-[3rem_1fr_auto] items-center gap-3 border rounded-lg px-4 py-3 transition-all ${rankClass} hover:bg-base-200/60`}
+                                className={`grid items-center border px-3 py-2.5 transition-all ${rankClass} hover:bg-white/5`}
+                                style={{
+                                    gridTemplateColumns: '40px 1fr 60px',
+                                    gap: '0.75rem',
+                                    borderRadius: 0
+                                }}
                             >
-                                <span className={`font-black text-right pr-2 ${rankNumberStyle}`}>
+                                <span className={`font-black text-center ${rankNumberStyle}`} style={{ fontSize: 'clamp(0.75rem, 2vw, 1rem)' }}>
                                     {rank}
                                 </span>
-                                <span className="font-semibold truncate min-w-0 tracking-wide text-white" title={e.nickname}>
+                                <span className="font-semibold truncate text-white" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }} title={e.nickname}>
                                     {e.nickname}
                                 </span>
-                                <span className={`font-extrabold text-lg text-right ${rank <= 3 ? 'text-white' : 'text-success'}`}>
-                                    {e.score} PTS
+                                <span className={`font-extrabold text-right ${rank <= 3 ? 'text-white' : 'text-success'}`} style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)' }}>
+                                    {e.score}
                                 </span>
                             </div>
                         );
@@ -97,12 +104,14 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
 
             {/* Window 4: Hot Topics */}
             <div
-                className="nes-container is-dark with-title is-rounded w-full"
+                className="nes-container is-dark with-title w-full"
                 style={{
-                    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                    backgroundColor: '#111827',
                     border: '4px solid #dc2626',
-                    boxShadow: '0 0 30px rgba(220, 38, 38, 0.1), 8px 8px 0px rgba(0, 0, 0, 0.3)',
-                    padding: '1.5rem',
+                    borderRadius: 0,
+                    boxShadow: '8px 8px 0px rgba(0, 0, 0, 0.3)',
+                    padding: '1rem',
+                    boxSizing: 'border-box',
                 }}
             >
                 <p className="title" style={{ backgroundColor: '#dc2626', color: '#fff', fontSize: '0.75rem', padding: '0 10px' }}>
@@ -117,12 +126,14 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
 
             {/* Window 5: Recent Plays */}
             <div
-                className="nes-container is-dark with-title is-rounded w-full"
+                className="nes-container is-dark with-title w-full"
                 style={{
-                    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                    backgroundColor: '#111827',
                     border: '4px solid #dc2626',
-                    boxShadow: '0 0 30px rgba(220, 38, 38, 0.1), 8px 8px 0px rgba(0, 0, 0, 0.3)',
-                    padding: '1.5rem',
+                    borderRadius: 0,
+                    boxShadow: '8px 8px 0px rgba(0, 0, 0, 0.3)',
+                    padding: '1rem',
+                    boxSizing: 'border-box',
                 }}
             >
                 <p className="title" style={{ backgroundColor: '#dc2626', color: '#fff', fontSize: '0.75rem', padding: '0 10px' }}>
@@ -145,21 +156,24 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                         return (
                             <div
                                 key={h.id || i}
-                                className="px-3 py-2 bg-base-200/40 border-b border-base-300/40 last:border-0 hover:bg-base-200/60 transition-colors"
+                                className="border-b border-white/10 last:border-0 hover:bg-white/5 transition-colors"
+                                style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '30px 1fr auto',
+                                    gap: '0.75rem',
+                                    alignItems: 'center',
+                                    padding: '0.625rem 0.75rem',
+                                }}
                             >
-                                <div className="flex items-center gap-3 text-xs w-full">
-                                    <span className="font-bold text-accent shrink-0 min-w-[1.2rem]">{i + 1}.</span>
-                                    <span className="font-semibold text-white truncate min-w-0 flex-1" title={h.nickname}>
-                                        {h.nickname || 'Player'}
-                                    </span>
-                                    <span className="opacity-60 text-[10px] whitespace-nowrap shrink-0 text-white">played</span>
-                                    <span className="font-medium text-secondary truncate max-w-[130px] shrink-0" title={h.title}>
-                                        {h.title}
-                                    </span>
-                                    <span className="opacity-40 text-[9px] whitespace-nowrap shrink-0 ml-1 min-w-[35px] text-right text-white">
-                                        {timeAgo}
-                                    </span>
-                                </div>
+                                <span className="font-bold text-accent" style={{ fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)' }}>
+                                    {i + 1}.
+                                </span>
+                                <span className="font-semibold text-white truncate" style={{ fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)' }} title={h.nickname}>
+                                    {h.nickname || 'Player'}
+                                </span>
+                                <span className="text-secondary text-right whitespace-nowrap" style={{ fontSize: 'clamp(0.65rem, 1.5vw, 0.75rem)' }}>
+                                    {timeAgo}
+                                </span>
                             </div>
                         );
                     })}

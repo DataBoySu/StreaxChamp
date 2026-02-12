@@ -22,7 +22,6 @@ interface LandingHeroProps {
     onStartQuiz: () => void;
     totalQuestions: number;
     showTimeoutMessage?: boolean;
-    errorMessage?: string | undefined;
     hasPlayed?: boolean;
     totalPoints?: number;
     dailyCompleted?: boolean;
@@ -49,7 +48,6 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
     onOpenTopicMenu,
     onStartQuiz,
     totalQuestions,
-    errorMessage,
     hasPlayed = false,
     totalPoints = 0,
     dailyCompleted = false,
@@ -99,12 +97,15 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
 
             {/* Combined Section: Hero, Robot & Quiz Actions */}
             <div
-                className="nes-container is-dark is-rounded w-full relative z-10"
+                className="nes-container is-dark w-full relative z-10"
                 style={{
                     backgroundColor: 'rgba(17, 24, 39, 0.95)',
                     border: '4px solid #dc2626',
+                    borderRadius: 0,
                     boxShadow: '0 0 40px rgba(0, 255, 136, 0.15), 8px 8px 0px rgba(0, 0, 0, 0.3)',
                     padding: '1.5rem 1rem',
+                    boxSizing: 'border-box',
+                    marginBottom: '2rem',
                 }}
             >
                 <HeroSection
@@ -165,7 +166,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
                     >
                         {/* Questions - Cyan Neon */}
                         <div
-                            className="nes-container is-dark is-rounded flex flex-col items-center justify-center"
+                            className="nes-container is-dark flex flex-col items-center justify-center"
                             style={{
                                 backgroundColor: 'rgba(0, 255, 136, 0.05)',
                                 border: '3px solid #00ff88',
@@ -200,7 +201,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
 
                         {/* Timer - Purple/Violet Neon */}
                         <div
-                            className="nes-container is-dark is-rounded flex flex-col items-center justify-center"
+                            className="nes-container is-dark flex flex-col items-center justify-center"
                             style={{
                                 backgroundColor: 'rgba(124, 58, 237, 0.05)',
                                 border: '3px solid #7c3aed',
@@ -235,7 +236,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
 
                         {/* Rank - Hot Pink Neon */}
                         <div
-                            className="nes-container is-dark is-rounded flex flex-col items-center justify-center"
+                            className="nes-container is-dark flex flex-col items-center justify-center"
                             style={{
                                 backgroundColor: 'rgba(255, 105, 180, 0.05)',
                                 border: '3px solid #ff69b4',

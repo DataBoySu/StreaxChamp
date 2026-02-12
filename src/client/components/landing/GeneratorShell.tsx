@@ -22,7 +22,7 @@ export const GeneratorShell: React.FC<GeneratorShellProps> = ({ children, classN
                 `,
                 backgroundSize: '50px 50px',
             }}
-            className={`w-full relative flex flex-col items-center py-6 px-4 md:px-8 lg:px-12 ${className}`}
+            className={`w-full relative flex flex-col items-center py-6 px-4 md:px-8 lg:px-12 generator-theme-locked ${className}`}
         >
             {/* Removed giant monolithic container to allow separate section windows */}
             <div className="w-full max-w-4xl relative z-10 flex flex-col gap-6 md:gap-10 items-center">

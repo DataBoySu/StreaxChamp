@@ -46,6 +46,7 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         pixel: ['"Press Start 2P"', 'cursive'],
+        retro: ['VT323', 'monospace'],
       },
       animation: {
         'slide-in-up': 'slideInUp 0.5s ease-out',

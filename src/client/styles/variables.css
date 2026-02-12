@@ -1,17 +1,23 @@
 /* ===== CSS CUSTOM PROPERTIES (DESIGN TOKENS) ===== */
 
 /* 
-   DEFAULT THEME (LIGHT / PARCHMENT) 
+   DEFAULT THEME (LIGHT / PARCHMENT / FLASHY) 
    Used by the Generator and as a fallback Light Mode.
 */
 :root {
-    /* Background Colors (Warm Parchment) */
+    /* Background Colors (Flashy Warm) */
     --color-bg-primary: 249 246 240;
     --color-bg-secondary: 255 193 7;
     /* Gravy Yellow */
     --color-bg-tertiary: 243 244 246;
     --color-bg-card: 255 255 255;
     --color-bg-card-hover: 249 250 251;
+
+    /* Flashy Accents for generator */
+    --color-accent-vibrant: 255 122 0;
+    /* Flashy Orange */
+    --color-accent-neon: 0 255 136;
+    /* Cyber Green */
 
     /* Text Colors */
     --color-text-primary: 17 24 39;
@@ -37,11 +43,12 @@
     --error-rgb: 239, 68, 68;
 
     --gradient-primary: linear-gradient(135deg, rgb(255 69 0) 0%, rgb(220 38 0) 100%);
+    --gradient-flashy: linear-gradient(135deg, #ff7a00 0%, #ff4500 100%);
 }
 
 /* 
    DARK THEME (CYBERPUNK / CREATOR DEFAULT) 
-   The primary aesthetic of StreaxChamp.
+   THE PRIMARY AESTHETIC: Deep Contrast & Neon.
 */
 @media (prefers-color-scheme: dark) {
     :root {
@@ -53,11 +60,16 @@
         --color-bg-card-hover: 30 30 30;
 
         --color-text-primary: 255 255 255;
-        --color-text-secondary: 200 200 200;
-        --color-text-tertiary: 150 150 150;
+        /* RESTORED: Pure white for readability */
+        --color-text-secondary: 212 212 216;
+        /* Zinc-300 */
+        --color-text-tertiary: 161 161 170;
+        /* Zinc-400 */
 
-        --color-border: 60 60 60;
-        --color-border-hover: 80 80 80;
+        --color-border: 63 63 70;
+        /* Zinc-700 */
+        --color-border-hover: 82 82 91;
+        /* Zinc-600 */
 
         --color-accent: 255 69 0;
         --color-accent-hover: 255 110 64;
@@ -66,6 +78,7 @@
         --color-warning: 251 191 36;
 
         --accent-rgb: 255, 69, 0;
+        --color-shadow: 0 0 0;
     }
 }
 
@@ -78,11 +91,12 @@
     --color-bg-card-hover: 30 30 30;
 
     --color-text-primary: 255 255 255;
-    --color-text-secondary: 200 200 200;
-    --color-text-tertiary: 150 150 150;
+    /* RESTORED */
+    --color-text-secondary: 212 212 216;
+    --color-text-tertiary: 161 161 170;
 
-    --color-border: 60 60 60;
-    --color-border-hover: 80 80 80;
+    --color-border: 63 63 70;
+    --color-border-hover: 82 82 91;
 
     --color-accent: 255 69 0;
     --color-accent-hover: 255 110 64;
@@ -91,4 +105,5 @@
     --color-warning: 251 191 36;
 
     --accent-rgb: 255, 69, 0;
+    --color-shadow: 0 0 0;
 }

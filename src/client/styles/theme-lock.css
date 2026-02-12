@@ -1,94 +1,92 @@
 /* =========================================
-   GENERATOR THEME LOCK (ART DIRECTED)
-   Overrides Global Dark Mode for Generator UI
+   GENERATOR THEME LOCK (FLASHY UPGRADE)
+   Art-Directed aesthetic with VT323 & Neon
    ========================================= */
 
 .generator-theme-locked {
+    /* Flashy Tokens */
     --color-bg-primary: 249 246 240;
-    --color-bg-secondary: 255 193 7;
-    --color-bg-tertiary: 243 244 246;
     --color-bg-card: 255 255 255;
-    --color-bg-card-hover: 249 250 251;
     --color-text-primary: 17 24 39;
     --color-text-secondary: 75 85 99;
-    --color-text-tertiary: 156 163 175;
-    --color-border: 229 231 235;
-    --color-border-hover: 209 213 219;
-    --color-accent: 255 69 0;
+    --color-accent: 255 122 0;
+    --color-border: 43 43 43;
+
+    font-family: 'VT323', monospace !important;
+    font-size: 1.25rem;
 
     background-color: rgb(249, 246, 240) !important;
     color: rgb(17, 24, 39) !important;
-}
-
-.generator-theme-locked .modern-card {
-    background-color: rgb(255, 255, 255) !important;
-    border-color: rgb(229, 231, 235) !important;
-    color: rgb(17, 24, 39) !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
 }
 
 .generator-theme-locked h1,
 .generator-theme-locked h2,
-.generator-theme-locked h3,
-.generator-theme-locked h4,
-.generator-theme-locked h5,
-.generator-theme-locked h6 {
-    color: rgb(17, 24, 39) !important;
+.generator-theme-locked h3 {
+    font-family: 'Press Start 2P', cursive !important;
+    text-transform: uppercase;
+    color: var(--color-accent) !important;
+    text-shadow: 3px 3px 0px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1rem;
 }
 
-.generator-theme-locked .text-primary {
-    color: rgb(17, 24, 39) !important;
+.generator-theme-locked .modern-card {
+    background-color: #ffffff !important;
+    border: 4px solid #2b2b2b !important;
+    border-radius: 0 !important;
+    /* Sharp */
+    box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.15) !important;
+    padding: 2rem !important;
 }
 
-.generator-theme-locked .text-secondary {
-    color: rgb(75, 85, 99) !important;
-}
-
-.generator-theme-locked .text-accent {
-    color: rgb(255, 69, 0) !important;
-}
-
-.generator-theme-locked .text-success {
-    color: rgb(34, 197, 94) !important;
-}
-
-.generator-theme-locked .text-error {
-    color: rgb(239, 68, 68) !important;
-}
-
-.generator-theme-locked .text-warning {
-    color: rgb(245, 158, 11) !important;
-}
-
-.generator-theme-locked .text-white {
-    color: #ffffff !important;
-}
-
-.generator-theme-locked .text-black {
-    color: #000000 !important;
-}
-
-.generator-theme-locked button {
-    color: inherit;
-}
-
+/* Flashy Buttons - Sharp */
 .generator-theme-locked .modern-button-primary {
+    background: linear-gradient(135deg, #ff9e22 0%, #ff4500 100%) !important;
+    border: 3px solid #2b2b2b !important;
+    border-radius: 0 !important;
+    /* Sharp */
+    font-family: 'Press Start 2P', cursive !important;
+    font-size: 0.8rem !important;
     color: white !important;
-}
-
-.generator-theme-locked .glass-button {
-    color: white !important;
+    padding: 1rem 2rem !important;
+    box-shadow: 4px 4px 0px #000 !important;
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.5);
 }
 
 .generator-theme-locked .modern-button-secondary {
-    background-color: rgb(255, 255, 255) !important;
-    border-color: rgb(229, 231, 235) !important;
-    color: rgb(17, 24, 39) !important;
+    background: #ffffff !important;
+    border: 3px solid #2b2b2b !important;
+    border-radius: 0 !important;
+    /* Sharp */
+    font-family: 'Press Start 2P', cursive !important;
+    font-size: 0.7rem !important;
+    color: #2b2b2b !important;
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.1) !important;
 }
 
-.generator-theme-locked .modern-button-primary {
-    background-image: var(--gradient-primary) !important;
-    background-color: transparent !important;
-    color: white !important;
-    border-color: transparent !important;
+/* Flashy Inputs - Sharp */
+.generator-theme-locked input,
+.generator-theme-locked textarea,
+.generator-theme-locked select {
+    background: #fff !important;
+    border: 3px solid #2b2b2b !important;
+    border-radius: 0 !important;
+    /* Sharp */
+    padding: 0.75rem 1rem !important;
+    font-family: 'VT323', monospace !important;
+    font-size: 1.4rem !important;
+    color: #333 !important;
+}
+
+/* List Items / Options - Sharp */
+.generator-theme-locked .quiz-option {
+    background: #fff !important;
+    border: 3px solid #2b2b2b !important;
+    border-radius: 0 !important;
+    /* Sharp */
+    font-family: 'VT323', monospace !important;
+    font-size: 1.35rem !important;
+    color: #444 !important;
+    padding: 1rem 1.5rem !important;
 }

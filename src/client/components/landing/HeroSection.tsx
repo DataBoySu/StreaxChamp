@@ -31,13 +31,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             {/* Title & Subtitle Group - Reduced spacing to shift robot up */}
             <div className="mb-6 md:mb-10 relative z-20 px-4">
                 <motion.h1
-                    // Cyberpunk neon aesthetic with strong glow for readability
                     style={{
                         fontFamily: "'Press Start 2P', cursive",
-                        color: '#00ff88', // Neon cyan matching robot eyes
-                        textShadow: '0 0 20px #00ff88, 0 0 40px rgba(0, 255, 136, 0.5), 0 0 60px rgba(0, 255, 136, 0.3)',
-                        fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', // Slightly smaller for better mobile fit
+                        color: '#00ff88',
+                        fontSize: 'clamp(1.5rem, 4vw, 2.25rem)',
                         lineHeight: '1.4',
+                        textShadow: '3px 3px 0px rgba(0, 0, 0, 0.4)', // Sharp shadow instead of blur
                     }}
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
