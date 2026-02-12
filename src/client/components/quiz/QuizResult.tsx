@@ -9,6 +9,7 @@ interface QuizResultProps {
     totalQuestions: number;
     onPlayAgain: () => void;
     onReset: () => void;
+    sources?: string[]; // NEW prop
 }
 
 export const QuizResult: React.FC<QuizResultProps> = ({
@@ -16,6 +17,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
     totalQuestions,
     onPlayAgain,
     onReset,
+    sources = []
 }) => {
     const percentage = (score / totalQuestions) * 100;
     const isExcellent = percentage >= 80;
@@ -173,9 +175,43 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                             boxShadow: '0 0 15px rgba(255, 165, 0, 0.3)',
                         }}
                     >
-                        Join Community
+                        r/StreaxChamp
                     </button>
                 </div>
+
+                {/* Sources Section */}
+                {sources && sources.length > 0 && (
+                    <div className="mt-8 text-center">
+                        <p
+                            className="mb-4 text-xs tracking-wider text-slate-400 uppercase"
+                            style={{ fontFamily: "'Press Start 2P', cursive", fontSize: '0.6rem' }}
+                        >
+                            Knowledge Sources
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-3">
+                            {sources.map((url, i) => {
+                                try {
+                                    const domain = new URL(url).hostname.replace('www.', '');
+                                    return (
+                                        <a
+                                            key={i}
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="nes-badge is-splited"
+                                            style={{ textDecoration: 'none' }}
+                                        >
+                                            <span className="is-dark" style={{ fontSize: '0.6rem' }}>LINK</span>
+                                            <span className="is-primary" style={{ fontSize: '0.6rem' }}>{domain}</span>
+                                        </a>
+                                    );
+                                } catch (e) {
+                                    return null;
+                                }
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
         </motion.div>
     );

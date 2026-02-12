@@ -14,6 +14,7 @@ export interface QuizMetadata {
   topic: string;
   difficulty: string;
   source: string;
+  sources?: string[];
 }
 
 export interface DailyQuiz {
@@ -107,6 +108,7 @@ export const useQuizData = (contextPostId?: string | null, date?: string): UseQu
           topic: raw.metadata?.topic || 'General Knowledge',
           difficulty: raw.metadata?.difficulty || 'mixed',
           source: raw.metadata?.source || 'internal',
+          sources: raw.metadata?.sourceWikis || raw.sources || [], // Capture sources
         },
       };
 

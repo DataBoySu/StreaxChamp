@@ -70,7 +70,8 @@ export const App = () => {
     id?: string | undefined;
     topicSlug?: string; // [FIX] Track which topic this quiz belongs to
     questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[];
-    bonus?: { question: string; options: string[]; correctIndex: number } | null
+    bonus?: { question: string; options: string[]; correctIndex: number } | null;
+    sources?: string[]; // Add sources field
   }
   const [selectedTopicQuiz, setSelectedTopicQuiz] = useState<SelectedTopicQuiz | null>(null);
   const [topicQuizStatus, setTopicQuizStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -1085,7 +1086,6 @@ export const App = () => {
                       startQuiz();
                     }}
                     totalQuestions={NUM_QUESTIONS}
-                    errorMessage={currentError?.robotDialogue}
                     hasPlayed={hasCompletedQuizSession}
                     totalPoints={userTotalScore}
                     dailyCompleted={hasDailyCompleted}
@@ -1133,6 +1133,7 @@ export const App = () => {
                     totalQuestions={NUM_QUESTIONS + (showBonusQuestion ? 1 : 0)}
                     onPlayAgain={startQuiz}
                     onReset={resetQuiz}
+                    sources={selectedTopic ? selectedTopicQuiz?.sources : dailyQuiz?.metadata?.sources}
                   />
                 ) : (
                   <QuizActiveView

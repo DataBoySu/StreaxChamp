@@ -34,7 +34,7 @@ import { useSystemStatus } from '../../hooks/useSystemStatus'; // NEW
 export const TopicSelector: React.FC<{
   onClose?: () => void;
   initialQuery?: string;
-  onTopicReady?: (topic: { title: string; slug: string; quizId?: string; quiz?: { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[] }; bonus?: { question: string; options: string[]; correctIndex: number } | null }) => void;
+  onTopicReady?: (topic: { title: string; slug: string; quizId?: string; sources?: string[]; quiz?: { questions?: { question: string; options?: string[]; answers?: string[]; correctAnswer: number | string }[] }; bonus?: { question: string; options: string[]; correctIndex: number } | null }) => void;
   onError?: (code: string, robotDialogue: string, persistent?: boolean) => void;
 }> = ({ onClose, initialQuery, onTopicReady, onError }) => {
   const [topics, setTopics] = useState<TopicDoc[]>([]);
@@ -196,7 +196,14 @@ export const TopicSelector: React.FC<{
       // Delay slightly for effect
       await new Promise(r => setTimeout(r, 800));
 
-      onTopicReady?.({ title: topic.name, slug, quizId: result.id, quiz: result?.quiz || result, bonus: result?.bonus || null });
+      onTopicReady?.({
+        title: topic.name,
+        slug,
+        quizId: result.id,
+        quiz: result?.quiz || result,
+        bonus: result?.bonus || null,
+        sources: result?.quiz?.metadata?.sourceWikis || result?.sources || [] // Pass sources
+      });
     } catch (e) {
       console.warn('[QuizGen] Failed', e);
       setGenerationError((e as Error).message || 'Quiz generation failed');
