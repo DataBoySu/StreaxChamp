@@ -18,28 +18,50 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
         return 'is-warning';
     };
 
+    // Get color for glow effect
+    const getGlowColor = () => {
+        if (message.type === 'success') return 'rgba(0, 255, 136, 0.5)';
+        if (message.type === 'error') return 'rgba(220, 38, 38, 0.5)';
+        return 'rgba(255, 165, 0, 0.5)';
+    };
+
     return (
         <AnimatePresence>
             {message.text && (
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 20 }}
-                    className="fixed bottom-8 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4"
+                    initial={{ opacity: 0, x: 100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 100, scale: 0.9 }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                    style={{
+                        position: 'fixed',
+                        top: '50%',
+                        right: '2rem',
+                        transform: 'translateY(-50%)',
+                        zIndex: 10000,
+                        pointerEvents: 'none',
+                    }}
                 >
                     <div
-                        className={`nes-container is-rounded ${getContainerClass()}`}
+                        className={`nes-container ${getContainerClass()}`}
                         style={{
-                            display: 'inline-block',
-                            padding: '1rem',
-                            maxWidth: '90%',
-                            textAlign: 'center',
-                            backgroundColor: message.type === 'success' ? '#90EE90' :
-                                message.type === 'error' ? '#FFB6C1' :
-                                    '#FFE4B5'
+                            borderRadius: 0,
+                            padding: '1.25rem 2rem',
+                            boxShadow: `0 0 30px ${getGlowColor()}, 6px 6px 0px rgba(0, 0, 0, 0.4)`,
+                            minWidth: '150px',
                         }}
                     >
-                        <p style={{ margin: 0, fontWeight: 'bold' }}>{message.text}</p>
+                        <p
+                            style={{
+                                margin: 0,
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(0.75rem, 2.5vw, 1rem)',
+                                textAlign: 'center',
+                                lineHeight: '1.5',
+                            }}
+                        >
+                            {message.text}
+                        </p>
                     </div>
                 </motion.div>
             )}
