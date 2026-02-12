@@ -1,0 +1,236 @@
+/* Miscellaneous Game Styles */
+
+.timer-urgent {
+    filter: drop-shadow(0 0 20px rgba(234, 179, 8, 0.6));
+}
+
+.timer-critical {
+    filter: drop-shadow(0 0 25px rgba(249, 115, 22, 0.8));
+}
+
+.timer-last-second {
+    filter: drop-shadow(0 0 30px rgba(239, 68, 68, 1));
+}
+
+.timer-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+}
+
+@media (max-width: 768px) {
+    .timer-container {
+        min-height: 110px;
+    }
+}
+
+/* Circular Timer */
+.circular-timer {
+    position: relative;
+    width: 45px;
+    height: 45px;
+}
+
+.circular-timer.warning {
+    animation: urgentPulse 0.5s infinite;
+}
+
+.timer-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 4px solid rgba(var(--color-border), 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    position: relative;
+    overflow: hidden;
+}
+
+.timer-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 4px solid transparent;
+    border-top-color: rgb(var(--color-accent));
+    transform: rotate(-90deg);
+    transition: border-top-color 0.3s ease;
+}
+
+.timer-progress.warning {
+    border-top-color: rgb(var(--color-error));
+    animation: spin 1s linear infinite;
+}
+
+.timer-text {
+    position: relative;
+    z-index: 2;
+    color: rgb(var(--color-text-primary));
+    transition: color 0.3s ease;
+    font-weight: 900;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.02em;
+}
+
+.timer-text.warning {
+    color: rgb(var(--error-rgb));
+    animation: urgentBlink 0.5s infinite;
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor, 0 2px 4px rgba(0, 0, 0, 0.5);
+    filter: brightness(1.2) saturate(1.3);
+}
+
+/* Multiplier Pop */
+.multiplier-pop {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    font-size: 3rem;
+    font-weight: 900;
+    animation: multiplierPop 2s ease-out forwards;
+    z-index: 50;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8), 0 0 15px currentColor, 0 0 30px currentColor;
+    -webkit-text-stroke: 2px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    transform-origin: center;
+    max-width: 200px;
+    word-wrap: break-word;
+    text-align: center;
+}
+
+.multiplier-pop-1 {
+    color: #ff6b35;
+}
+
+.multiplier-pop-2 {
+    color: #ff4500;
+}
+
+.multiplier-pop-3 {
+    color: #ff0000;
+}
+
+.multiplier-pop-4 {
+    color: #ffd700;
+}
+
+.multiplier-pop-5 {
+    color: #ff1493;
+}
+
+.score-glow {
+    animation: scoreGlow 2s ease-in-out infinite;
+}
+
+.times-up-glow {
+    font-size: 3rem !important;
+    font-weight: 900 !important;
+    color: #ef4444 !important;
+    text-shadow: 0 0 10px #ef4444, 0 0 20px #ef4444, 0 0 30px #ef4444, 0 0 40px #ef4444;
+    animation: timesUpPulse 1s ease-in-out infinite;
+}
+
+/* Messages */
+.message-dramatic {
+    font-size: 2.5rem !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1rem !important;
+    animation: dramaPulse 1.5s ease-in-out infinite !important;
+    text-shadow: 0 0 20px currentColor !important;
+    transform: scale(1.2) !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+@media (min-width: 768px) {
+    .message-dramatic {
+        font-size: 3.5rem !important;
+        letter-spacing: 0.15rem !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    .message-dramatic {
+        font-size: 4rem !important;
+        letter-spacing: 0.2rem !important;
+    }
+}
+
+.message-incorrect {
+    color: #ff3333 !important;
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #ff3333 !important;
+    background-clip: unset !important;
+    filter: none !important;
+    text-shadow: 0 0 5px #ff3333, 0 0 10px #ff3333, 0 0 15px #ff3333, 0 0 20px #ff3333 !important;
+}
+
+.message-correct {
+    color: #ffd700 !important;
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #ffd700 !important;
+    background-clip: unset !important;
+    filter: none !important;
+    text-shadow: 0 0 5px #ffd700, 0 0 10px #ffd700, 0 0 15px #ffd700, 0 0 20px #ffd700 !important;
+    animation: victoryGlow 1.2s ease-in-out infinite !important;
+}
+
+/* Status */
+.connection-status {
+    backdrop-filter: blur(8px);
+    font-weight: 500;
+    letter-spacing: 0.025em;
+}
+
+.connection-indicator {
+    transition: all 0.3s ease;
+}
+
+.connection-indicator:hover {
+    transform: scale(1.05);
+}
+
+.connection-pulse {
+    animation: connectionPulse 2s infinite;
+}
+
+.fresh-questions-notice {
+    backdrop-filter: blur(8px);
+    border-style: dashed;
+    animation: slideInFromTop 0.5s ease-out;
+}
+
+/* Celebration */
+.celebration-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.balloon-shadow {
+    filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.sludge-splatter {
+    filter: drop-shadow(1px 2px 3px rgba(0, 0, 0, 0.3));
+}
+
+.celebration-glow {
+    text-shadow: 0 0 20px currentColor, 0 0 40px currentColor, 0 0 60px currentColor;
+    animation: celebrationPulse 2s ease-in-out infinite;
+}

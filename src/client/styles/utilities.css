@@ -1,0 +1,102 @@
+@layer utilities {
+    .text-gradient {
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .glass-effect {
+        backdrop-filter: blur(12px) saturate(180%);
+        background: rgba(var(--color-bg-card), 0.8);
+        border: 1px solid rgba(var(--color-border), 0.2);
+    }
+
+    .bg-primary {
+        background-color: rgb(var(--color-bg-primary));
+    }
+
+    .bg-secondary {
+        background-color: rgb(var(--color-bg-secondary));
+    }
+
+    .bg-tertiary {
+        background-color: rgb(var(--color-bg-tertiary));
+    }
+
+    .bg-card {
+        background-color: rgb(var(--color-bg-card));
+    }
+
+    .bg-card-hover {
+        background-color: rgb(var(--color-bg-card-hover));
+    }
+
+    .bg-accent {
+        background-color: rgb(var(--color-accent));
+    }
+
+    .bg-success {
+        background-color: rgb(var(--color-success));
+    }
+
+    .bg-error {
+        background-color: rgb(var(--color-error));
+    }
+
+    .bg-warning {
+        background-color: rgb(var(--color-warning));
+    }
+
+    .text-primary {
+        color: rgb(var(--color-text-primary));
+    }
+
+    .text-secondary {
+        color: rgb(var(--color-text-secondary));
+    }
+
+    .text-tertiary {
+        color: rgb(var(--color-text-tertiary));
+    }
+
+    .text-accent {
+        color: rgb(var(--color-accent));
+    }
+
+    .text-success {
+        color: rgb(var(--color-success));
+    }
+
+    .text-error {
+        color: rgb(var(--color-error));
+    }
+
+    .text-warning {
+        color: rgb(var(--color-warning));
+    }
+
+    .border-primary {
+        border-color: rgb(var(--color-border));
+    }
+
+    .border-secondary {
+        border-color: rgb(var(--color-border-hover));
+    }
+
+    .border-accent {
+        border-color: rgb(var(--color-accent));
+    }
+
+    .border-success {
+        border-color: rgb(var(--color-success));
+    }
+
+    .border-error {
+        border-color: rgb(var(--color-error));
+    }
+
+    .border-warning {
+        border-color: rgb(var(--color-warning));
+    }
+}

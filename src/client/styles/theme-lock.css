@@ -1,0 +1,94 @@
+/* =========================================
+   GENERATOR THEME LOCK (ART DIRECTED)
+   Overrides Global Dark Mode for Generator UI
+   ========================================= */
+
+.generator-theme-locked {
+    --color-bg-primary: 249 246 240;
+    --color-bg-secondary: 255 193 7;
+    --color-bg-tertiary: 243 244 246;
+    --color-bg-card: 255 255 255;
+    --color-bg-card-hover: 249 250 251;
+    --color-text-primary: 17 24 39;
+    --color-text-secondary: 75 85 99;
+    --color-text-tertiary: 156 163 175;
+    --color-border: 229 231 235;
+    --color-border-hover: 209 213 219;
+    --color-accent: 255 69 0;
+
+    background-color: rgb(249, 246, 240) !important;
+    color: rgb(17, 24, 39) !important;
+}
+
+.generator-theme-locked .modern-card {
+    background-color: rgb(255, 255, 255) !important;
+    border-color: rgb(229, 231, 235) !important;
+    color: rgb(17, 24, 39) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.generator-theme-locked h1,
+.generator-theme-locked h2,
+.generator-theme-locked h3,
+.generator-theme-locked h4,
+.generator-theme-locked h5,
+.generator-theme-locked h6 {
+    color: rgb(17, 24, 39) !important;
+}
+
+.generator-theme-locked .text-primary {
+    color: rgb(17, 24, 39) !important;
+}
+
+.generator-theme-locked .text-secondary {
+    color: rgb(75, 85, 99) !important;
+}
+
+.generator-theme-locked .text-accent {
+    color: rgb(255, 69, 0) !important;
+}
+
+.generator-theme-locked .text-success {
+    color: rgb(34, 197, 94) !important;
+}
+
+.generator-theme-locked .text-error {
+    color: rgb(239, 68, 68) !important;
+}
+
+.generator-theme-locked .text-warning {
+    color: rgb(245, 158, 11) !important;
+}
+
+.generator-theme-locked .text-white {
+    color: #ffffff !important;
+}
+
+.generator-theme-locked .text-black {
+    color: #000000 !important;
+}
+
+.generator-theme-locked button {
+    color: inherit;
+}
+
+.generator-theme-locked .modern-button-primary {
+    color: white !important;
+}
+
+.generator-theme-locked .glass-button {
+    color: white !important;
+}
+
+.generator-theme-locked .modern-button-secondary {
+    background-color: rgb(255, 255, 255) !important;
+    border-color: rgb(229, 231, 235) !important;
+    color: rgb(17, 24, 39) !important;
+}
+
+.generator-theme-locked .modern-button-primary {
+    background-image: var(--gradient-primary) !important;
+    background-color: transparent !important;
+    color: white !important;
+    border-color: transparent !important;
+}
