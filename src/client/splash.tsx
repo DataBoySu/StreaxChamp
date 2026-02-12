@@ -183,27 +183,35 @@ const Splash = () => {
 
     const renderMenu = () => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-            {/* 2 Big Buttons */}
+            {/* 2 Big Buttons: Create & Generate */}
             <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
-                <button
-                    type="button"
-                    className="nes-btn is-primary"
-                    style={{ flex: 1, fontFamily: "'Press Start  2P'", fontSize: '0.7rem' }}
-                    onClick={handleGenerate}
-                >
-                    Start Quiz
-                </button>
                 <button
                     type="button"
                     className="nes-btn is-warning"
-                    style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.7rem' }}
-                    onClick={() => navigateTo('https://devpost.com/software/streax-champ')}
+                    style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.8rem', padding: '1.25rem' }}
+                    onClick={handleCreate}
                 >
-                    Hackathon Page
+                    Create
+                </button>
+                <button
+                    type="button"
+                    className="nes-btn is-primary"
+                    style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.8rem', padding: '1.25rem' }}
+                    onClick={handleGenerate}
+                >
+                    Generate
                 </button>
             </div>
-            {/* 2 Small Buttons */}
+            {/* 2 Small Buttons: Hackathon & Join Community */}
             <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                <button
+                    type="button"
+                    className="nes-btn"
+                    style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.6rem', padding: '0.75rem' }}
+                    onClick={() => navigateTo('https://devpost.com/software/streax-champ')}
+                >
+                    Hackathon
+                </button>
                 <button
                     type="button"
                     className="nes-btn"
@@ -217,14 +225,6 @@ const Splash = () => {
                     }}
                 >
                     Join Community
-                </button>
-                <button
-                    type="button"
-                    className="nes-btn"
-                    style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.6rem', padding: '0.75rem' }}
-                    onClick={handleCreate}
-                >
-                    Create
                 </button>
             </div>
         </div>
@@ -258,6 +258,32 @@ const Splash = () => {
                     <button type="button" className="nes-btn is-primary" style={{ width: '100%' }} onClick={handleStartQuiz}>
                         Play Now!
                     </button>
+
+                    {/* Community Buttons */}
+                    <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '8px' }}>
+                        <button
+                            type="button"
+                            className="nes-btn"
+                            style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.6rem', padding: '0.75rem' }}
+                            onClick={async () => {
+                                try {
+                                    await fetch('/api/community/subscribe', { method: 'POST' });
+                                } catch (err) {
+                                    console.error('Subscribe failed', err);
+                                }
+                            }}
+                        >
+                            Subscribe
+                        </button>
+                        <button
+                            type="button"
+                            className="nes-btn"
+                            style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.6rem', padding: '0.75rem' }}
+                            onClick={() => navigateTo('https://reddit.com/r/streaxchamp')}
+                        >
+                            Visit Community
+                        </button>
+                    </div>
                 </>
             )}
         </div>
