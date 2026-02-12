@@ -39,35 +39,131 @@ export const ExplanationScreen: React.FC<ExplanationScreenProps> = ({
             <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className={`w-full p-8 rounded-xl border-4 ${isCorrect ? 'bg-green-900/20 border-green-500' : 'bg-red-900/20 border-red-500'}`}
+                className="nes-container is-dark w-full"
+                style={{
+                    borderRadius: 0,
+                    background: isCorrect
+                        ? 'linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 255, 136, 0.05))'
+                        : 'linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(220, 38, 38, 0.05))',
+                    border: `4px solid ${isCorrect ? '#00ff88' : '#dc2626'}`,
+                    boxShadow: isCorrect
+                        ? '0 0 25px rgba(0, 255, 136, 0.4)'
+                        : '0 0 25px rgba(220, 38, 38, 0.4)',
+                    padding: '2rem',
+                }}
             >
-                <h2 className={`text-2xl font-bold mb-4 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
-                    {isCorrect ? 'Correct!' : 'Incorrect'}
+                {/* Result Header */}
+                <h2
+                    style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        fontSize: 'clamp(1.2rem, 3vw, 1.5rem)',
+                        color: isCorrect ? '#00ff88' : '#ff6b6b',
+                        textShadow: `0 0 15px ${isCorrect ? 'rgba(0, 255, 136, 0.5)' : 'rgba(255, 107, 107, 0.5)'}`,
+                        marginBottom: '1.5rem',
+                    }}
+                >
+                    {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
                 </h2>
 
-                <div className="mb-6 opacity-80 text-sm">{question}</div>
-
-                <div className="mb-8">
-                    <p className="text-xs uppercase tracking-wider opacity-60 mb-2">Correct Answer</p>
-                    <p className="text-xl font-mono font-bold">{correctAnswer}</p>
+                {/* Question Display */}
+                <div
+                    style={{
+                        fontFamily: "'VT323', monospace",
+                        fontSize: 'clamp(0.9rem, 2vw, 1.1rem)',
+                        color: '#e5e7eb',
+                        marginBottom: '1.5rem',
+                        opacity: 0.9,
+                    }}
+                >
+                    {question}
                 </div>
 
+                {/* Correct Answer */}
+                <div
+                    className="nes-container is-dark"
+                    style={{
+                        borderRadius: 0,
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        border: '2px solid rgba(255, 255, 255, 0.2)',
+                        padding: '1rem',
+                        marginBottom: '1.5rem',
+                    }}
+                >
+                    <p
+                        style={{
+                            fontFamily: "'VT323', monospace",
+                            fontSize: '0.75rem',
+                            color: '#9ca3af',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.1em',
+                            marginBottom: '0.5rem',
+                        }}
+                    >
+                        Correct Answer
+                    </p>
+                    <p
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.8rem, 2vw, 1rem)',
+                            color: '#ffffff',
+                            textShadow: '0 0 10px rgba(255, 255, 255, 0.3)',
+                        }}
+                    >
+                        {correctAnswer}
+                    </p>
+                </div>
+
+                {/* Explanation */}
                 {explanation && (
-                    <div className="mb-8 p-4 bg-black/30 rounded-lg text-left">
-                        <p className="text-xs uppercase tracking-wider opacity-50 mb-2">Did you know?</p>
-                        <p className="text-md leading-relaxed">{explanation}</p>
+                    <div
+                        className="nes-container is-dark"
+                        style={{
+                            borderRadius: 0,
+                            background: 'rgba(124, 58, 237, 0.1)',
+                            border: '2px solid rgba(124, 58, 237, 0.3)',
+                            padding: '1rem',
+                            marginBottom: '1.5rem',
+                            textAlign: 'left',
+                        }}
+                    >
+                        <p
+                            style={{
+                                fontFamily: "'VT323', monospace",
+                                fontSize: '0.75rem',
+                                color: '#a78bfa',
+                                textTransform: 'uppercase',
+                                marginBottom: '0.5rem',
+                            }}
+                        >
+                            Did you know?
+                        </p>
+                        <p
+                            style={{
+                                fontFamily: "'VT323', monospace",
+                                fontSize: 'clamp(0.95rem, 2vw, 1.1rem)',
+                                color: '#e5e7eb',
+                                lineHeight: '1.6',
+                            }}
+                        >
+                            {explanation}
+                        </p>
                     </div>
                 )}
 
+                {/* Next Button */}
                 <button
                     onClick={onNext}
                     disabled={!canProceed}
-                    className={`
-            w-full py-4 text-lg font-bold rounded-lg transition-all
-            ${canProceed
-                            ? 'bg-primary hover:bg-primary-focus text-white cursor-pointer transform hover:scale-105'
-                            : 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'}
-          `}
+                    className={`nes-btn w-full ${canProceed ? 'is-primary' : ''}`}
+                    style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
+                        padding: '1rem',
+                        borderRadius: 0,
+                        opacity: canProceed ? 1 : 0.5,
+                        cursor: canProceed ? 'pointer' : 'not-allowed',
+                        boxShadow: canProceed ? '0 0 15px rgba(0, 255, 136, 0.3)' : 'none',
+                    }}
                 >
                     {canProceed ? 'Next Question →' : `Wait ${timeLeft}s...`}
                 </button>

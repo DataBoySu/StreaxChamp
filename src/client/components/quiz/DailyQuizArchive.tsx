@@ -12,7 +12,7 @@ export const DailyQuizArchive: React.FC<DailyQuizArchiveProps> = ({
     onClose
 }) => {
     const [dates, setDates] = useState<string[]>([]);
-    const [completedDates, setCompletedDates] = useState<string[]>([]); // internal state
+    const [completedDates, setCompletedDates] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -47,22 +47,72 @@ export const DailyQuizArchive: React.FC<DailyQuizArchiveProps> = ({
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="modern-card w-full max-w-lg max-h-[80vh] flex flex-col p-0 overflow-hidden"
+                className="nes-container is-dark w-full max-w-lg max-h-[80vh] flex flex-col p-0"
+                style={{
+                    borderRadius: 0,
+                    background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(31, 41, 55, 0.95))',
+                    border: '4px solid #00ff88',
+                    boxShadow: '0 0 30px rgba(0, 255, 136, 0.4), 8px 8px 0px rgba(0, 0, 0, 0.5)',
+                }}
             >
-                <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
-                    <h2 className="text-xl font-bold text-gradient">Past Daily Quizzes</h2>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                {/* Header */}
+                <div
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '1.5rem',
+                        borderBottom: '3px solid rgba(0, 255, 136, 0.3)',
+                        background: 'rgba(0, 255, 136, 0.05)',
+                    }}
+                >
+                    <h2
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.75rem, 2vw, 0.9rem)',
+                            color: '#00ff88',
+                            textShadow: '0 0 10px rgba(0, 255, 136, 0.5)',
+                            margin: 0,
+                        }}
+                    >
+                        Past Daily Quizzes
+                    </h2>
+                    <button
+                        onClick={onClose}
+                        className="nes-btn is-error"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: '0.625rem',
+                            padding: '0.5rem',
+                            borderRadius: 0,
+                        }}
+                    >
                         ✕
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                {/* Content */}
+                <div
+                    className="flex-1 overflow-y-auto p-4 space-y-3"
+                    style={{
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#00ff88 rgba(255, 255, 255, 0.1)',
+                    }}
+                >
                     {loading ? (
                         <div className="flex justify-center py-8">
                             <KawaiiLoader />
                         </div>
                     ) : dates.length === 0 ? (
-                        <div className="text-center text-secondary py-8">
+                        <div
+                            style={{
+                                textAlign: 'center',
+                                padding: '2rem',
+                                fontFamily: "'VT323', monospace",
+                                fontSize: '1.2rem',
+                                color: '#9ca3af',
+                            }}
+                        >
                             No archives found.
                         </div>
                     ) : (
@@ -73,29 +123,53 @@ export const DailyQuizArchive: React.FC<DailyQuizArchiveProps> = ({
                                 <button
                                     key={date}
                                     onClick={() => onSelectDate(date)}
-                                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all group
-                    ${isCompleted
-                                            ? 'bg-green-900/10 border-green-500/30 hover:bg-green-900/20'
-                                            : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-primary/50'}
-                  `}
+                                    className={`nes-btn w-full ${isCompleted ? 'is-success' : 'is-primary'}`}
+                                    style={{
+                                        fontFamily: "'VT323', monospace",
+                                        fontSize: 'clamp(0.9rem, 2vw, 1.1rem)',
+                                        padding: '1rem',
+                                        borderRadius: 0,
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        textAlign: 'left',
+                                        boxShadow: isCompleted
+                                            ? '0 0 15px rgba(0, 255, 136, 0.3)'
+                                            : '0 0 10px rgba(150, 206, 180, 0.2)',
+                                    }}
                                 >
-                                    <div className="flex flex-col items-start">
-                                        <span className={`font-bold ${isToday ? 'text-accent' : 'text-white'}`}>
+                                    <div>
+                                        <div
+                                            style={{
+                                                fontFamily: "'Press Start 2P', cursive",
+                                                fontSize: 'clamp(0.5rem, 1.5vw, 0.65rem)',
+                                                color: isToday ? '#ff69b4' : isCompleted ? '#00ff88' : '#96ceb4',
+                                                marginBottom: '0.25rem',
+                                            }}
+                                        >
                                             {formatDate(date)}
-                                        </span>
-                                        {isToday && <span className="text-xs text-accent uppercase tracking-wider">Today's Quiz</span>}
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        {isCompleted ? (
-                                            <span className="text-green-400 text-sm font-bold flex items-center gap-1">
-                                                ✓ Completed
-                                            </span>
-                                        ) : (
-                                            <span className="text-secondary text-sm group-hover:text-primary transition-colors">
-                                                Play →
-                                            </span>
+                                        </div>
+                                        {isToday && (
+                                            <div
+                                                style={{
+                                                    fontFamily: "'VT323', monospace",
+                                                    fontSize: '0.75rem',
+                                                    color: '#ff69b4',
+                                                    textTransform: 'uppercase',
+                                                }}
+                                            >
+                                                Today's Quiz
+                                            </div>
                                         )}
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontFamily: "'VT323', monospace",
+                                            fontSize: '0.9rem',
+                                            color: isCompleted ? '#00ff88' : '#96ceb4',
+                                        }}
+                                    >
+                                        {isCompleted ? '✓ Done' : 'Play →'}
                                     </div>
                                 </button>
                             );
