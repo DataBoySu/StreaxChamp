@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { CircularTimer } from '../ui';
+import { CircularOverlayTimer } from './CircularOverlayTimer';
 
 interface BonusQuestionViewProps {
     bonusQuestion: { question: string; answers: string[]; correctAnswer: string } | null;
@@ -40,7 +40,7 @@ export const BonusQuestionView: React.FC<BonusQuestionViewProps> = ({
                 {/* Prominent Bonus Timer */}
                 {timerActive && (
                     <div className="timer-container my-6">
-                        <CircularTimer timeLeft={timeLeft} totalTime={totalTime} />
+                        <CircularOverlayTimer timeLeft={timeLeft} totalTime={totalTime} />
                     </div>
                 )}
             </div>
@@ -61,10 +61,10 @@ export const BonusQuestionView: React.FC<BonusQuestionViewProps> = ({
                             onClick={() => onAnswer(answer, bonusQuestion.correctAnswer)}
                             disabled={selectedAnswer !== null}
                             className={`quiz-option quiz-option-big ${selectedAnswer && answer === correctAnswer
-                                    ? 'correct'
-                                    : selectedAnswer === answer
-                                        ? 'incorrect'
-                                        : ''
+                                ? 'correct'
+                                : selectedAnswer === answer
+                                    ? 'incorrect'
+                                    : ''
                                 }`}
                         >
                             <span className="relative z-10 font-bold text-left text-lg">

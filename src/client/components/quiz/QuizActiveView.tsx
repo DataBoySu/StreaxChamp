@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { AppQuestion } from '../../hooks/useQuizData';
-import { CircularTimer } from '../../components/ui';
+import { CircularOverlayTimer } from './CircularOverlayTimer';
 
 interface QuizActiveViewProps {
     question: AppQuestion;
@@ -74,11 +74,9 @@ export const QuizActiveView: React.FC<QuizActiveViewProps> = ({
                     </div>
                 </div>
 
-                {/* Prominent Timer Display */}
+                {/* Overlay Timer - appears only in final 15s */}
                 {timerActive && (
-                    <div className="timer-container mb-4">
-                        <CircularTimer timeLeft={timeLeft} totalTime={totalTime} />
-                    </div>
+                    <CircularOverlayTimer timeLeft={timeLeft} totalTime={totalTime} />
                 )}
             </div>
 
