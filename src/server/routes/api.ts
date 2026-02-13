@@ -11,6 +11,7 @@ import { LandingController } from '../controllers/LandingController';
 import { HistoryController } from '../controllers/HistoryController'; // Added import
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { LimitController } from '../controllers/LimitController';
+import { MaintenanceController } from '../controllers/MaintenanceController';
 import { context } from '@devvit/web/server';
 import { reddit, redis } from '@devvit/web/server';
 import { CONFIG } from '../../shared/constants';
@@ -60,6 +61,9 @@ router.get('/robot/dialogues/today', RobotController.getDialogues);
 
 // --- Landing ---
 router.get('/landing/summary', LandingController.getSummary);
+
+// --- Maintenance ---
+router.get('/maintenance/migrate-legacy', MaintenanceController.migrateLegacySnapshots);
 
 // --- Users ---
 router.get('/context/user', UserController.resolveContextUser);

@@ -1,38 +1,29 @@
-Implement a one-time Legacy Snapshot Freezer for topic leaderboards.
+Modify topic leaderboard flow to use TopicLeaderboardService exclusively.
 
-Task:
+Do NOT delete LeaderboardMemoryService yet.
+Do NOT remove interval yet.
+Do NOT modify daily quiz flow.
 
-For each document in collection:
+Tasks:
+
+1️⃣ In LeaderboardController.submitScore (topic branch only):
+Replace call to LeaderboardMemoryService.submit(...) with:
+TopicLeaderboardService.submitScore(...)
+
+Ensure:
+
+quizId is resolved from topics/{slug}.activeQuizId
+
+stale_version logic is respected
+
+2️⃣ In LeaderboardController.listTopicLeaderboard:
+Replace memory read with:
+TopicLeaderboardService.getLeaderboard(slug, activeQuizId, limit)
+
+3️⃣ Ensure no code path writes topic data into LeaderboardMemoryService.
+
+4️⃣ Ensure no writes occur to:
 leaderboards/{slug}
 
-If document exists:
-
-Create new quiz version:
-topics/{slug}/quizzes/legacy_snapshot
-
-Write metadata:
-source: "memory_snapshot"
-migratedAt: REQUEST_TIME
-generationVersion: -1
-legacy: true
-
-For each entry in entries array:
-Create:
-topics/{slug}/quizzes/legacy_snapshot/leaderboard/{username}
-
-Fields:
-username
-score
-timestamp
-legacy: true
-
-After successful migration:
-Delete leaderboards/{slug}
-
-Do not modify daily quiz system.
-Do not remove LeaderboardMemoryService yet.
-Do not change submission flow.
-This is archival only.
-
-Ensure idempotency:
-If legacy_snapshot already exists, skip.
+Do not remove existing code.
+Only bypass it for topics.
