@@ -38,7 +38,7 @@ export class CommentLeaderboardService {
             // Create new comment if missing
             const comment = await reddit.submitComment({
                 id: postId,
-                text: this.formatLeaderboard([], date)
+                text: this.renderLeaderboard([], date)
             });
 
             // Save commentId to Firestore
@@ -56,7 +56,7 @@ export class CommentLeaderboardService {
      */
     async updateLeaderboardComment(reddit: any, commentId: string, entries: CommentLeaderboardEntry[], date: string): Promise<boolean> {
         try {
-            const text = this.formatLeaderboard(entries, date);
+            const text = this.renderLeaderboard(entries, date);
             await reddit.editComment({
                 id: commentId,
                 text: text
@@ -69,7 +69,10 @@ export class CommentLeaderboardService {
         }
     }
 
-    private formatLeaderboard(entries: CommentLeaderboardEntry[], date: string): string {
+    /**
+     * Renders the markdown leaderboard text.
+     */
+    public renderLeaderboard(entries: CommentLeaderboardEntry[], date: string): string {
         const header = `### 🏆 Daily Quiz Leaderboard: ${date}\n\n`;
 
         if (entries.length === 0) {

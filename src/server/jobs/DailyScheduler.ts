@@ -1,6 +1,7 @@
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { generateUnifiedContent } from '../services/GeminiService';
 import { createPost } from '../core/post';
+import { CommentLeaderboardService } from '../services/CommentLeaderboardService';
 import { Logger } from '../Logger';
 
 // Job Names (Must match main.ts registration)
@@ -123,87 +124,65 @@ export async function handleLeaderboardSync(_event: any, context: any) {
         }
 
         // c. Fetch top 10 leaderboard
-        // getQuizLeaderboard(date, limit) returns { userKey, nickname, score, completedAt }
         const entries = await fs.getQuizLeaderboard(todayStr, 10);
 
         // d. Render markdown & Compute Hash
-        // formatLeaderboard expects CommentLeaderboardEntry[]
         const mappedEntries = entries.map(e => ({
-            username: e.nickname, // Use nickname as username for display
+            username: e.nickname,
             score: e.score,
             timestamp: new Date(e.completedAt).getTime()
         }));
 
-        // Access private method? No, formatLeaderboard is private.
-        // We can't access formatLeaderboard publicly. 
-        // We should expose a public formatting method or construct hash from content string.
-        // Or reproduce formatting logic here to compute hash.
-        // Better: Update CommentLeaderboardService to expose `getLeaderboardText(entries, date)` public method.
-        // For now, let's assume we can make it public or duplicate logic if needed.
-        // Wait, CommentLeaderboardService handles the update too.
-        // Let's use `updateLeaderboardComment`? But that updates blindly.
-        // We need to check hash first.
-
-        // Let's implement hash check logic here.
-        // Format text first.
-        const text = formatLeaderboard(mappedEntries, todayStr);
+        const lbService = CommentLeaderboardService.getInstance();
+        const text = lbService.renderLeaderboard(mappedEntries, todayStr);
 
         // e. Compute SHA256 Hash
         const currentHash = await sha256(text);
         const storedHash = quiz.metadata?.leaderboardHash || '';
+        const changed = currentHash !== storedHash;
+
+        Logger.info(`[Job:Sync] Results: entries=${mappedEntries.length}, changed=${changed}, currentHash=${currentHash.slice(0, 8)}, storedHash=${storedHash.slice(0, 8)}`);
 
         // f. Compare
-        if (currentHash === storedHash) {
-            Logger.info('[Job:Sync] Hash match. No changes.');
+        if (!changed) {
+            Logger.info('[Job:Sync] Content unchanged. Exiting.');
             return;
         }
 
-        Logger.info('[Job:Sync] content changed. Updating comment...');
+        Logger.info('[Job:Sync] Content changed or missing hash. Procceeding to update...');
 
         // g. Update Comment
         let commentId = quiz.metadata?.leaderboardCommentId;
+        let commentCreated = false;
+        let commentEdited = false;
 
         if (!commentId) {
-            // Create New
+            Logger.info('[Job:Sync] No commentId. Creating new comment.');
             const comment = await context.reddit.submitComment({
-                id: postId,
+                id: postId as string,
                 text: text
             });
-            commentId = comment.id;
-            Logger.info(`[Job:Sync] Created new comment: ${commentId}`);
+            commentId = (comment.id as string);
+            commentCreated = true;
+            Logger.info(`[Job:Sync] Comment created: ${commentId}`);
 
-            // Update Firestore with new comment ID
-            const fsMeta: any = { leaderboardCommentId: commentId }; // Partial updates usually supported?
-            // saveDailyQuizMetadata uses PATCH, correct.
-            await fs.saveDailyQuizMetadata(todayStr, fsMeta);
+            await fs.saveDailyQuizMetadata(todayStr, { leaderboardCommentId: commentId });
         } else {
             // Edit Existing
             await context.reddit.editComment({
-                id: commentId,
+                id: commentId as string,
                 text: text
             });
-            Logger.info(`[Job:Sync] Updated existing comment: ${commentId}`);
+            commentEdited = true;
+            Logger.info(`[Job:Sync] Comment updated: ${commentId}`);
         }
 
-        // h. Update Hash & Timestamp
-        // We need a method to update arbitrary metadata or reuse saveDailyQuizMetadata
-        // saveDailyQuizMetadata expects { leaderboardCommentId? } in interface logic? 
-        // Let's check FirestoreRestService.saveDailyQuizMetadata.
-
-        // It currently only handles leaderboardCommentId (see lines 1543-1562 in FirestoreRestService.ts).
-        // I need to update saveDailyQuizMetadata to accept generic or expanded fields.
-        // For now, I can use a raw patch call or add `leaderboardHash` to `saveDailyQuizMetadata`.
-
-        // Workaround: We will update saveDailyQuizMetadata to generic later.
-        // Actually, let's extend saveDailyQuizMetadata now in source logic or use raw fetch here?
-        // Raw fetch inside Job is ugly. 
-        // I'll assume I update saveDailyQuizMetadata in next tool call.
-
-        // Call assuming extended capability:
+        // h. Update Hash
         await fs.saveDailyQuizMetadata(todayStr, {
             leaderboardHash: currentHash
-            // lastSync: new Date().toISOString()
         });
+
+        Logger.info(`[Job:Sync] Completed: created=${commentCreated}, edited=${commentEdited}`);
 
     } catch (e) {
         Logger.error(`[Job:Sync] Failed`, e);
@@ -216,30 +195,4 @@ async function sha256(message: string) {
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Helper: Format Leaderboard (Duplicated for now to avoid breaking encapsulation)
-function formatLeaderboard(entries: any[], date: string): string {
-    const header = `### 🏆 Daily Quiz Leaderboard: ${date}\n\n`;
-
-    if (entries.length === 0) {
-        return header + `Be the first to play and claim your spot!\n\n*Updated every 3 hours*`;
-    }
-
-    let table = `| Rank | Player | Score | Time |\n`;
-    table += `|:---:|:---|:---:|:---:|\n`;
-
-    const rows = entries.slice(0, 10).map((e, i) => {
-        const rank = i + 1;
-        const timeStr = new Date(e.timestamp).toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        const name = rank <= 3 ? `**u/${e.username}**` : `u/${e.username}`;
-        const score = rank <= 3 ? `**${e.score}**` : `${e.score}`;
-
-        return `| ${rank} | ${name} | ${score} | ${timeStr} |`;
-    });
-
-    return header + table + rows.join('\n') + `\n\n*Updated every 3 hours. Only your first shared score counts.*`;
 }

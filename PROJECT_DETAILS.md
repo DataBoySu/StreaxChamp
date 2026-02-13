@@ -1,28 +1,115 @@
-Modify handleDailyGeneration to eliminate race condition.
+PROMPT START
 
-Current issue:
-Reddit post is created before Firestore doc is saved.
-This can lead to duplicate posts if job runs twice.
+Implement minimal structured logging for scheduled jobs only.
 
-Required change:
+Scope
 
-1. After generation, attempt to CREATE Firestore document
-   at daily-quizzes/{date}
-   using a commit with precondition:
-       currentDocument.exists = false
+Only modify:
 
-2. If Firestore creation fails because document already exists:
-       exit immediately and DO NOT create Reddit post.
+src/server/jobs/DailyScheduler.ts
 
-3. Only after Firestore doc is successfully created,
-       create Reddit post.
+Do NOT touch controllers or services.
 
-4. After creating Reddit post,
-       update Firestore document to set:
-           metadata.redditPostId = post.id
+1️⃣ Create Job Context Helper
 
-This ensures Firestore is the locking authority.
+At top of file, add:
 
-Do not remove structured logging.
-Do not change fallback logic.
-Do not change leaderboard sync job.
+import crypto from 'crypto';
+
+function createJobContext(jobName: string) {
+  return {
+    jobName,
+    runId: crypto.randomUUID().slice(0, 8),
+    startTime: Date.now()
+  };
+}
+
+2️⃣ Instrument handleDailyGeneration
+
+At start:
+
+const ctx = createJobContext('DailyGen');
+Logger.info(`[Job:${ctx.jobName}] START runId=${ctx.runId} date=${todayStr}`);
+
+
+Add phase logs:
+
+After AI generation success:
+
+Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=generate success`);
+
+
+If lock fails (document already exists):
+
+Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=lock skipped_existing`);
+
+
+After Reddit post:
+
+Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=reddit_post success postId=${redditPostId}`);
+
+
+After Firestore metadata update:
+
+Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=firestore_update success`);
+
+
+At end:
+
+Logger.info(`[Job:DailyGen] END runId=${ctx.runId} durationMs=${Date.now() - ctx.startTime}`);
+
+
+In catch block:
+
+Logger.error(`[Job:DailyGen] FAIL runId=${ctx.runId}`, e);
+
+3️⃣ Instrument handleLeaderboardSync
+
+At start:
+
+const ctx = createJobContext('Sync');
+Logger.info(`[Job:Sync] START runId=${ctx.runId} date=${todayStr}`);
+
+
+After fetching entries:
+
+Logger.info(`[Job:Sync] runId=${ctx.runId} entries=${entries.length}`);
+
+
+After hash comparison:
+
+Logger.info(`[Job:Sync] runId=${ctx.runId} hashChanged=${currentHash !== storedHash}`);
+
+
+When creating comment:
+
+Logger.info(`[Job:Sync] runId=${ctx.runId} createdComment=${commentId}`);
+
+
+When editing comment:
+
+Logger.info(`[Job:Sync] runId=${ctx.runId} editedComment=${commentId}`);
+
+
+At end:
+
+Logger.info(`[Job:Sync] END runId=${ctx.runId} durationMs=${Date.now() - ctx.startTime}`);
+
+
+In catch block:
+
+Logger.error(`[Job:Sync] FAIL runId=${ctx.runId}`, e);
+
+4️⃣ Do NOT modify:
+
+FirestoreRestService
+
+CommentLeaderboardService
+
+Controllers
+
+Scheduler registration logic
+
+Return full updated DailyScheduler.ts only.
+
+PROMPT END

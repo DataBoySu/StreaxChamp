@@ -1673,6 +1673,19 @@ export class FirestoreRestService {
   }
 
   /**
+   * Safe set for leaderboard comment ID.
+   */
+  async setLeaderboardCommentIdAtomic(date: string, commentId: string): Promise<boolean> {
+    try {
+      await this.saveDailyQuizMetadata(date, { leaderboardCommentId: commentId });
+      return true;
+    } catch (e) {
+      Logger.error('[Firestore] setLeaderboardCommentIdAtomic failed', e);
+      return false;
+    }
+  }
+
+  /**
    * Get leaderboard for a specific daily quiz.
    */
   async getQuizLeaderboard(date: string, limit: number = 25): Promise<Array<{ userKey: string; nickname: string; score: number; completedAt: string }>> {
