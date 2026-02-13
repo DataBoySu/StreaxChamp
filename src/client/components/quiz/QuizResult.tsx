@@ -11,6 +11,7 @@ interface QuizResultProps {
     postId?: string | null;
     isDailyQuiz?: boolean;
     quizId?: string;
+    nickname?: string;
     onGoHome: () => void;
 }
 
@@ -23,6 +24,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
     postId = null,
     isDailyQuiz = false,
     quizId,
+    nickname = 'Player',
     onGoHome
 }) => {
 
@@ -52,8 +54,13 @@ export const QuizResult: React.FC<QuizResultProps> = ({
         if (sharing || shared) return;
         setSharing(true);
         try {
-            // [NEW] Share scorecard to Reddit comment
-            const text = `[🎯 SCORECARD] I scored ${score}/${totalQuestions} on Streax! Can you beat my streak? #StreaxChamp`;
+            // [NEW] Single Line Share Format
+            // Requested: "telling their rank, username and score"
+            // Since rank is TBD on client, we show TBD.
+            const dateStr = isDailyQuiz && quizId ? quizId : new Date().toISOString().slice(0, 10);
+
+            // Format: 🏆 Rank: TBD | 👤 Username | 🎯 Score: X/Y
+            const text = `🏆 Rank: TBD | 👤 ${nickname} | 🎯 Score: ${score}/${totalQuestions}`;
             const slug = quizId || topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
             const res = await fetch('/api/share/comment', {
@@ -62,7 +69,8 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                 body: JSON.stringify({
                     postId,
                     quizId: slug,
-                    text
+                    text,
+                    score // [NEW] Pass score explicitly for Memory Leaderboard reliability
                 })
             });
 

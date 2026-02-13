@@ -70,6 +70,7 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
     history,
     hideRecentPlays = false,
 }) => {
+    // console.log('[GameSidebar] History Prop:', history);
     return (
         <div className="lg:col-span-1">
             <motion.div

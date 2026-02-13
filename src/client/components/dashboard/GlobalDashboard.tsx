@@ -223,13 +223,14 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                                 </span>
                                 {/* Type Badge */}
                                 <span
-                                    className={`text-xs px-2 py-1 rounded text-center font-bold ${(h.topicSlug && h.topicSlug.includes('daily')) || (h.topicTitle && h.topicTitle.includes('Daily'))
-                                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                    className={`text-xs px-2 py-1 rounded text-center font-bold truncate max-w-[120px] ${(h.topicSlug && h.topicSlug.includes('daily')) || (h.topicTitle && h.topicTitle.includes('Daily'))
+                                        ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                        : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                                         }`}
                                     style={{ fontSize: '0.65rem' }}
+                                    title={h.topicTitle || h.title}
                                 >
-                                    {(h.topicSlug && h.topicSlug.includes('daily')) || (h.topicTitle && h.topicTitle.includes('Daily')) ? 'DAILY' : 'TOPIC'}
+                                    {h.topicTitle || h.title || 'TOPIC'}
                                 </span>
                                 <span className="text-secondary text-right whitespace-nowrap" style={{ fontSize: 'clamp(0.65rem, 1.5vw, 0.75rem)' }}>
                                     {timeAgo}

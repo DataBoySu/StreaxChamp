@@ -262,6 +262,7 @@ export const App = () => {
 
   // Transform global history to match UI expectations
   const history = useMemo(() => {
+    // console.log('[App] 📜 Processing Global History:', globalHistory);
     return globalHistory.map(h => ({
       id: `${h.username}-${h.topicSlug}-${h.timestamp}`,
       slug: h.topicSlug,
@@ -773,9 +774,13 @@ export const App = () => {
       // Step 1.5: Submit Daily Score (New Architecture)
       if (!selectedTopic) {
         try {
-          const res = await fetch('/api/quiz/daily/submit', {
+          console.log('[App] 📤 Submitting Daily Score...', { nickname, headers: { 'x-devvit-user-id': nickname } });
+          const res = await fetch(`/api/quiz/daily/submit?userId=${encodeURIComponent(nickname)}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-devvit-user-id': nickname // Pass nickname as ID for local dev environment
+            },
             body: JSON.stringify({
               quizDate: dailyQuiz?.id || new Date().toISOString().slice(0, 10),
               score,
@@ -1152,8 +1157,19 @@ export const App = () => {
                     sources={(selectedTopic ? selectedTopicQuiz?.sources : dailyQuiz?.metadata?.sources) || []}
                     topicTitle={selectedTopic?.title || 'Daily Quiz'}
                     postId={postId}
+                    // [NEW] Calculate Projected Rank for Share Comment
                     isDailyQuiz={!selectedTopic}
                     quizId={(!selectedTopic && dailyQuiz?.id) ? dailyQuiz.id : undefined}
+                    nickname={authUser?.nickname}
+                    userRank={(() => {
+                      if (!dailyLeaderboard) return 1;
+                      const betterScores = dailyLeaderboard.filter(e => e.score > score).length;
+                      return betterScores + 1;
+                    })()}
+                    onShareSuccess={() => {
+                      console.log('[App] 🔄 Refreshing Daily Leaderboard after Share...');
+                      refreshDailyLeaderboard?.();
+                    }}
                     onGoHome={() => {
 
                       setShowScore(false);

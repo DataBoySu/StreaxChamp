@@ -214,7 +214,7 @@ export const CONFIG = {
     },
     DEV: {
         // [MASTER TOGGLE] If true, users in USERNAMES list are "invisible" (no scores/history saved)
-        SAFE_MODE: true,
+        SAFE_MODE: false,
         USERNAMES: ['Pretend-Pangolin-846'],
     }
 };

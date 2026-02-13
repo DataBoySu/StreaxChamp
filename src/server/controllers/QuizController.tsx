@@ -81,7 +81,16 @@ export class QuizController {
             const todayStr = new Date().toISOString().slice(0, 10);
 
             // 0. Resolve User
-            const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
+            let userId: string | null = null;
+            try {
+                const curr = await reddit.getCurrentUsername();
+                if (curr) userId = curr;
+            } catch { /* ignore */ }
+
+            if (!userId) {
+                const ctx = await import('../context/userContext').then(m => m.getDevvitUserId(req));
+                userId = ctx.userId;
+            }
 
             // 1. Determine Requested Date
             let reqDate = req.query.date as string;
@@ -215,9 +224,31 @@ export class QuizController {
         try {
             const { quizDate, score, totalQuestions, nickname, timeTakenMs, postId: _postId } = req.body;
             // 0. Resolve User
-            const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
-            const effectiveUserId = userId; // username is not available from getDevvitUserId
-            const effectiveNickname = nickname || 'Player';
+            let effectiveUserId: string | null = null;
+            let effectiveNickname: string = 'Player';
+
+            // Try SDK first (Production/Devvit)
+            try {
+                const curr = await reddit.getCurrentUsername();
+                if (curr) {
+                    effectiveUserId = curr;
+                    effectiveNickname = curr;
+                }
+            } catch (e) { /* ignore SDK error */ }
+
+            // Fallback to Header/Context (Local Dev) if SDK failed
+            if (!effectiveUserId) {
+                const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
+                effectiveUserId = userId;
+            }
+
+            // FINAL FALLBACK: Trust the nickname in the body (Local Dev / "App knows who it is")
+            if (!effectiveUserId && nickname && nickname !== 'Player') {
+                effectiveUserId = nickname;
+                effectiveNickname = nickname;
+            }
+
+            effectiveNickname = nickname || effectiveUserId || 'Player';
 
             if (!effectiveUserId) return res.status(401).json({ error: 'User required' });
 
@@ -239,6 +270,13 @@ export class QuizController {
                 totalQuestions,
                 isPerfect: score === totalQuestions,
                 timeTakenMs: Number(timeTakenMs || 0)
+            });
+
+            // 2b. Sync User Topic Stats (Ensure isCompleted is true)
+            await fs.updateUserTopicStats(effectiveUserId, quizDate, {
+                isCompleted: true,
+                lastAttemptDate: new Date().toISOString(),
+                lastQuizId: quizDate
             });
 
             // 3. Quiz-Specific Leaderboard (IN-MEMORY - Phase 3)

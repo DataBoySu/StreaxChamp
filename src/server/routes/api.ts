@@ -210,68 +210,46 @@ router.post('/share/comment', async (req, res) => {
         console.log("[SHARE] Resolved userStats:", userStats);
         console.log("[SHARE] hasShared =", userStats?.hasShared);
 
+        // [Moved Up] Opt-in Daily Leaderboard Submission (Prioritize Leaderboard over Comment)
+        // If this is a daily quiz (quizId is a date), add to Memory Leaderboard unconditionally
+        if (quizId.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            try {
+                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+                const mem = LeaderboardMemoryService.getInstance();
+
+                // Priority: Use score from client (most reliable context), fallback to Firestore
+                let scoreToSubmit = req.body.score;
+
+                if (typeof scoreToSubmit !== 'number') {
+                    // Fallback to Firestore play history
+                    console.log('[SHARE] Score not provided in body, fetching from Firestore...');
+                    const history = await fs.getDailyPlayHistory(username, quizId);
+                    if (history) {
+                        scoreToSubmit = history.score;
+                    }
+                }
+
+                if (typeof scoreToSubmit === 'number') {
+                    // Submit to Memory (Key: daily:YYYY-MM-DD)
+                    mem.submit(`daily:${quizId}`, username, scoreToSubmit);
+                    console.log(`[SHARE] ✅ Added ${username} to Memory Leaderboard (daily:${quizId}) with score ${scoreToSubmit}`);
+                } else {
+                    console.warn(`[SHARE] ⚠️ Could not resolve score for ${username}, Memory Leaderboard skipped.`);
+                }
+            } catch (memErr) {
+                console.error('[SHARE] Memory Leaderboard Update Error', memErr);
+            }
+        }
+
         // Allow DEV users to bypass limit
         const isDev = CONFIG.DEV.USERNAMES.includes(username);
         if (isDev) {
             console.log(`[SHARE] User ${username} is DEV. Bypassing share limit.`);
         } else if (userStats?.hasShared === true) {
             console.log("[SHARE] User already shared score for this quiz.");
+            // Even if already shared, we updated the leaderboard above, so we can return success or 409.
+            // Returning 409 is fine as long as leaderboard is updated.
             return res.status(409).json({ error: 'Already shared' });
-        }
-
-        // Use context.reddit if available for user-authenticated action
-        // Cast context to 'any' or proper type to access reddit/ui if imported context is plain object
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ctx: any = context;
-        console.log('[SHARE] Context keys:', Object.keys(ctx));
-        console.log('[SHARE] Has context.reddit?', !!ctx.reddit);
-
-        // Attempt user-authenticated submit
-        // Attempt user-authenticated submit
-        // In Web API context, `ctx.reddit` may be undefined.
-        // We rely on the imported `reddit` client which SHOULD handle user context if `asUser` permission is enabled.
-        const client = reddit;
-
-        console.log('[SHARE] Utilizing imported reddit client for submission.');
-
-        await client.submitComment({
-            id: targetPostId,
-            text: text,
-            // @ts-ignore: Devvit Typings may be outdated for runAs
-            runAs: 'USER'
-        });
-
-        const commentId = 'posted';
-
-        console.log("[SHARE] Comment posted successfully", { commentId });
-
-        // Update state
-        await fs.updateUserTopicStats(username, quizId, { hasShared: true } as any);
-
-        // [NEW] Opt-in Daily Leaderboard Submission
-        // If this is a daily quiz (quizId is a date), add to Memory Leaderboard
-        if (quizId.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            try {
-                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-                const mem = LeaderboardMemoryService.getInstance();
-
-                // Fetch the score from Firestore play history (since it was saved on complete)
-                const history = await fs.getDailyPlayHistory(username, quizId);
-                if (history) {
-                    console.log(`[SHARE] Opting-in to Daily Leaderboard for ${username} (Score: ${history.score})`);
-                    mem.submit(`daily:${quizId}`, username, history.score, {
-                        userKey: username,
-                        timeTakenMs: (history as any).timeTakenMs || 0
-                    });
-
-                    // Ensure Placeholder Comment exists for this post
-                    const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
-                    const commentService = new CommentLeaderboardService();
-                    await commentService.ensureComment(reddit, targetPostId, quizId);
-                }
-            } catch (err) {
-                console.error('[SHARE] Memory Leaderboard Opt-in Failed', err);
-            }
         }
 
         res.json({ success: true });

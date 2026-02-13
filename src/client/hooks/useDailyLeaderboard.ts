@@ -27,7 +27,7 @@ export function useDailyLeaderboard(date: string | undefined, enabled = true) {
                     nickname: e.nickname,
                     score: e.score,
                     timeTakenMs: 0, // Daily quiz currently doesn't store duration in leaderboard
-                    submittedAt: e.completedAt, // Map completedAt to submittedAt
+                    submittedAt: e.submittedAt, // Correctly map submittedAt from server
                     rank: idx + 1
                 }));
                 setEntries(mapped);
