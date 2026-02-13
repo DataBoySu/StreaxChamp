@@ -77,63 +77,65 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                             <span className="text-xs font-medium opacity-50 uppercase tracking-widest" style={{ color: '#fff' }}>Total Scores</span>
                         )}
                     </div>
-                    {(landingSummary?.globalTop || []).slice(0, 50).map((e, i) => {
-                        let rankClass = 'bg-base-200/40 border-base-300/40 text-base-content';
-                        let rankNumberStyle = 'text-accent';
-                        const rank = i + 1;
-                        let trophyIcon = '';
-                        let nameClass = 'font-semibold truncate text-white';
-                        let scoreClass = 'font-extrabold text-right text-success';
+                    <div className="overflow-y-auto pr-1 space-y-3" style={{ maxHeight: '600px' }}>
+                        {(landingSummary?.globalTop || []).slice(0, 50).map((e, i) => {
+                            let rankClass = 'bg-base-200/40 border-base-300/40 text-base-content';
+                            let rankNumberStyle = 'text-accent';
+                            const rank = i + 1;
+                            let trophyIcon = '';
+                            let nameClass = 'font-semibold truncate text-white';
+                            let scoreClass = 'font-extrabold text-right text-success';
 
-                        if (rank === 1) {
-                            rankClass = 'bg-yellow-900/40 border-yellow-400 text-yellow-100 shadow-[0_0_20px_rgba(255,215,0,0.4)] scale-[1.03] z-10 border-2';
-                            rankNumberStyle = 'text-yellow-400 text-2xl drop-shadow-[0_0_8px_rgba(255,215,0,0.8)] font-pixel';
-                            trophyIcon = '🥇';
-                            nameClass = 'font-black truncate text-yellow-100';
-                            scoreClass = 'font-black text-right text-yellow-400';
-                        } else if (rank === 2) {
-                            rankClass = 'bg-slate-700/40 border-slate-300 text-slate-100 shadow-[0_0_15px_rgba(192,192,192,0.3)] border-2';
-                            rankNumberStyle = 'text-slate-300 text-xl drop-shadow-[0_0_6px_rgba(192,192,192,0.6)] font-pixel';
-                            trophyIcon = '🥈';
-                            nameClass = 'font-bold truncate text-slate-100';
-                            scoreClass = 'font-bold text-right text-slate-300';
-                        } else if (rank === 3) {
-                            rankClass = 'bg-orange-950/40 border-orange-700 text-orange-100 shadow-[0_0_12px_rgba(205,127,50,0.2)] border-2';
-                            rankNumberStyle = 'text-orange-600 text-xl drop-shadow-[0_0_4px_rgba(205,127,50,0.5)] font-pixel';
-                            trophyIcon = '🥉';
-                            nameClass = 'font-bold truncate text-orange-100';
-                            scoreClass = 'font-bold text-right text-orange-600';
-                        } else {
-                            scoreClass = `font-extrabold text-right ${rank <= 3 ? 'text-white' : 'text-success'}`;
-                        }
+                            if (rank === 1) {
+                                rankClass = 'bg-yellow-900/40 border-yellow-400 text-yellow-100 shadow-[0_0_20px_rgba(255,215,0,0.4)] scale-[1.03] z-10 border-2';
+                                rankNumberStyle = 'text-yellow-400 text-2xl drop-shadow-[0_0_8px_rgba(255,215,0,0.8)] font-pixel';
+                                trophyIcon = '🥇';
+                                nameClass = 'font-black truncate text-yellow-100';
+                                scoreClass = 'font-black text-right text-yellow-400';
+                            } else if (rank === 2) {
+                                rankClass = 'bg-slate-700/40 border-slate-300 text-slate-100 shadow-[0_0_15px_rgba(192,192,192,0.3)] border-2';
+                                rankNumberStyle = 'text-slate-300 text-xl drop-shadow-[0_0_6px_rgba(192,192,192,0.6)] font-pixel';
+                                trophyIcon = '🥈';
+                                nameClass = 'font-bold truncate text-slate-100';
+                                scoreClass = 'font-bold text-right text-slate-300';
+                            } else if (rank === 3) {
+                                rankClass = 'bg-orange-950/40 border-orange-700 text-orange-100 shadow-[0_0_12px_rgba(205,127,50,0.2)] border-2';
+                                rankNumberStyle = 'text-orange-600 text-xl drop-shadow-[0_0_4px_rgba(205,127,50,0.5)] font-pixel';
+                                trophyIcon = '🥉';
+                                nameClass = 'font-bold truncate text-orange-100';
+                                scoreClass = 'font-bold text-right text-orange-600';
+                            } else {
+                                scoreClass = `font-extrabold text-right ${rank <= 3 ? 'text-white' : 'text-success'}`;
+                            }
 
-                        return (
-                            <div
-                                key={`${e.userKey}-${i}`}
-                                className={`grid items-center border px-3 py-2.5 transition-all ${rankClass} hover:bg-white/5`}
-                                style={{
-                                    gridTemplateColumns: rank <= 3 ? '50px 1fr 60px' : '40px 1fr 60px',
-                                    gap: '0.75rem',
-                                    borderRadius: 0
-                                }}
-                            >
-                                <span className={`font-black text-center ${rankNumberStyle}`} style={{ fontSize: rank <= 3 ? 'clamp(0.9rem, 2.5vw, 1.2rem)' : 'clamp(0.75rem, 2vw, 1rem)' }}>
-                                    {trophyIcon ? `${trophyIcon} ${rank}` : rank}
-                                </span>
-                                <span className={nameClass} style={{ fontSize: rank <= 3 ? 'clamp(0.85rem, 2.2vw, 1rem)' : 'clamp(0.75rem, 2vw, 0.9rem)' }} title={e.nickname}>
-                                    {e.nickname}
-                                </span>
-                                <span className={scoreClass} style={{ fontSize: rank <= 3 ? 'clamp(0.85rem, 2.2vw, 1rem)' : 'clamp(0.75rem, 2vw, 0.9rem)' }}>
-                                    {e.score}
-                                </span>
+                            return (
+                                <div
+                                    key={`${e.userKey}-${i}`}
+                                    className={`grid items-center border px-3 py-2.5 transition-all ${rankClass} hover:bg-white/5`}
+                                    style={{
+                                        gridTemplateColumns: rank <= 3 ? '50px 1fr 60px' : '40px 1fr 60px',
+                                        gap: '0.75rem',
+                                        borderRadius: 0
+                                    }}
+                                >
+                                    <span className={`font-black text-center ${rankNumberStyle}`} style={{ fontSize: rank <= 3 ? 'clamp(0.9rem, 2.5vw, 1.2rem)' : 'clamp(0.75rem, 2vw, 1rem)' }}>
+                                        {trophyIcon ? `${trophyIcon} ${rank}` : rank}
+                                    </span>
+                                    <span className={nameClass} style={{ fontSize: rank <= 3 ? 'clamp(0.85rem, 2.2vw, 1rem)' : 'clamp(0.75rem, 2vw, 0.9rem)' }} title={e.nickname}>
+                                        {e.nickname}
+                                    </span>
+                                    <span className={scoreClass} style={{ fontSize: rank <= 3 ? 'clamp(0.85rem, 2.2vw, 1rem)' : 'clamp(0.75rem, 2vw, 0.9rem)' }}>
+                                        {e.score}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                        {(landingSummary?.globalTop?.length || 0) === 0 && (
+                            <div className="col-span-full text-center text-secondary py-6 text-sm">
+                                {authUser?.nickname || 'You'}, showcase your streak!
                             </div>
-                        );
-                    })}
-                    {(landingSummary?.globalTop?.length || 0) === 0 && (
-                        <div className="col-span-full text-center text-secondary py-6 text-sm">
-                            {authUser?.nickname || 'You'}, showcase your streak!
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
 

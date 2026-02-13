@@ -9,20 +9,67 @@ interface QuizResultProps {
     totalQuestions: number;
     onPlayAgain: () => void;
     onReset: () => void;
-    sources?: string[]; // NEW prop
+    sources?: string[];
+    quizId?: string | undefined; // NEW
+    postId?: string | null; // NEW
 }
 
 export const QuizResult: React.FC<QuizResultProps> = ({
     score,
     totalQuestions,
     onPlayAgain,
-    onReset,
-    sources = []
+    sources = [],
+    postId,
+    quizId // NEW
 }) => {
     const [subscribed, setSubscribed] = useState(false);
+    const [sharing, setSharing] = useState(false);
+    const [shared, setShared] = useState(false);
+
     const percentage = (score / totalQuestions) * 100;
     const isExcellent = percentage >= 80;
     const isGood = percentage >= 60;
+
+    const handleShare = async () => {
+        if (!postId || sharing || shared) return;
+        setSharing(true);
+        try {
+            // Construct a fun share message
+            const shareText = `I just scored ${score}/${totalQuestions} on StreaxChamp! 🏆 Can you beat my streak?`;
+
+            const response = await fetch('/api/share/comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    postId,
+                    quizId, // NEW: Required by backend
+                    text: shareText
+                })
+            });
+
+            if (response.ok) {
+                setShared(true);
+            } else {
+                console.error('Share failed', await response.text());
+            }
+        } catch (e) {
+            console.error('Share error', e);
+        } finally {
+            setSharing(false);
+        }
+    };
+
+    const handleJoin = async () => {
+        if (subscribed) return;
+        try {
+            const res = await fetch('/api/community/subscribe', { method: 'POST' });
+            if (res.ok) {
+                setSubscribed(true);
+            }
+        } catch (err) {
+            console.error('Subscribe failed', err);
+        }
+    };
 
     return (
         <motion.div
@@ -119,7 +166,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
 
                 {/* Feedback Message */}
                 <motion.p
-                    storage={{
+                    style={{
                         fontFamily: "'VT323', monospace",
                         fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)',
                         color: isExcellent ? '#ff69b4' : isGood ? '#00ff88' : '#9ca3af',
@@ -147,7 +194,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                     {/* Button 1: Explore More Quizzes (navigates to sub) */}
                     <button
                         onClick={() => navigateTo('https://reddit.com/r/streaxchamp')}
-                        className="nes-btn is-warning"
+                        className="nes-btn is-warning transition-transform hover:scale-105 active:scale-95"
                         style={{
                             fontFamily: "'Press Start 2P', cursive",
                             fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
@@ -159,35 +206,27 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                         Explore More Quizzes
                     </button>
 
-                    {/* Button 2: Share Score (keep as is) */}
+                    {/* Button 2: Share Score */}
                     <button
-                        onClick={onPlayAgain}
-                        className="nes-btn is-success"
+                        onClick={handleShare}
+                        disabled={!postId || sharing || shared}
+                        className={`nes-btn ${shared ? 'is-disabled' : 'is-success'} transition-transform hover:scale-105 active:scale-95`}
                         style={{
                             fontFamily: "'Press Start 2P', cursive",
                             fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
                             padding: '1rem 1.5rem',
                             borderRadius: 0,
-                            boxShadow: '0 0 15px rgba(0, 255, 136, 0.3)',
+                            boxShadow: shared ? 'none' : '0 0 15px rgba(0, 255, 136, 0.3)',
+                            opacity: (!postId || sharing || shared) ? 0.7 : 1
                         }}
                     >
-                        Share Score
+                        {sharing ? 'Sharing...' : shared ? 'Shared! 🚀' : 'Share Score'}
                     </button>
 
-                    {/* Button 3: Join Sub (with subscribe functionality) */}
+                    {/* Button 3: Join Sub */}
                     <button
-                        onClick={async () => {
-                            if (subscribed) return;
-                            try {
-                                const res = await fetch('/api/community/subscribe', { method: 'POST' });
-                                if (res.ok) {
-                                    setSubscribed(true);
-                                }
-                            } catch (err) {
-                                console.error('Subscribe failed', err);
-                            }
-                        }}
-                        className={`nes-btn ${subscribed ? 'is-disabled' : 'is-error'}`}
+                        onClick={handleJoin}
+                        className={`nes-btn ${subscribed ? 'is-success' : 'is-error'} transition-transform hover:scale-105 active:scale-95`}
                         style={{
                             fontFamily: "'Press Start 2P', cursive",
                             fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
@@ -197,7 +236,19 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                         }}
                         disabled={subscribed}
                     >
-                        {subscribed ? 'r/StreaxChamp' : 'Join Sub'}
+                        {subscribed ? 'Joined! 🎉' : 'Join Sub'}
+                    </button>
+
+                    {/* Replay Button (Optional/Secondary) */}
+                    <button
+                        onClick={onPlayAgain}
+                        className="nes-btn"
+                        style={{
+                            marginTop: '1rem',
+                            fontSize: '0.7rem'
+                        }}
+                    >
+                        Replay
                     </button>
                 </div>
 

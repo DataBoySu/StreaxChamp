@@ -224,7 +224,7 @@ export class QuizController {
             // But we still want to indicate "Replay" to client if history exists.
 
             // 2. Save History (New Record) - Upsert to ensure latest metadata
-            const now = new Date().toISOString();
+            // 2. Save History (New Record) - Upsert to ensure latest metadata
             await fs.saveDailyPlayHistory(effectiveUserId, quizDate, {
                 score,
                 totalQuestions,

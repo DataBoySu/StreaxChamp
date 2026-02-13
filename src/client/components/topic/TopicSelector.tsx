@@ -279,6 +279,24 @@ export const TopicSelector: React.FC<{
         // Success! Now initiate the smooth fill for the artificial delay.
         setProgress(90);
 
+        // Optimistic Update: Add to local state immediately so it appears in list
+        const newSlug = slugify(formatted);
+        const newTopicDoc: TopicDoc = {
+          id: newSlug,
+          name: formatted,
+          slug: newSlug,
+          urls: {},
+          hasQuiz: true,
+          status: 'ready',
+          createdAt: Date.now()
+        };
+
+        setTopics(prev => {
+          // Avoid duplicates
+          if (prev.some(t => t.slug === newSlug)) return prev;
+          return [...prev, newTopicDoc];
+        });
+
         // USER REQUEST: Extend loading state by 3s + Smoothly fill progress bar
         const delayDuration = 3000;
         const startTime = Date.now();
@@ -417,7 +435,7 @@ export const TopicSelector: React.FC<{
                 padding: '0.75rem 1.5rem',
               }}
             >
-              {addingTopic ? '...' : (topicExists ? 'Go' : 'Add')}
+              {topicExists ? 'Go' : 'Add'}
             </button>
           ))}
         </div>

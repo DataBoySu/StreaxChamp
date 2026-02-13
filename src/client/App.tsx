@@ -25,6 +25,7 @@ import { MessageDisplay } from './components/ui/MessageDisplay';
 import { KawaiiLoader } from './components/loading/KawaiiLoader';
 import { ExplanationScreen } from './components/quiz/ExplanationScreen';
 import { DailyQuizArchive } from './components/quiz/DailyQuizArchive'; // NEW
+import { usePostId } from './hooks/usePostId'; // NEW
 
 const QUIZ_DURATIONS = Array(CONFIG.GAME.DEFAULT_QUESTIONS_COUNT).fill(CONFIG.GAME.TIMER_DURATION);
 const BONUS_QUIZ_DURATION = CONFIG.GAME.BONUS_TIMER_DURATION;
@@ -35,6 +36,7 @@ const NUM_QUESTIONS = CONFIG.GAME.DEFAULT_QUESTIONS_COUNT;
  */
 export const App = () => {
   const theme = useTheme();
+  const postId = usePostId(); // NEW
   // Archive State
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
   // Fix: pass null for contextPostId, and selectedDate as second argument
@@ -266,7 +268,7 @@ export const App = () => {
       id: `${h.username}-${h.topicSlug}-${h.timestamp}`,
       slug: h.topicSlug,
       title: h.topicTitle,
-      ts: h.timestamp,
+      timestamp: h.timestamp, // Fix: match HistoryEntry type
       nickname: h.nickname
     }));
   }, [globalHistory]);
@@ -1133,7 +1135,9 @@ export const App = () => {
                     totalQuestions={NUM_QUESTIONS + (showBonusQuestion ? 1 : 0)}
                     onPlayAgain={startQuiz}
                     onReset={resetQuiz}
-                    sources={selectedTopic ? selectedTopicQuiz?.sources : dailyQuiz?.metadata?.sources}
+                    sources={(selectedTopic ? selectedTopicQuiz?.sources : dailyQuiz?.metadata?.sources) || []}
+                    quizId={selectedTopic ? selectedTopicQuiz?.id : dailyQuiz?.id}
+                    postId={postId}
                   />
                 ) : (
                   <QuizActiveView
