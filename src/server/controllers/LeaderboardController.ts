@@ -44,13 +44,29 @@ export class LeaderboardController {
             const svc = new LeaderboardService();
             const entry: LeaderboardEntryInput = { userKey, nickname, score, timeTakenMs: timeTakenMs || 0 };
 
-            // Persist across all relevant leaderboard partitions
-            const topicRes = await svc.submit(slug || 'global', entry);
+            // Persist across all relevant leaderboard partitions (IN-MEMORY - Phase 3)
+            // const topicRes = await svc.submit(slug || 'global', entry);
+            const topicRes = { ok: true, updated: false }; // Mock response for now
 
-            if (slug) {
-                await svc.submitRolling(slug, entry);
+            // Submit to Memory
+            try {
+                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+                const mem = LeaderboardMemoryService.getInstance();
 
-                // NEW: Mark this quiz as completed for the user so they get a fresh one next time (if next day)
+                // If we have a specific PostID (Custom Quiz), use that key
+                // Otherwise use topic slug
+                const postId = req.body.postId;
+                const key = postId ? `post:${postId}` : `topic:${slug || 'global'}`;
+
+                mem.submit(key, nickname, score);
+            } catch (memErr) {
+                Logger.error('[SubmitScore] Memory Fail', memErr);
+            }
+
+            if (slug && !req.body.postId) { // Only update topic stats if it's a topic quiz? Keep existing logic for now
+                // await svc.submitRolling(slug, entry);
+
+                // NEW: Mark this quiz as completed (stays, this is progression)
                 // We resolve the user ID from headers (userKey is often just username in client payload, 
                 // but for security/consistency we try to use the auth header if present, or fallback to userKey)
                 // In Devvit, userKey IS the username. 
@@ -62,7 +78,7 @@ export class LeaderboardController {
             }
 
             // Removed addToGlobalTotals – we now query 'users' directly for total scores
-            res.json({ ok: true, topic: topicRes });
+            res.json({ ok: true });
         } catch (e) {
             Logger.error('[Leaderboard] Submit Error', e);
             res.status(500).json({ error: 'Failed to submit score' });
@@ -84,11 +100,26 @@ export class LeaderboardController {
             const cached = await cache.get(cacheKey);
             if (cached) return res.json(cached);
 
-            const svc = new LeaderboardService();
-            const dateParam = typeof req.params.date === 'string' ? req.params.date : undefined;
-            const list = await svc.list(slug, dateParam); // Pass original undefined if missing
+            // const svc = new LeaderboardService();
+            // const dateParam = typeof req.params.date === 'string' ? req.params.date : undefined;
+            // const list = await svc.list(slug, dateParam); // OLD
 
-            await cache.set(cacheKey, list, 180); // Cache for 3 mins
+            // NEW: Read from Memory
+            const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+            const mem = LeaderboardMemoryService.getInstance();
+            // Key format: topic:slug
+            const key = `topic:${slug}`;
+            const raw = mem.get(key);
+
+            const list = raw.map(e => ({
+                nickname: e.username,
+                score: e.score,
+                submittedAt: new Date(e.timestamp).toISOString(),
+                userKey: e.username,
+                timeTakenMs: 0
+            }));
+
+            await cache.set(cacheKey, list, 10); // Cache for 10s
             res.json(list);
         } catch (e) {
             Logger.error('[Leaderboard] List topic error', e);

@@ -226,13 +226,15 @@ export class QuizController {
                 isPerfect: score === totalQuestions
             });
 
-            // 3. Quiz-Specific Leaderboard
-            // SAFEGUARDED INTERNALLY: Will only write if missing.
-            await fs.saveQuizLeaderboardEntry(quizDate, effectiveUserId, {
-                score,
-                completedAt: now,
-                nickname: effectiveNickname
-            });
+            // 3. Quiz-Specific Leaderboard (IN-MEMORY - Phase 3)
+            // Was: await fs.saveQuizLeaderboardEntry(...)
+            try {
+                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+                const mem = LeaderboardMemoryService.getInstance();
+                mem.submit(`daily:${quizDate}`, effectiveNickname, score);
+            } catch (memErr) {
+                Logger.error('[SubmitDaily] Memory Leaderboard Fail', memErr);
+            }
 
             const isReplay = existing && existing.completed;
 
@@ -245,8 +247,7 @@ export class QuizController {
             // 4. Update Global XP (Only on first play)
             await fs.incrementUserTotalScore(effectiveUserId, score);
 
-            // 5. [NEW] Bridge to Topic Leaderboard
-            // If this daily quiz belongs to a Topic, also submit score there!
+            // 5. [NEW] Bridge to Topic Leaderboard (IN-MEMORY - Phase 3)
             try {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const quizContent: any = await fs.getDailyQuizByDate(quizDate);
@@ -257,24 +258,11 @@ export class QuizController {
                     const slug = topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
                     if (slug && slug !== 'mixed-general-knowledge' && slug !== 'general-knowledge') {
-                        Logger.info(`[SubmitDaily] Bridging score to Topic Leaderboard: ${slug}`, { nickname: effectiveNickname, score });
-                        const ls = new LeaderboardService();
-                        // Note: timeTakenMs defaults to 0 as it's not currently in the daily payload
-                        const timeTakenMs = req.body.timeTakenMs || 0;
-
-                        await ls.submit(slug, {
-                            userKey: effectiveUserId,
-                            nickname: effectiveNickname,
-                            score,
-                            timeTakenMs
-                        });
-                        // Also Rolling
-                        await ls.submitRolling(slug, {
-                            userKey: effectiveUserId,
-                            nickname: effectiveNickname,
-                            score,
-                            timeTakenMs
-                        });
+                        Logger.info(`[SubmitDaily] Mem-Bridging score to Topic: ${slug}`, { nickname: effectiveNickname, score });
+                        const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+                        const mem = LeaderboardMemoryService.getInstance();
+                        const key = `topic:${slug}`;
+                        mem.submit(key, effectiveNickname, score);
                     }
                 }
             } catch (bridgeErr) {
@@ -296,8 +284,22 @@ export class QuizController {
             const date = req.query.date as string || new Date().toISOString().slice(0, 10);
             const limit = parseInt(req.query.limit as string || '25');
 
-            const fs = new FirestoreRestService();
-            const entries = await fs.getQuizLeaderboard(date, limit);
+            // const fs = new FirestoreRestService();
+            // const entries = await fs.getQuizLeaderboard(date, limit); // OLD
+
+            // NEW: Read from Memory
+            const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+            const mem = LeaderboardMemoryService.getInstance();
+            const raw = mem.get(`daily:${date}`);
+
+            // Map to client format
+            const entries = raw.map(e => ({
+                nickname: e.username,
+                score: e.score,
+                submittedAt: new Date(e.timestamp).toISOString(),
+                userKey: e.username, // Approximation
+                timeTakenMs: 0
+            }));
 
             return res.json({ entries });
         } catch (e) {

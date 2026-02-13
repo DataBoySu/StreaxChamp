@@ -38,7 +38,8 @@ const Splash = () => {
                         userKey: username,
                         nickname: username,
                         score: finalScore,
-                        slug: customQuizMeta.quizId
+                        slug: customQuizMeta.quizId,
+                        postId: customQuizMeta.postId // NEW: Pass PostID for comment service
                     })
                 });
                 console.log('[Splash] Score submitted successfully.');
