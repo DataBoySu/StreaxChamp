@@ -1,156 +1,117 @@
-🔧 TASK: Remove Topic/Daily Leaderboards from Firestore and Replace with Comment-Driven System
+You are not designing anything new.
 
-DO NOT TOUCH GLOBAL LEADERBOARD
+You are explaining the architecture that is already implemented in this project.
 
-You must analyze the entire leaderboard pipeline before modifying anything.
+Provide a complete technical breakdown of the current system.
 
-🔎 Phase 1 — Audit (Mandatory First Step)
+Do not summarize. Do not simplify.
 
-Identify all code paths that:
+Explain:
 
-Write topic leaderboard data to Firestore
+Firestore schema
 
-Write daily leaderboard data to Firestore
+Collections
 
-Write custom quiz leaderboard data to Firestore
+Documents
 
-Call submitLeaderboardScore
+Indexes
 
-Update topic/daily leaderboard collections
+Transaction usage
 
-Confirm that:
+Batched writes
 
-Global leaderboard (XP / total score accumulation) is implemented separately.
+Consistency guarantees
 
-Global leaderboard logic does NOT depend on topic leaderboard collections.
+Caching layer
 
-Print a summary before implementing changes.
+Where it exists
 
-🚫 Phase 2 — Remove Firestore Writes (Topic/Daily/Custom Only)
+TTL logic
 
-Modify behavior so that:
+Invalidation strategy
 
-On Quiz Completion:
+Cache stampede prevention
 
-DO NOT write topic leaderboard entry to Firestore.
+Memory constraints
 
-DO NOT write daily leaderboard entry to Firestore.
+Leaderboard system
 
-DO NOT write custom post leaderboard entry to Firestore.
+Score write flow
 
-DO NOT block replay.
+Rank calculation
 
-DO NOT alter Global XP accumulation.
+Tie-breaking
 
-Instead:
+Anti-score-inflation protection
 
-Only return quiz results to client.
+Atomicity guarantees
 
-Global XP update remains intact.
+Deterministic quiz engine
 
-🧠 Phase 3 — Introduce In-Memory Leaderboard Manager
+Seed derivation
 
-Create a server-side singleton:
+Question selection algorithm
 
-LeaderboardMemoryService
+Integrity enforcement
 
+Replay protection
 
-Behavior:
+Streak multiplier math
 
-Store only Top 10 entries per:
+Rate limiting
 
-Topic slug
+Strategy (token bucket, sliding window, etc.)
 
-Daily date
+Storage location
 
-Custom postId
+Burst handling
 
-Data structure example:
+Abuse prevention
 
-{
-key: "topic:anime" | "daily:2026-02-02" | "post:t3_abc",
-entries: [
-{ username, score, timestamp }
-]
-}
+Autonomous processes
 
-Rules:
+Intervals
 
-On "Share Score" button press:
+Scheduled jobs
 
-Insert user score into memory
+Cleanup logic
 
-Sort descending by score
+Leaderboard recalculation
 
-Keep only top 10
+Cache warmup
 
-Replace existing entry if user already exists
+Anti-cheat mechanisms
 
-No Firestore writes here.
+Client tamper protection
 
-📝 Phase 4 — Comment-Based Leaderboard (App Managed)
+Server-side validation
 
-Implement:
+Duplicate submission handling
 
-CommentLeaderboardService
+IP/device tracking if any
 
+Determinism guarantees
 
-Behavior:
+What ensures same inputs → same outputs
 
-For each postId:
+What is non-deterministic
 
-Maintain lastUpdatedAt
+Failure modes
 
-Maintain commentId (store in Redis or memory)
+Failure scenarios
 
-Every 8 hours:
+Firestore outage
 
-If comment does not exist:
+Partial writes
 
-Create new comment under the post
+Cache poisoning
 
-If comment exists:
+Race conditions
 
-Edit existing comment
+Scalability ceiling
 
-Comment format:
+Where this system breaks
 
-🏆 TOP 10 — {Topic or Daily Date}
+Current bottlenecks
 
-u/username — 5/5
-
-...
-
-...
-
-Last updated: {timestamp}
-
-Only update if leaderboard changed since last edit.
-
-🔒 Constraints
-
-DO NOT remove or modify Global Leaderboard logic.
-
-DO NOT modify XP accumulation.
-
-DO NOT modify user progression.
-
-DO NOT change unrelated UI.
-
-DO NOT introduce Firestore writes for topic/daily leaderboards.
-
-Keep global leaderboard untouched.
-
-📦 Deliverables
-
-Before finishing, print:
-
-What Firestore writes were removed.
-
-What new memory service was added.
-
-Confirmation that global leaderboard still works.
-
-Where comment ID is stored.
-
-How concurrent updates are handled.
+Be precise. Show actual control flow.
