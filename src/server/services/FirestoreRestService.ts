@@ -19,6 +19,10 @@ export interface QuizData {
     topic: string;
     difficulty: string;
     source: string;
+    redditPostId?: string;
+    leaderboardHash?: string;
+    leaderboardCommentId?: string;
+    generationSource?: string;
   };
 }
 
@@ -104,6 +108,89 @@ export class FirestoreRestService {
   }
 
   /**
+   * Create today's quiz to Firestore at daily-quizzes/{date}
+   * STRICT: Only succeeds if document Does Not Exist.
+   */
+  async createDailyQuizOnly(date: string, quiz: { questions: any[]; metadata: Record<string, any> }): Promise<boolean> {
+    try {
+      const documentPath = `daily-quizzes/${date}`;
+      const dbPath = `projects/${this.projectId}/databases/(default)/documents`;
+      const fullPath = `${dbPath}/${documentPath}`;
+      const url = `${this.baseUrl}:commit`;
+      const nowIso = new Date().toISOString();
+
+      const questionsValues = quiz.questions.map((q, idx) => ({
+        mapValue: {
+          fields: {
+            id: { stringValue: q.id || `q${idx + 1}` },
+            question: { stringValue: q.question },
+            options: { arrayValue: { values: q.options.map((o: string) => ({ stringValue: o })) } },
+            correctAnswer: { integerValue: String(q.correctAnswer ?? 0) },
+            difficulty: { stringValue: q.difficulty || 'medium' },
+            category: { stringValue: q.category || 'General' },
+            ...(q.explanation ? { explanation: { stringValue: q.explanation } } : {}),
+            createdAt: { stringValue: q.createdAt || nowIso },
+          },
+        },
+      }));
+
+      const meta = quiz.metadata || {};
+      const fields = {
+        id: { stringValue: date },
+        questions: { arrayValue: { values: questionsValues } },
+        metadata: {
+          mapValue: {
+            fields: {
+              generatedAt: { stringValue: meta.generatedAt || nowIso },
+              sourceWikis: { arrayValue: { values: (meta.sourceWikis || []).map((s: string) => ({ stringValue: s || '' })) } },
+              version: { stringValue: meta.version || 'v1' },
+              model: { stringValue: meta.model || 'gemini' },
+              generator: { stringValue: meta.generator || 'system' },
+              topic: { stringValue: meta.topic || 'General Knowledge' },
+              difficulty: { stringValue: meta.difficulty || 'mixed' },
+              source: { stringValue: meta.source || 'system' },
+              redditPostId: { stringValue: meta.redditPostId || '' },
+              leaderboardHash: { stringValue: meta.leaderboardHash || '' },
+              leaderboardCommentId: { stringValue: meta.leaderboardCommentId || '' },
+              generationSource: { stringValue: meta.generationSource || 'manual' }
+            },
+          },
+        },
+        updatedAt: { stringValue: nowIso },
+      };
+
+      const writes = [
+        {
+          update: {
+            name: fullPath,
+            fields
+          },
+          currentDocument: { exists: false }
+        }
+      ];
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ writes })
+      });
+
+      if (!res.ok) {
+        // 409 Conflict = already exists with precondition
+        if (res.status === 409) return false;
+        const txt = await res.text();
+        Logger.error('[Firestore] createDailyQuizOnly failed', { status: res.status, error: txt });
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      Logger.error('[Firestore] createDailyQuizOnly exception', e);
+      return false;
+    }
+  }
+
+  /**
    * Save today's quiz to Firestore at daily-quizzes/{date}
    */
   async saveTodaysQuiz(quiz: { questions: any[]; metadata: Record<string, any> }): Promise<boolean> {
@@ -143,7 +230,12 @@ export class FirestoreRestService {
                 generator: { stringValue: meta.generator || 'system' },
                 topic: { stringValue: meta.topic || 'General Knowledge' },
                 difficulty: { stringValue: meta.difficulty || 'mixed' },
-                source: { stringValue: 'system' }
+                source: { stringValue: meta.source || 'system' },
+                // Scheduled Architecture Fields
+                redditPostId: { stringValue: meta.redditPostId || '' },
+                leaderboardHash: { stringValue: meta.leaderboardHash || '' },
+                leaderboardCommentId: { stringValue: meta.leaderboardCommentId || '' },
+                generationSource: { stringValue: meta.generationSource || 'manual' }
               },
             },
           },
@@ -189,10 +281,14 @@ export class FirestoreRestService {
 
     const metadataFields = fields.metadata.mapValue.fields;
     const metadata = {
-      generatedAt: metadataFields.generatedAt.stringValue,
-      topic: 'General Knowledge',
-      difficulty: 'mixed',
-      source: metadataFields.sourceWikis?.arrayValue?.values?.[0]?.stringValue || 'Wiki',
+      generatedAt: metadataFields.generatedAt?.stringValue || '',
+      topic: metadataFields.topic?.stringValue || 'General Knowledge',
+      difficulty: metadataFields.difficulty?.stringValue || 'mixed',
+      source: metadataFields.source?.stringValue || metadataFields.sourceWikis?.arrayValue?.values?.[0]?.stringValue || 'Wiki',
+      redditPostId: metadataFields.redditPostId?.stringValue,
+      leaderboardHash: metadataFields.leaderboardHash?.stringValue,
+      leaderboardCommentId: metadataFields.leaderboardCommentId?.stringValue,
+      generationSource: metadataFields.generationSource?.stringValue
     };
 
     return {
@@ -1437,8 +1533,9 @@ export class FirestoreRestService {
         return path.split('/').pop() || '';
       }).filter(Boolean);
 
-      // Sort descending (newest first)
-      return ids.sort().reverse();
+
+      // Sort descending (newest first) assuming YYYY-MM-DD format
+      return ids.sort((a, b) => b.localeCompare(a));
 
     } catch (e) {
       Logger.error('[Firestore] listDailyQuizDates failed', e);
@@ -1540,18 +1637,32 @@ export class FirestoreRestService {
   /**
    * Saves metadata for a daily quiz.
    */
-  async saveDailyQuizMetadata(date: string, metadata: { leaderboardCommentId?: string }): Promise<void> {
+  async saveDailyQuizMetadata(date: string, metadata: Record<string, string>): Promise<void> {
     try {
       const url = `${this.baseUrl}/daily-quizzes/${date}`;
       const fields: any = {};
+      const updateMask: string[] = ['updatedAt'];
 
-      if (metadata.leaderboardCommentId) {
-        fields.leaderboardCommentId = { stringValue: metadata.leaderboardCommentId };
+      for (const [key, value] of Object.entries(metadata)) {
+        // Use nested path mapping for the metadata MapValue
+        fields[key] = { stringValue: value };
+        updateMask.push(`metadata.${key}`);
       }
 
-      const body = { fields };
+      // Structure body specifically for the MapValue nesting in PATCH
+      const body = {
+        fields: {
+          metadata: {
+            mapValue: {
+              fields: fields
+            }
+          },
+          updatedAt: { stringValue: new Date().toISOString() }
+        }
+      };
 
-      await fetch(url, {
+      const maskParams = updateMask.map(f => `updateMask.fieldPaths=${f}`).join('&');
+      await fetch(`${url}?${maskParams}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

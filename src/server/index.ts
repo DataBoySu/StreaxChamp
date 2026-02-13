@@ -19,6 +19,19 @@ Devvit.addSettings({
 // Note: Menu items & Post configurations are handled via devvit.json
 // pointing to /internal/ routes mounted below.
 
+// Register Scheduler
+import { handleDailyGeneration, handleLeaderboardSync, JOB_GENERATE_DAILY, JOB_SYNC_LEADERBOARD } from './jobs/DailyScheduler';
+
+Devvit.addSchedulerJob({
+    name: JOB_GENERATE_DAILY,
+    onRun: handleDailyGeneration,
+});
+
+Devvit.addSchedulerJob({
+    name: JOB_SYNC_LEADERBOARD,
+    onRun: handleLeaderboardSync,
+});
+
 // Try to load secrets from Devvit settings at startup (non-blocking)
 hydrateGeminiKeyFromSettings();
 // Create Express app
