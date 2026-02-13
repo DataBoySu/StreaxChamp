@@ -1,29 +1,33 @@
-Modify topic leaderboard flow to use TopicLeaderboardService exclusively.
+Perform structural verification of topic cutover integrity.
 
-Do NOT delete LeaderboardMemoryService yet.
-Do NOT remove interval yet.
-Do NOT modify daily quiz flow.
+Do NOT modify code.
 
-Tasks:
+Report only.
 
-1️⃣ In LeaderboardController.submitScore (topic branch only):
-Replace call to LeaderboardMemoryService.submit(...) with:
-TopicLeaderboardService.submitScore(...)
+1️⃣ Search entire codebase for:
+LeaderboardMemoryService.submit
+with keys starting with "topic:"
 
-Ensure:
+List all occurrences.
 
-quizId is resolved from topics/{slug}.activeQuizId
-
-stale_version logic is respected
-
-2️⃣ In LeaderboardController.listTopicLeaderboard:
-Replace memory read with:
-TopicLeaderboardService.getLeaderboard(slug, activeQuizId, limit)
-
-3️⃣ Ensure no code path writes topic data into LeaderboardMemoryService.
-
-4️⃣ Ensure no writes occur to:
+2️⃣ Search entire codebase for writes to:
 leaderboards/{slug}
 
-Do not remove existing code.
-Only bypass it for topics.
+List all remaining write paths.
+
+3️⃣ In LeaderboardController.submitScore:
+Show exact code where quizId is determined.
+Confirm whether quizId comes from:
+- client input
+- or Firestore topics/{slug}.activeQuizId
+
+4️⃣ In QuizController (bridging logic):
+Show exact logic that routes daily score into topic leaderboard.
+Confirm it uses TopicLeaderboardService.
+
+5️⃣ In LeaderboardMemoryService:
+Show the new guard logic.
+Confirm it rejects topic keys BEFORE mutating memory.
+
+No commentary.
+Just code paths and confirmations.

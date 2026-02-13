@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { LeaderboardMemoryService } from '../services/LeaderboardMemoryService';
+import { FirestoreRestService } from '../services/FirestoreRestService';
+import { TopicLeaderboardService } from '../services/TopicLeaderboardService';
 
 export class InMemoryLeaderboardController {
 
@@ -14,6 +16,24 @@ export class InMemoryLeaderboardController {
         }
 
         try {
+            const fs = new FirestoreRestService();
+            const topic = await fs.getTopic(safeSlug);
+
+            if (topic && topic.activeQuizId) {
+                // TOPIC BRANCH: Use TopicLeaderboardService (Requirement 3 & 4)
+                const topicSvc = new TopicLeaderboardService();
+                const result = await topicSvc.submitScore({
+                    slug: safeSlug,
+                    quizId: topic.activeQuizId,
+                    userId: String(userKey || nickname),
+                    nickname,
+                    score: Number(score || 0),
+                    submittedAt: new Date().toISOString()
+                });
+                res.json({ ok: result.accepted, reason: result.reason });
+                return;
+            }
+
             const mem = LeaderboardMemoryService.getInstance();
             // Pass metadata including timeTakenMs and userKey
             mem.submit(safeSlug, nickname, Number(score || 0), {
@@ -31,6 +51,24 @@ export class InMemoryLeaderboardController {
         const { slug } = req.params;
         const safeSlug = String(slug);
         try {
+            const fs = new FirestoreRestService();
+            const topic = await fs.getTopic(safeSlug);
+
+            if (topic && topic.activeQuizId) {
+                // TOPIC BRANCH: Use TopicLeaderboardService (Requirement 3 & 4)
+                const topicSvc = new TopicLeaderboardService();
+                const raw = await topicSvc.getLeaderboard(safeSlug, topic.activeQuizId, 10);
+                const entries = raw.map(e => ({
+                    username: e.nickname,
+                    score: e.score,
+                    timestamp: new Date(e.submittedAt).getTime(),
+                    timeTakenMs: 0,
+                    userKey: e.userId
+                }));
+                res.json({ entries });
+                return;
+            }
+
             const mem = LeaderboardMemoryService.getInstance();
             const entries = mem.get(safeSlug);
             res.json({ entries });

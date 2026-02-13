@@ -460,7 +460,8 @@ export class FirestoreRestService {
         });
       }
       const playCount = f.playCount?.integerValue ? Number(f.playCount.integerValue) : 0;
-      return { title, slug: recoveredSlug, sources, status, lastGenerated, generationPhase, questions, playCount };
+      const activeQuizId = f.activeQuizId?.stringValue || null;
+      return { title, slug: recoveredSlug, sources, status, lastGenerated, generationPhase, questions, playCount, activeQuizId };
     } catch (error) {
       return null;
     }

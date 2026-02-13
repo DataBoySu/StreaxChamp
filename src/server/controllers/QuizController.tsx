@@ -327,10 +327,21 @@ export class QuizController {
 
                     if (slug && slug !== 'mixed-general-knowledge' && slug !== 'general-knowledge') {
                         Logger.info(`[SubmitDaily] Mem-Bridging score to Topic: ${slug}`, { nickname: effectiveNickname, score });
-                        const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-                        const mem = LeaderboardMemoryService.getInstance();
-                        const key = `topic:${slug}`;
-                        mem.submit(key, effectiveNickname, score);
+                        Logger.info(`[SubmitDaily] Persist-Bridging score to Topic: ${slug}`, { nickname: effectiveNickname, score });
+
+                        const topic = await fs.getTopic(slug);
+                        if (topic && topic.activeQuizId) {
+                            const { TopicLeaderboardService } = await import('../services/TopicLeaderboardService');
+                            const topicSvc = new TopicLeaderboardService();
+                            await topicSvc.submitScore({
+                                slug,
+                                quizId: topic.activeQuizId,
+                                userId: effectiveUserId,
+                                nickname: effectiveNickname,
+                                score,
+                                submittedAt: new Date().toISOString()
+                            });
+                        }
                     }
                 }
             } catch (bridgeErr) {

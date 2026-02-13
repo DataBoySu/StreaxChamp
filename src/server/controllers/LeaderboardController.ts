@@ -5,6 +5,7 @@ import { LeaderboardService } from '../services/LeaderboardService';
 import { Logger } from '../Logger';
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { CacheService } from '../services/CacheService';
+import { TopicLeaderboardService } from '../services/TopicLeaderboardService';
 
 /**
  * Controller for managing global and topic-specific leaderboards.
@@ -51,7 +52,7 @@ export class LeaderboardController {
             // Persist across all relevant leaderboard partitions (IN-MEMORY - Phase 3)
             // const topicRes = await svc.submit(slug || 'global', entry);
 
-            // Submit to Memory
+            // Submit to Memory or Topic Service (Persistent)
             try {
                 const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
                 const mem = LeaderboardMemoryService.getInstance();
@@ -59,17 +60,47 @@ export class LeaderboardController {
                 // If we have a specific PostID (Custom Quiz), use that key
                 // Otherwise use topic slug
                 const postId = req.body.postId;
-                const key = postId ? `post:${postId}` : `topic:${slug || 'global'}`;
 
-                mem.submit(key, nickname, score);
-
-                // NEW: Trigger Comment Leaderboard Update (Fire & Forget, but await for context safety)
                 if (postId) {
+                    // Custom Posts still use Memory + Comment Side Effect
+                    const key = `post:${postId}`;
+                    mem.submit(key, nickname, score);
                     const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
                     await CommentLeaderboardService.getInstance().ensureComment(reddit, postId, slug || 'custom');
+                } else if (slug && slug !== 'global') {
+                    // TOPIC BRANCH: Use TopicLeaderboardService (Persistent + Atomic)
+                    const fs = new FirestoreRestService();
+                    const topic = await fs.getTopic(slug);
+                    if (!topic || !topic.activeQuizId) {
+                        return res.status(404).json({ error: 'TOPIC_NOT_FOUND_OR_NO_QUIZ' });
+                    }
+
+                    const topicSvc = new TopicLeaderboardService();
+                    const result = await topicSvc.submitScore({
+                        slug,
+                        quizId: topic.activeQuizId,
+                        userId: userKey,
+                        nickname,
+                        score,
+                        submittedAt: new Date().toISOString()
+                    });
+
+                    if (!result.accepted) {
+                        if (result.reason === 'stale_version') {
+                            return res.status(409).json({ error: 'STALE_QUIZ_VERSION', reason: 'A new quiz has been generated for this topic.' });
+                        }
+                        if (result.reason === 'already_played') {
+                            return res.status(403).json({ error: 'ALREADY_PLAYED', reason: 'You have already submitted a score for this version.' });
+                        }
+                        return res.status(500).json({ error: 'SUBMISSION_FAILED', reason: result.reason });
+                    }
+                } else {
+                    // Global / Default fallback
+                    const key = `topic:${slug || 'global'}`;
+                    mem.submit(key, nickname, score);
                 }
             } catch (memErr) {
-                Logger.error('[SubmitScore] Memory/Comment Fail', memErr);
+                Logger.error('[SubmitScore] Submission Fail', memErr);
             }
 
             if (slug && !req.body.postId) {
@@ -109,18 +140,22 @@ export class LeaderboardController {
             // const dateParam = typeof req.params.date === 'string' ? req.params.date : undefined;
             // const list = await svc.list(slug, dateParam); // OLD
 
-            // NEW: Read from Memory
-            const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-            const mem = LeaderboardMemoryService.getInstance();
-            // Key format: topic:slug
-            const key = `topic:${slug}`;
-            const raw = mem.get(key);
+            // NEW: Read from TopicLeaderboardService
+            const fs = new FirestoreRestService();
+            const topic = await fs.getTopic(slug);
 
-            const list = raw.map(e => ({
-                nickname: e.username,
+            if (!topic || !topic.activeQuizId) {
+                return res.json([]);
+            }
+
+            const topicSvc = new TopicLeaderboardService();
+            const raw = await topicSvc.getLeaderboard(slug, topic.activeQuizId, 10);
+
+            const list = raw.map((e: any) => ({
+                nickname: e.nickname,
                 score: e.score,
-                submittedAt: new Date(e.timestamp).toISOString(),
-                userKey: e.username,
+                submittedAt: e.submittedAt,
+                userKey: e.userId,
                 timeTakenMs: 0
             }));
 

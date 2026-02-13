@@ -22,6 +22,7 @@ export class LeaderboardMemoryService {
     private readonly CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 Minutes
     private fs: FirestoreRestService;
     private commentService: CommentLeaderboardService;
+
     private constructor() {
         this.fs = new FirestoreRestService();
         this.commentService = new CommentLeaderboardService();
@@ -57,6 +58,13 @@ export class LeaderboardMemoryService {
 
         // Initialize creation timestamp for this key if new
         if (!this.created.has(key)) {
+            // Guard: Block generated topics from entering memory (Task 3 & 4)
+            // We allow 'topic:global' because it's a special root leaderboard
+            // but block 'topic:science', etc.
+            if (key.startsWith('topic:') && key !== 'topic:global') {
+                Logger.warn(`[LeaderboardMemory] Blocked submission to topic memory: ${key}. Use TopicLeaderboardService.`);
+                return;
+            }
             this.created.set(key, Date.now());
         }
 
@@ -141,8 +149,6 @@ export class LeaderboardMemoryService {
             }
 
             // 2. Fetch latest absolute scores from Firestore (Persistent DB)
-            // We fetch from Firestore because the memory buffer might have been flushed,
-            // or we want the most complete top 10 from the whole day.
             const rawEntries = await this.fs.getQuizLeaderboard(date, 10);
             const entries = rawEntries.map(e => ({
                 username: e.nickname || e.userKey,
@@ -151,7 +157,6 @@ export class LeaderboardMemoryService {
             }));
 
             // 3. Update the comment using the CommentLeaderboardService
-            // It will handle the tabular formatting.
             await this.commentService.updateLeaderboardComment(reddit, meta.leaderboardCommentId, entries, date);
 
             // 4. Mark update time
