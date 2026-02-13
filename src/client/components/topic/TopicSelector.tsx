@@ -479,7 +479,7 @@ export const TopicSelector: React.FC<{
                 textAlign: 'center',
               }}
             >
-              Custom topics take 1–3 minutes. Cached after first generation.
+              Custom topics take 1-2 minutes. Cached after first generation. Kindly refresh.
             </span>
           </div>
         </div>

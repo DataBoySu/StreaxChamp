@@ -136,11 +136,13 @@ export class LeaderboardMemoryService {
             // 1. Get Reddit/Post Info from Firestore Metadata (Comment ID is stored there)
             const meta = await this.fs.getDailyQuizMetadata(date);
             if (!meta || !meta.leaderboardCommentId) {
-                // If no commentId, maybe wait for a user submission to trigger ensureComment
+                Logger.info(`[LeaderboardMemory] No leaderboardCommentId for ${date}, skipping auto-update`);
                 return;
             }
 
             // 2. Fetch latest absolute scores from Firestore (Persistent DB)
+            // We fetch from Firestore because the memory buffer might have been flushed,
+            // or we want the most complete top 10 from the whole day.
             const rawEntries = await this.fs.getQuizLeaderboard(date, 10);
             const entries = rawEntries.map(e => ({
                 username: e.nickname || e.userKey,
@@ -148,12 +150,13 @@ export class LeaderboardMemoryService {
                 timestamp: e.completedAt ? new Date(e.completedAt).getTime() : Date.now()
             }));
 
-            // 3. Update the comment
+            // 3. Update the comment using the CommentLeaderboardService
+            // It will handle the tabular formatting.
             await this.commentService.updateLeaderboardComment(reddit, meta.leaderboardCommentId, entries, date);
 
             // 4. Mark update time
             this.lastRedditUpdate.set(key, Date.now());
-            Logger.info(`[LeaderboardMemory] Successfully updated Reddit comment for ${key}`);
+            Logger.info(`[LeaderboardMemory] Successfully updated Reddit comment for ${key} (Entries: ${entries.length})`);
 
         } catch (e) {
             Logger.error(`[LeaderboardMemory] updateRedditComment failed for ${key}`, e);

@@ -22,6 +22,7 @@ const Splash = () => {
     const [quizLoading, setQuizLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [username, setUsername] = useState<string | null>(null);
+    const [dailyQuizStatus, setDailyQuizStatus] = useState<string | null>(null);
 
     const {
         currentIndex,
@@ -108,8 +109,18 @@ const Splash = () => {
                         const stats = await statsRes.json();
                         setQuizStats(stats);
                     }
-                    setQuizLoading(false);
                 }
+
+                // [NEW] Daily Quiz Status Check
+                if (initData.dailyQuizStatus === 'READY' && !initData.customQuiz) {
+                    setDailyQuizStatus('READY');
+                    console.log('[Splash] 📅 New Daily Quiz is READY!');
+                } else if (initData.dailyQuizStatus === 'COMPLETED') {
+                    setDailyQuizStatus('COMPLETED');
+                    console.log('[Splash] 📅 Daily Quiz already finished.');
+                }
+
+                setQuizLoading(false);
             } catch (e) {
                 console.error('[Splash] Context check failed', e);
             }
@@ -414,6 +425,24 @@ const Splash = () => {
                     }}>
                         {mode === 'QUIZ' ? 'Streax Game' : (customQuizMeta ? 'Challenger!' : 'Streax Quiz')}
                     </div>
+
+                    {/* [NEW] Dynamic Daily Alert Banner */}
+                    {!customQuizMeta && dailyQuizStatus === 'READY' && mode === 'MENU' && (
+                        <div
+                            className="nes-container is-rounded is-dark p-2 text-center"
+                            style={{
+                                padding: '0.5rem',
+                                marginTop: '0.5rem',
+                                marginBottom: '1rem',
+                                width: '100%',
+                                borderColor: '#f7d51d'
+                            }}
+                        >
+                            <p className="mb-0 animate-pulse" style={{ fontSize: '0.7rem', color: '#f7d51d' }}>
+                                🌟 <span style={{ color: '#fff' }}>NEW DAILY QUIZ READY!</span> 🌟
+                            </p>
+                        </div>
+                    )}
 
                     {/* Content Router */}
                     <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 0 }}>

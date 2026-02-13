@@ -119,11 +119,37 @@ router.get('/init', async (_req, res) => {
             console.error(`[Init] Failed to lookup quiz mapping for ${postId}`, e);
         }
 
+        // [NEW] Daily Quiz Status for dynamic splash
+        let dailyQuizStatus = 'READY';
+        try {
+            const todayStr = new Date().toISOString().slice(0, 10);
+
+            // Check Memory First
+            const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+            const mem = LeaderboardMemoryService.getInstance();
+            const memEntries = mem.get(`daily:${todayStr}`);
+            const hasPlayedMem = username && memEntries.some(e => e.username === username);
+
+            if (hasPlayedMem) {
+                dailyQuizStatus = 'COMPLETED';
+            } else if (username) {
+                // Check Firestore
+                const fs = new FirestoreRestService();
+                const history = await fs.getDailyPlayHistory(username, todayStr);
+                if (history && history.completed) {
+                    dailyQuizStatus = 'COMPLETED';
+                }
+            }
+        } catch (statusErr) {
+            console.error('[Init] Failed to check daily quiz status', statusErr);
+        }
+
         res.json({
             type: 'init',
             postId: postId,
             username: username,
-            customQuiz: customQuiz
+            customQuiz: customQuiz,
+            dailyQuizStatus: dailyQuizStatus
         });
     } catch (error: any) {
         console.error(`API Init Error for post ${postId}:`, error);
@@ -219,15 +245,32 @@ router.post('/share/comment', async (req, res) => {
 
         console.log("[SHARE] Comment posted successfully", { commentId });
 
-        // Update state (Still track it even for devs, just don't block them)
+        // Update state
         await fs.updateUserTopicStats(username, quizId, { hasShared: true } as any);
 
-        // Native Toast (if supported in API context) or standard response
-        if (ctx.ui && ctx.ui.showToast) {
+        // [NEW] Opt-in Daily Leaderboard Submission
+        // If this is a daily quiz (quizId is a date), add to Memory Leaderboard
+        if (quizId.match(/^\d{4}-\d{2}-\d{2}$/)) {
             try {
-                ctx.ui.showToast({ text: 'Score shared successfully!', appearance: 'success' });
-            } catch (uiErr) {
-                console.warn('[SHARE] Native toast failed (expected in API route if no UI context):', uiErr);
+                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+                const mem = LeaderboardMemoryService.getInstance();
+
+                // Fetch the score from Firestore play history (since it was saved on complete)
+                const history = await fs.getDailyPlayHistory(username, quizId);
+                if (history) {
+                    console.log(`[SHARE] Opting-in to Daily Leaderboard for ${username} (Score: ${history.score})`);
+                    mem.submit(`daily:${quizId}`, username, history.score, {
+                        userKey: username,
+                        timeTakenMs: (history as any).timeTakenMs || 0
+                    });
+
+                    // Ensure Placeholder Comment exists for this post
+                    const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
+                    const commentService = new CommentLeaderboardService();
+                    await commentService.ensureComment(reddit, targetPostId, quizId);
+                }
+            } catch (err) {
+                console.error('[SHARE] Memory Leaderboard Opt-in Failed', err);
             }
         }
 

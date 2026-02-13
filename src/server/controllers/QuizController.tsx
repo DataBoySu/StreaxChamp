@@ -231,55 +231,48 @@ export class QuizController {
 
             // 1. Replay Check (Authority)
             const existing = await fs.getDailyPlayHistory(effectiveUserId, quizDate);
+            const isReplay = !!(existing && existing.completed);
 
-            // Allow Write IF: History missing OR User not in leaderboard yet (Recover state)
-            // We check leaderboard existence implicitly by letting saveQuizLeaderboardEntry safeguard itself.
-            // But we still want to indicate "Replay" to client if history exists.
-
-            // 2. Save History (New Record) - Upsert to ensure latest metadata
             // 2. Save History (New Record) - Upsert to ensure latest metadata
             await fs.saveDailyPlayHistory(effectiveUserId, quizDate, {
                 score,
                 totalQuestions,
-                isPerfect: score === totalQuestions
+                isPerfect: score === totalQuestions,
+                timeTakenMs: Number(timeTakenMs || 0)
             });
 
             // 3. Quiz-Specific Leaderboard (IN-MEMORY - Phase 3)
-            const isReplay = existing && existing.completed;
+            // REMOVED: Auto-submission to memory leaderboard is now OPT-IN via /api/share/comment
 
+            /*
             try {
                 const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
                 const mem = LeaderboardMemoryService.getInstance();
 
-                // [GATED] Only submit to competitive leaderboard if NOT a replay
                 if (!isReplay) {
-                    // [MEMORY SYNC] Submit to in-memory buffer ONLY. 
-                    // Persistent save happens during 3-hour flush cycle.
                     mem.submit(`daily:${quizDate}`, effectiveNickname, score, {
                         timeTakenMs: Number(timeTakenMs || 0),
                         userKey: effectiveUserId
                     });
 
-                    // Ensure Placeholder Comment exists for this post
                     if (postId) {
-                        try {
-                            const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
-                            const commentService = new CommentLeaderboardService();
-                            await commentService.ensureComment(reddit, postId, quizDate);
-                        } catch (commentErr) {
-                            Logger.error('[SubmitDaily] ensureComment fail', commentErr);
-                        }
+                        const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
+                        const commentService = new CommentLeaderboardService();
+                        await commentService.ensureComment(reddit, postId, quizDate);
                     }
                 }
             } catch (memErr) {
                 Logger.error('[SubmitDaily] Memory Leaderboard Fail', memErr);
             }
+            */
+
 
             if (isReplay) {
                 Logger.info(`[DAILY QUIZ] Replay play processed`, { userId: effectiveUserId, date: quizDate });
                 // Return replay: true so client shows badge, but we attempted recovery above
                 return res.json({ success: true, replay: true });
             }
+
 
             // 4. Update Global XP (Only on first play)
             await fs.incrementUserTotalScore(effectiveUserId, score);

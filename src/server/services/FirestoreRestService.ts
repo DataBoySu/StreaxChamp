@@ -1328,7 +1328,7 @@ export class FirestoreRestService {
    * Collection: daily-play-history
    * ID: {userId}_{quizDate}
    */
-  async saveDailyPlayHistory(userId: string, quizDate: string, stats: { score: number; totalQuestions: number; isPerfect: boolean }): Promise<boolean> {
+  async saveDailyPlayHistory(userId: string, quizDate: string, stats: { score: number; totalQuestions: number; isPerfect: boolean; timeTakenMs?: number }): Promise<boolean> {
     try {
       const docId = `${userId}_${quizDate}`;
       const url = `${this.baseUrl}/daily-play-history/${docId}`;
@@ -1342,7 +1342,8 @@ export class FirestoreRestService {
           score: { integerValue: String(stats.score) },
           totalQuestions: { integerValue: String(stats.totalQuestions) },
           isPerfect: { booleanValue: stats.isPerfect },
-          completedAt: { stringValue: nowIso }
+          completedAt: { stringValue: nowIso },
+          timeTakenMs: { integerValue: String(stats.timeTakenMs || 0) }
         }
       };
 
@@ -1361,7 +1362,7 @@ export class FirestoreRestService {
   /**
    * Check if user completed a daily quiz.
    */
-  async getDailyPlayHistory(userId: string, quizDate: string): Promise<{ completed: boolean; score: number } | null> {
+  async getDailyPlayHistory(userId: string, quizDate: string): Promise<{ completed: boolean; score: number; timeTakenMs?: number } | null> {
     try {
       const docId = `${userId}_${quizDate}`;
       const url = `${this.baseUrl}/daily-play-history/${docId}`;
@@ -1375,7 +1376,8 @@ export class FirestoreRestService {
 
       return {
         completed: true,
-        score: Number(f.score?.integerValue || 0)
+        score: Number(f.score?.integerValue || 0),
+        timeTakenMs: Number(f.timeTakenMs?.integerValue || 0)
       };
     } catch (e) {
       Logger.error('[Firestore] getDailyPlayHistory failed', e);

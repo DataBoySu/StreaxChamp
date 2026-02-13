@@ -70,25 +70,28 @@ export class CommentLeaderboardService {
     }
 
     private formatLeaderboard(entries: CommentLeaderboardEntry[], date: string): string {
-        const header = `### Daily Quiz Leaderboard: ${date}\n\n`;
+        const header = `### 🏆 Daily Quiz Leaderboard: ${date}\n\n`;
 
         if (entries.length === 0) {
             return header + `Be the first to play and claim your spot!\n\n*Updated every 3 hours*`;
         }
 
-        // Use a bolded list format instead of a table to avoid dashes and emojis
-        const lines = entries.slice(0, 10).map((e, i) => {
+        let table = `| Rank | Player | Score | Time |\n`;
+        table += `|:---:|:---|:---:|:---:|\n`;
+
+        const rows = entries.slice(0, 10).map((e, i) => {
             const rank = i + 1;
-            const isTop3 = rank <= 3;
-            const playerLabel = isTop3 ? `**Rank ${rank}**` : `Rank ${rank}`;
             const timeStr = new Date(e.timestamp).toLocaleTimeString('en-US', {
                 hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short'
+                minute: '2-digit'
             });
-            return `${playerLabel} : u/${e.username} : **${e.score} points** at ${timeStr}`;
-        }).join('\n\n');
+            // Bold Top 3
+            const name = rank <= 3 ? `**u/${e.username}**` : `u/${e.username}`;
+            const score = rank <= 3 ? `**${e.score}**` : `${e.score}`;
 
-        return header + lines + `\n\n*Updated every 3 hours . Only first attempt counts*`;
+            return `| ${rank} | ${name} | ${score} | ${timeStr} |`;
+        });
+
+        return header + table + rows.join('\n') + `\n\n*Updated every 3 hours. Only your first shared score counts.*`;
     }
 }
