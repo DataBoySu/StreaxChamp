@@ -200,7 +200,7 @@ export class QuizController {
      */
     static async submitDailyScore(req: Request, res: Response) {
         try {
-            const { quizDate, score, totalQuestions, nickname, timeTakenMs } = req.body;
+            const { quizDate, score, totalQuestions, nickname, timeTakenMs, postId } = req.body;
             // 0. Resolve User
             const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
             const effectiveUserId = userId; // username is not available from getDevvitUserId
@@ -232,16 +232,41 @@ export class QuizController {
             });
 
             // 3. Quiz-Specific Leaderboard (IN-MEMORY - Phase 3)
-            // Was: await fs.saveQuizLeaderboardEntry(...)
+            const isReplay = existing && existing.completed;
+
             try {
                 const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
                 const mem = LeaderboardMemoryService.getInstance();
-                mem.submit(`daily:${quizDate}`, effectiveNickname, score, { timeTakenMs: Number(timeTakenMs || 0) });
+
+                // [GATED] Only submit to competitive leaderboard if NOT a replay
+                if (!isReplay) {
+                    // [IMMEDIATE SAVE] Save to Firestore Leaderboard for Daily Rankings UI & Reddit Bot
+                    await fs.saveQuizLeaderboardEntry(quizDate, effectiveUserId, {
+                        score,
+                        nickname: effectiveNickname,
+                        completedAt: new Date().toISOString()
+                    });
+
+                    // [MEMORY SYNC] Submit to in-memory buffer as well
+                    mem.submit(`daily:${quizDate}`, effectiveNickname, score, {
+                        timeTakenMs: Number(timeTakenMs || 0),
+                        userKey: effectiveUserId
+                    });
+
+                    // Ensure Placeholder Comment exists for this post
+                    if (postId) {
+                        try {
+                            const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
+                            const commentService = new CommentLeaderboardService();
+                            await commentService.ensureComment(reddit, postId, quizDate);
+                        } catch (commentErr) {
+                            Logger.error('[SubmitDaily] ensureComment fail', commentErr);
+                        }
+                    }
+                }
             } catch (memErr) {
                 Logger.error('[SubmitDaily] Memory Leaderboard Fail', memErr);
             }
-
-            const isReplay = existing && existing.completed;
 
             if (isReplay) {
                 Logger.info(`[DAILY QUIZ] Replay play processed`, { userId: effectiveUserId, date: quizDate });

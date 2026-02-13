@@ -1,69 +1,33 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { navigateTo } from '@devvit/web/client';
 import { CelebrationBackground } from './CelebrationBackground';
 import { ScoreFace } from './ScoreFace';
-import { InMemoryLeaderboard } from '../leaderboard/InMemoryLeaderboard'; // NEW
+import { InMemoryLeaderboard } from '../leaderboard/InMemoryLeaderboard';
 
 interface QuizResultProps {
     score: number;
     totalQuestions: number;
-    onPlayAgain: () => void;
     sources?: string[];
     quizId?: string | undefined;
-    postId?: string | null;
-    isGenerated?: boolean | undefined; // NEW
-    topicTitle?: string | undefined;   // NEW
-    currentUser?: string | undefined;  // NEW
+    isGenerated?: boolean | undefined;
+    topicTitle?: string | undefined;
+    currentUser?: string | undefined;
 }
 
 export const QuizResult: React.FC<QuizResultProps> = ({
     score,
     totalQuestions,
-    onPlayAgain,
     sources = [],
-    postId,
     quizId,
     isGenerated = false,
     topicTitle = '',
     currentUser = ''
 }) => {
     const [subscribed, setSubscribed] = useState(false);
-    const [sharing, setSharing] = useState(false);
-    const [shared, setShared] = useState(false);
 
     const percentage = (score / totalQuestions) * 100;
     const isExcellent = percentage >= 80;
     const isGood = percentage >= 60;
-
-    const handleShare = async () => {
-        if (!postId || sharing || shared) return;
-        setSharing(true);
-        try {
-            // Construct a fun share message
-            const shareText = `I just scored ${score}/${totalQuestions} on StreaxChamp! 🏆 Can you beat my streak?`;
-
-            const response = await fetch('/api/share/comment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    postId,
-                    quizId,
-                    text: shareText
-                })
-            });
-
-            if (response.ok) {
-                setShared(true);
-            } else {
-                console.error('Share failed', await response.text());
-            }
-        } catch (e) {
-            console.error('Share error', e);
-        } finally {
-            setSharing(false);
-        }
-    };
 
     const handleJoin = async () => {
         if (subscribed) return;
@@ -190,48 +154,14 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                             : '💪 Keep Practicing!'}
                 </motion.p>
 
-                {/* Action Buttons */}
+                {/* Action Buttons & Leaderboard Container */}
                 <div
-                    className="flex flex-col gap-4 w-full max-w-md mx-auto"
+                    className="flex flex-col gap-4 w-full max-w-md mx-auto mt-8"
                     style={{
                         fontFamily: "'Press Start 2P', cursive",
                     }}
                 >
-                    {/* Button 1: Explore More Quizzes (Always show) */}
-                    <button
-                        onClick={() => navigateTo('https://reddit.com/r/streaxchamp')}
-                        className="nes-btn is-warning transition-transform hover:scale-105 active:scale-95"
-                        style={{
-                            fontFamily: "'Press Start 2P', cursive",
-                            fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
-                            padding: '1rem 1.5rem',
-                            borderRadius: 0,
-                            boxShadow: '0 0 15px rgba(255, 165, 0, 0.3)',
-                        }}
-                    >
-                        Explore More Quizzes
-                    </button>
-
-                    {/* Button 2: Share Score (Conditional: Hide if Generated) */}
-                    {!isGenerated && (
-                        <button
-                            onClick={handleShare}
-                            disabled={!postId || sharing || shared}
-                            className={`nes-btn ${shared ? 'is-disabled' : 'is-success'} transition-transform hover:scale-105 active:scale-95`}
-                            style={{
-                                fontFamily: "'Press Start 2P', cursive",
-                                fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
-                                padding: '1rem 1.5rem',
-                                borderRadius: 0,
-                                boxShadow: shared ? 'none' : '0 0 15px rgba(0, 255, 136, 0.3)',
-                                opacity: (!postId || sharing || shared) ? 0.7 : 1
-                            }}
-                        >
-                            {sharing ? 'Sharing...' : shared ? 'Shared! 🚀' : 'Share Score'}
-                        </button>
-                    )}
-
-                    {/* Button 3: Join Sub (Always show) */}
+                    {/* Button: Join Sub (Always show) */}
                     <button
                         onClick={handleJoin}
                         className={`nes-btn ${subscribed ? 'is-success' : 'is-error'} transition-transform hover:scale-105 active:scale-95`}
@@ -247,26 +177,16 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                         {subscribed ? 'Joined! 🎉' : 'Join Sub'}
                     </button>
 
-                    {/* Replay Button (Conditional: Hide if Generated) */}
-                    {!isGenerated && (
-                        <button
-                            onClick={onPlayAgain}
-                            className="nes-btn"
-                            style={{
-                                marginTop: '1rem',
-                                fontSize: '0.7rem'
-                            }}
-                        >
-                            Replay
-                        </button>
-                    )}
-
-                    {/* In-Memory Leaderboard (Conditional: Show ONLY if Generated) */}
-                    {isGenerated && quizId && (
+                    {/* Leaderboard Section (Always show if quizId exists) */}
+                    {quizId && (
                         <InMemoryLeaderboard
-                            slug={topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')} // Use robust slug generation if quizId is generic
-                            topicTitle={topicTitle}
+                            slug={isGenerated
+                                ? topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+                                : `daily:${quizId}`
+                            }
+                            topicTitle={isGenerated ? topicTitle : 'Daily Rankings'}
                             currentUser={currentUser}
+                            isDaily={!isGenerated}
                         />
                     )}
                 </div>
@@ -305,6 +225,6 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                     </div>
                 )}
             </div>
-        </motion.div>
+        </motion.div >
     );
 };

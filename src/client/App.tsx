@@ -774,7 +774,8 @@ export const App = () => {
               score,
               totalQuestions: NUM_QUESTIONS,
               nickname, // Pass nickname for leaderboard
-              timeTakenMs: totalMs // Pass timeTakenMs for tie breaking
+              timeTakenMs: totalMs, // Pass timeTakenMs for tie breaking
+              postId // [NEW] Pass postId to link comment leaderboard
             })
           });
           const data = await res.json();
@@ -1138,13 +1139,11 @@ export const App = () => {
                   <QuizResult
                     score={score}
                     totalQuestions={NUM_QUESTIONS + (showBonusQuestion ? 1 : 0)}
-                    onPlayAgain={startQuiz}
                     sources={(selectedTopic ? selectedTopicQuiz?.sources : dailyQuiz?.metadata?.sources) || []}
                     quizId={selectedTopic ? selectedTopicQuiz?.id : dailyQuiz?.id}
-                    postId={postId}
-                    isGenerated={!!selectedTopic} // NEW: Flag for conditional UI
-                    topicTitle={selectedTopic?.title} // NEW: For header
-                    currentUser={authUser?.nickname || 'Guest'} // NEW: For highlighting
+                    isGenerated={!!selectedTopic}
+                    topicTitle={selectedTopic?.title}
+                    currentUser={authUser?.nickname || 'Guest'}
                   />
                 ) : (
                   <QuizActiveView

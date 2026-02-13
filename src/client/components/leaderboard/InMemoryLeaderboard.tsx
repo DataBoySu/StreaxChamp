@@ -13,22 +13,29 @@ interface InMemoryLeaderboardProps {
     slug: string;
     topicTitle: string;
     currentUser: string | null;
+    isDaily?: boolean; // NEW: Toggle between memory and firestore logic
 }
 
-export const InMemoryLeaderboard: React.FC<InMemoryLeaderboardProps> = ({ slug, topicTitle, currentUser }) => {
+export const InMemoryLeaderboard: React.FC<InMemoryLeaderboardProps> = ({ slug, topicTitle, currentUser, isDaily = false }) => {
     const [scores, setScores] = useState<MemoryScore[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchScores = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/leaderboard/memory/${encodeURIComponent(slug)}`);
+            // If Daily, we can fetch from the "daily leaderboard" endpoint which is persistent
+            const url = isDaily
+                ? `/api/quiz/daily/leaderboard?date=${slug.replace('daily:', '')}`
+                : `/api/leaderboard/memory/${encodeURIComponent(slug)}`;
+
+            const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
-                setScores(data.entries || []);
+                const entries = isDaily ? data.entries : data.entries;
+                setScores(entries || []);
             }
         } catch (e) {
-            console.error('Failed to load memory leaderboard', e);
+            console.error('Failed to load leaderboard', e);
         } finally {
             setLoading(false);
         }
@@ -36,82 +43,106 @@ export const InMemoryLeaderboard: React.FC<InMemoryLeaderboardProps> = ({ slug, 
 
     useEffect(() => {
         fetchScores();
-        // Poll every 5s for live updates since it's transient
-        const interval = setInterval(fetchScores, 5000);
+        const interval = setInterval(fetchScores, 15000); // Poll slower for results
         return () => clearInterval(interval);
-    }, [slug]);
+    }, [slug, isDaily]);
 
     return (
         <motion.div
-            className="mt-8 w-full max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            className="mt-12 w-full max-w-2xl mx-auto"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
         >
             <div
                 className="nes-container is-dark with-title"
                 style={{
-                    borderColor: '#facc15', // Yellow border for "Special/Generated" feel
-                    boxShadow: '0 0 20px rgba(250, 204, 21, 0.3)',
-                    background: '#111827' // Consistent dark bg
+                    borderRadius: 0,
+                    backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                    border: `4px solid ${isDaily ? '#00ff88' : '#facc15'}`,
+                    boxShadow: `0 0 30px ${isDaily ? 'rgba(0, 255, 136, 0.2)' : 'rgba(250, 204, 21, 0.2)'}`,
+                    padding: '2rem 1.5rem',
                 }}
             >
-                <p className="title" style={{ color: '#facc15', fontFamily: "'Press Start 2P', cursive", fontSize: '0.8rem' }}>
-                    ⚡ Session Leaderboard ⚡
+                <p className="title px-4" style={{
+                    color: isDaily ? '#00ff88' : '#facc15',
+                    fontFamily: "'Press Start 2P', cursive",
+                    fontSize: '0.7rem',
+                    background: '#111827'
+                }}>
+                    {isDaily ? '[ LIVE RANKINGS ]' : '[ SESSION STANDINGS ]'}
                 </p>
 
-                <h3 className="text-center mb-6" style={{
-                    fontFamily: "'Press Start 2P', cursive",
-                    color: '#e879f9', // Pinkish purple
-                    textShadow: '2px 2px #000'
-                }}>
-                    {topicTitle}
-                </h3>
+                <div className="text-center mb-8">
+                    <h3 style={{
+                        fontFamily: "'Press Start 2P', cursive",
+                        fontSize: '1rem',
+                        color: isDaily ? '#00ff88' : '#e879f9',
+                        textShadow: '3px 3px 0px rgba(0,0,0,0.5)',
+                        marginBottom: '0.5rem'
+                    }}>
+                        {topicTitle || (isDaily ? 'Daily Quiz' : 'Leaderboard')}
+                    </h3>
+                    <div className="h-1 w-24 mx-auto" style={{ background: isDaily ? '#00ff88' : '#e879f9', boxShadow: `0 0 10px ${isDaily ? '#00ff88' : '#e879f9'}` }} />
+                </div>
 
                 {loading && scores.length === 0 ? (
-                    <div className="text-center p-4">Loading...</div>
+                    <div className="flex flex-col items-center gap-4 py-8">
+                        <div className="animate-pulse text-gray-500 font-vt323 text-2xl">SCANNING DATABASE...</div>
+                    </div>
                 ) : scores.length === 0 ? (
-                    <div className="text-center p-4 text-gray-400 font-vt323 text-xl">
-                        Be the first to conquer this topic!
+                    <div className="text-center py-10">
+                        <p className="font-vt323 text-2xl text-gray-500 italic">No rankings detected in this sector.</p>
+                        <p className="font-vt323 text-lg text-gray-600 mt-2">Be the first to leave a mark.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto custom-scrollbar">
-                        <table className="nes-table is-bordered is-dark w-full text-sm">
+                    <div className="overflow-hidden">
+                        <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: '0 8px' }}>
                             <thead>
-                                <tr style={{ color: '#60a5fa' }}>
-                                    <th style={{ width: '60px' }}>#</th>
-                                    <th>Player</th>
-                                    <th className="text-right">Score</th>
-                                    <th className="text-right">Time</th>
+                                <tr className="text-gray-500" style={{ fontFamily: "'Press Start 2P', cursive", fontSize: '0.6rem' }}>
+                                    <th className="pb-4 text-left pl-4">#</th>
+                                    <th className="pb-4 text-left">PLAYER</th>
+                                    <th className="pb-4 text-right">SCORE</th>
+                                    <th className="pb-4 text-right pr-4">TIME</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {scores.map((entry, idx) => {
-                                    const isMe = entry.nickname === currentUser;
+                            <tbody style={{ fontFamily: "'VT323', monospace", fontSize: '1.4rem' }}>
+                                {scores.slice(0, 10).map((entry, idx) => {
+                                    const isMe = entry.nickname === currentUser || entry.userKey === currentUser;
                                     const rank = idx + 1;
-                                    let rankColor = '#9ca3af';
-                                    if (rank === 1) rankColor = '#ffd700';
-                                    if (rank === 2) rankColor = '#c0c0c0';
-                                    if (rank === 3) rankColor = '#cd7f32';
 
                                     return (
-                                        <tr key={idx} style={{
-                                            background: isMe ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                                            fontWeight: isMe ? 'bold' : 'normal'
-                                        }}>
-                                            <td style={{ color: rankColor }}>{rank}</td>
-                                            <td style={{
-                                                color: isMe ? '#60a5fa' : '#e5e7eb',
-                                                maxWidth: '140px',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap'
+                                        <motion.tr
+                                            key={idx}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: idx * 0.05 }}
+                                            style={{
+                                                backgroundColor: isMe ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                                borderLeft: isMe ? '4px solid #3b82f6' : 'none',
+                                            }}
+                                        >
+                                            <td className="py-3 pl-4" style={{
+                                                color: rank === 1 ? '#fbbf24' : rank === 2 ? '#9ca3af' : rank === 3 ? '#b45309' : '#4b5563',
+                                                fontWeight: 'bold'
                                             }}>
-                                                {entry.nickname}
+                                                {rank.toString().padStart(2, '0')}
                                             </td>
-                                            <td className="text-right text-green-400">{entry.score}</td>
-                                            <td className="text-right text-gray-400">{(entry.timeTakenMs / 1000).toFixed(1)}s</td>
-                                        </tr>
+                                            <td className="py-3" style={{
+                                                color: isMe ? '#60a5fa' : '#e5e7eb',
+                                            }}>
+                                                <span className="flex items-center gap-2">
+                                                    {isMe && <span style={{ fontSize: '0.8rem' }}>▶</span>}
+                                                    {entry.nickname || 'Unknown'}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 text-right font-bold" style={{ color: '#00ff88' }}>
+                                                {entry.score}
+                                            </td>
+                                            <td className="py-3 text-right pr-4 text-gray-500" style={{ fontSize: '1.1rem' }}>
+                                                {((entry.timeTakenMs || 0) / 1000).toFixed(1)}s
+                                            </td>
+                                        </motion.tr>
                                     );
                                 })}
                             </tbody>
@@ -119,8 +150,15 @@ export const InMemoryLeaderboard: React.FC<InMemoryLeaderboardProps> = ({ slug, 
                     </div>
                 )}
 
-                <div className="text-center mt-4 text-xs text-gray-500 font-vt323">
-                    * This board resets on server restart
+                <div className="flex justify-between items-center mt-8 pt-4 border-t border-gray-800">
+                    <div className="text-[0.6rem] text-gray-600" style={{ fontFamily: "'Press Start 2P', cursive" }}>
+                        REFRESHING_V2.0
+                    </div>
+                    {isDaily && (
+                        <div className="text-[0.6rem] text-success/60" style={{ fontFamily: "'Press Start 2P', cursive" }}>
+                            VERIFIED_DATA
+                        </div>
+                    )}
                 </div>
             </div>
         </motion.div>

@@ -77,8 +77,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                             <span className="text-xs font-medium opacity-50 uppercase tracking-widest" style={{ color: '#fff' }}>Total Scores</span>
                         )}
                     </div>
-                    <div className="overflow-y-auto pr-1 space-y-3" style={{ maxHeight: '600px' }}>
-                        {(landingSummary?.globalTop || []).slice(0, 50).map((e, i) => {
+                    <div className="overflow-y-auto overflow-x-hidden pr-1 space-y-3" style={{ maxHeight: '420px' }}>
+                        {(landingSummary?.globalTop || []).slice(0, 100).map((e, i) => {
                             let rankClass = 'bg-base-200/40 border-base-300/40 text-base-content';
                             let rankNumberStyle = 'text-accent';
                             const rank = i + 1;
@@ -111,11 +111,12 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                             return (
                                 <div
                                     key={`${e.userKey}-${i}`}
-                                    className={`grid items-center border px-3 py-2.5 transition-all ${rankClass} hover:bg-white/5`}
+                                    className={`grid items-center border px-3 py-2.5 transition-all ${rankClass} hover:bg-white/5 w-full`}
                                     style={{
-                                        gridTemplateColumns: rank <= 3 ? '50px 1fr 60px' : '40px 1fr 60px',
+                                        gridTemplateColumns: '40px 1fr 80px',
                                         gap: '0.75rem',
-                                        borderRadius: 0
+                                        borderRadius: 0,
+                                        boxSizing: 'border-box'
                                     }}
                                 >
                                     <span className={`font-black text-center ${rankNumberStyle}`} style={{ fontSize: rank <= 3 ? 'clamp(0.9rem, 2.5vw, 1.2rem)' : 'clamp(0.75rem, 2vw, 1rem)' }}>

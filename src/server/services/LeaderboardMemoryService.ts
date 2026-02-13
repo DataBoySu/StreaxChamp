@@ -1,3 +1,4 @@
+import { Logger } from '../Logger';
 import { FirestoreRestService } from './FirestoreRestService';
 import { CommentLeaderboardService } from './CommentLeaderboardService';
 import { reddit } from '@devvit/web/server';
@@ -21,12 +22,10 @@ export class LeaderboardMemoryService {
     private readonly CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 Minutes
     private fs: FirestoreRestService;
     private commentService: CommentLeaderboardService;
-    private flushTimer: NodeJS.Timeout;
-
     private constructor() {
         this.fs = new FirestoreRestService();
         this.commentService = new CommentLeaderboardService();
-        this.flushTimer = setInterval(() => this.checkCycles(), this.CHECK_INTERVAL_MS);
+        setInterval(() => this.checkCycles(), this.CHECK_INTERVAL_MS);
     }
 
     public static getInstance(): LeaderboardMemoryService {
@@ -101,9 +100,12 @@ export class LeaderboardMemoryService {
     private async checkCycles() {
         const now = Date.now();
 
-        // 1. Standard Persistence Flush (8 Hours)
+        // 1. Standard Persistence Flush (8 Hours for topics, 10 Mins for daily)
         for (const [key, createdAt] of this.created.entries()) {
-            if (now - createdAt >= this.FLUSH_THRESHOLD_MS) {
+            const isDaily = key.startsWith('daily:');
+            const threshold = isDaily ? this.CHECK_INTERVAL_MS : this.FLUSH_THRESHOLD_MS;
+
+            if (now - createdAt >= threshold) {
                 await this.flush(key);
             }
         }
@@ -133,8 +135,12 @@ export class LeaderboardMemoryService {
             }
 
             // 2. Fetch latest absolute scores from Firestore (Persistent DB)
-            // Memory only has the last 10 entries of the current session
-            const entries = await this.fs.getQuizLeaderboard(date, 10);
+            const rawEntries = await this.fs.getQuizLeaderboard(date, 10);
+            const entries = rawEntries.map(e => ({
+                username: e.nickname || e.userKey,
+                score: e.score,
+                timestamp: e.completedAt ? new Date(e.completedAt).getTime() : Date.now()
+            }));
 
             // 3. Update the comment
             await this.commentService.updateLeaderboardComment(reddit, meta.leaderboardCommentId, entries, date);
