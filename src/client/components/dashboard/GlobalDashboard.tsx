@@ -209,7 +209,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                                 className="border-b border-white/10 last:border-0 hover:bg-white/5 transition-colors"
                                 style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '30px 1fr auto',
+                                    gridTemplateColumns: '30px 1fr 80px auto', // Added column for Type
                                     gap: '0.75rem',
                                     alignItems: 'center',
                                     padding: '0.625rem 0.75rem',
@@ -220,6 +220,16 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                                 </span>
                                 <span className="font-semibold text-white truncate" style={{ fontSize: 'clamp(0.7rem, 1.8vw, 0.85rem)' }} title={h.nickname}>
                                     {h.nickname || 'Player'}
+                                </span>
+                                {/* Type Badge */}
+                                <span
+                                    className={`text-xs px-2 py-1 rounded text-center font-bold ${(h.topicSlug && h.topicSlug.includes('daily')) || (h.topicTitle && h.topicTitle.includes('Daily'))
+                                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                        }`}
+                                    style={{ fontSize: '0.65rem' }}
+                                >
+                                    {(h.topicSlug && h.topicSlug.includes('daily')) || (h.topicTitle && h.topicTitle.includes('Daily')) ? 'DAILY' : 'TOPIC'}
                                 </span>
                                 <span className="text-secondary text-right whitespace-nowrap" style={{ fontSize: 'clamp(0.65rem, 1.5vw, 0.75rem)' }}>
                                     {timeAgo}

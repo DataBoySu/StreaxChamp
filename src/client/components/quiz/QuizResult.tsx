@@ -10,6 +10,7 @@ interface QuizResultProps {
     topicTitle?: string | undefined;
     postId?: string | null;
     isDailyQuiz?: boolean;
+    quizId?: string;
     onGoHome: () => void;
 }
 
@@ -21,6 +22,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
     topicTitle = '',
     postId = null,
     isDailyQuiz = false,
+    quizId,
     onGoHome
 }) => {
 
@@ -52,7 +54,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
         try {
             // [NEW] Share scorecard to Reddit comment
             const text = `[🎯 SCORECARD] I scored ${score}/${totalQuestions} on Streax! Can you beat my streak? #StreaxChamp`;
-            const slug = topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            const slug = quizId || topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
             const res = await fetch('/api/share/comment', {
                 method: 'POST',

@@ -1379,7 +1379,13 @@ export class FirestoreRestService {
         score: Number(f.score?.integerValue || 0),
         timeTakenMs: Number(f.timeTakenMs?.integerValue || 0)
       };
-    } catch (e) {
+    } catch (e: any) {
+      // 404 is expected for new players/new days
+      if (e.message && e.message.includes('404')) {
+        Logger.info(`[Firestore] getDailyPlayHistory: No record found for ${userId} on ${quizDate} (Not Played)`);
+        return null; // Treat as not played
+      }
+
       Logger.error('[Firestore] getDailyPlayHistory failed', e);
       return null;
     }

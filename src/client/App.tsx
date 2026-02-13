@@ -1153,6 +1153,7 @@ export const App = () => {
                     topicTitle={selectedTopic?.title || 'Daily Quiz'}
                     postId={postId}
                     isDailyQuiz={!selectedTopic}
+                    quizId={(!selectedTopic && dailyQuiz?.id) ? dailyQuiz.id : undefined}
                     onGoHome={() => {
 
                       setShowScore(false);
