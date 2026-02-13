@@ -240,14 +240,8 @@ export class QuizController {
 
                 // [GATED] Only submit to competitive leaderboard if NOT a replay
                 if (!isReplay) {
-                    // [IMMEDIATE SAVE] Save to Firestore Leaderboard for Daily Rankings UI & Reddit Bot
-                    await fs.saveQuizLeaderboardEntry(quizDate, effectiveUserId, {
-                        score,
-                        nickname: effectiveNickname,
-                        completedAt: new Date().toISOString()
-                    });
-
-                    // [MEMORY SYNC] Submit to in-memory buffer as well
+                    // [MEMORY SYNC] Submit to in-memory buffer ONLY. 
+                    // Persistent save happens during 3-hour flush cycle.
                     mem.submit(`daily:${quizDate}`, effectiveNickname, score, {
                         timeTakenMs: Number(timeTakenMs || 0),
                         userKey: effectiveUserId

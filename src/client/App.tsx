@@ -1140,10 +1140,14 @@ export const App = () => {
                     score={score}
                     totalQuestions={NUM_QUESTIONS + (showBonusQuestion ? 1 : 0)}
                     sources={(selectedTopic ? selectedTopicQuiz?.sources : dailyQuiz?.metadata?.sources) || []}
-                    quizId={selectedTopic ? selectedTopicQuiz?.id : dailyQuiz?.id}
                     isGenerated={!!selectedTopic}
                     topicTitle={selectedTopic?.title}
                     currentUser={authUser?.nickname || 'Guest'}
+                    onGoHome={() => {
+                      setShowScore(false);
+                      setQuizStarted(false);
+                      setSelectedTopic(null);
+                    }}
                   />
                 ) : (
                   <QuizActiveView

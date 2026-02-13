@@ -77,7 +77,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                             <span className="text-xs font-medium opacity-50 uppercase tracking-widest" style={{ color: '#fff' }}>Total Scores</span>
                         )}
                     </div>
-                    <div className="overflow-y-auto overflow-x-hidden pr-1 space-y-3" style={{ maxHeight: '420px' }}>
+                    <div className="overflow-y-auto overflow-x-hidden pr-4 space-y-3" style={{ maxHeight: '420px' }}>
                         {(landingSummary?.globalTop || []).slice(0, 100).map((e, i) => {
                             let rankClass = 'bg-base-200/40 border-base-300/40 text-base-content';
                             let rankNumberStyle = 'text-accent';
@@ -119,8 +119,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                                         boxSizing: 'border-box'
                                     }}
                                 >
-                                    <span className={`font-black text-center ${rankNumberStyle}`} style={{ fontSize: rank <= 3 ? 'clamp(0.9rem, 2.5vw, 1.2rem)' : 'clamp(0.75rem, 2vw, 1rem)' }}>
-                                        {trophyIcon ? `${trophyIcon} ${rank}` : rank}
+                                    <span className={`font-black text-center ${rankNumberStyle}`} style={{ fontSize: rank <= 3 ? '1.2rem' : '0.8rem' }}>
+                                        {trophyIcon ? trophyIcon : rank}
                                     </span>
                                     <span className={nameClass} style={{ fontSize: rank <= 3 ? 'clamp(0.85rem, 2.2vw, 1rem)' : 'clamp(0.75rem, 2vw, 0.9rem)' }} title={e.nickname}>
                                         {e.nickname}

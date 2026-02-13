@@ -100,10 +100,10 @@ export class LeaderboardMemoryService {
     private async checkCycles() {
         const now = Date.now();
 
-        // 1. Standard Persistence Flush (8 Hours for topics, 10 Mins for daily)
+        // 1. Standard Persistence Flush (8 Hours for topics, 3 Hours for daily)
         for (const [key, createdAt] of this.created.entries()) {
             const isDaily = key.startsWith('daily:');
-            const threshold = isDaily ? this.CHECK_INTERVAL_MS : this.FLUSH_THRESHOLD_MS;
+            const threshold = isDaily ? this.REDDIT_UPDATE_INTERVAL_MS : this.FLUSH_THRESHOLD_MS;
 
             if (now - createdAt >= threshold) {
                 await this.flush(key);

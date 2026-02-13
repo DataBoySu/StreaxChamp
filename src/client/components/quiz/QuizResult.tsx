@@ -8,20 +8,20 @@ interface QuizResultProps {
     score: number;
     totalQuestions: number;
     sources?: string[];
-    quizId?: string | undefined;
     isGenerated?: boolean | undefined;
     topicTitle?: string | undefined;
     currentUser?: string | undefined;
+    onGoHome: () => void;
 }
 
 export const QuizResult: React.FC<QuizResultProps> = ({
     score,
     totalQuestions,
     sources = [],
-    quizId,
     isGenerated = false,
     topicTitle = '',
-    currentUser = ''
+    currentUser = '',
+    onGoHome
 }) => {
     const [subscribed, setSubscribed] = useState(false);
 
@@ -154,14 +154,14 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                             : '💪 Keep Practicing!'}
                 </motion.p>
 
-                {/* Action Buttons & Leaderboard Container */}
+                {/* Action Buttons Container */}
                 <div
                     className="flex flex-col gap-4 w-full max-w-md mx-auto mt-8"
                     style={{
                         fontFamily: "'Press Start 2P', cursive",
                     }}
                 >
-                    {/* Button: Join Sub (Always show) */}
+                    {/* Button 1: Join Sub */}
                     <button
                         onClick={handleJoin}
                         className={`nes-btn ${subscribed ? 'is-success' : 'is-error'} transition-transform hover:scale-105 active:scale-95`}
@@ -177,19 +177,34 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                         {subscribed ? 'Joined! 🎉' : 'Join Sub'}
                     </button>
 
-                    {/* Leaderboard Section (Always show if quizId exists) */}
-                    {quizId && (
-                        <InMemoryLeaderboard
-                            slug={isGenerated
-                                ? topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-                                : `daily:${quizId}`
-                            }
-                            topicTitle={isGenerated ? topicTitle : 'Daily Rankings'}
-                            currentUser={currentUser}
-                            isDaily={!isGenerated}
-                        />
-                    )}
+                    {/* Button 2: Explore Past Quizzes (Return Home) */}
+                    <button
+                        onClick={onGoHome}
+                        className="nes-btn is-primary transition-transform hover:scale-105 active:scale-95"
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
+                            padding: '1rem 1.5rem',
+                            borderRadius: 0,
+                            boxShadow: '0 0 15px rgba(32, 151, 243, 0.3)',
+                            marginTop: '0.5rem'
+                        }}
+                    >
+                        Explore Past Quizzes
+                    </button>
                 </div>
+
+                {/* Leaderboard Section (NEW: Outside buttons, only for Generated quizzes) */}
+                {isGenerated && (
+                    <div className="mt-12 w-full max-w-md mx-auto">
+                        <InMemoryLeaderboard
+                            slug={topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}
+                            topicTitle={topicTitle}
+                            currentUser={currentUser}
+                            isDaily={false}
+                        />
+                    </div>
+                )}
 
                 {/* Sources Section */}
                 {sources && sources.length > 0 && (
