@@ -3,15 +3,25 @@ import { generateUnifiedContent } from '../services/GeminiService';
 import { createPost } from '../core/post';
 import { CommentLeaderboardService } from '../services/CommentLeaderboardService';
 import { Logger } from '../Logger';
+import crypto from 'crypto';
 
 // Job Names (Must match main.ts registration)
 export const JOB_GENERATE_DAILY = 'daily-quiz-generation';
 export const JOB_SYNC_LEADERBOARD = 'daily-quiz-leaderboard-sync';
 
+function createJobContext(jobName: string) {
+    return {
+        jobName,
+        runId: crypto.randomUUID().slice(0, 8),
+        startTime: Date.now()
+    };
+}
+
 // Job Handler: Generation
 export async function handleDailyGeneration(_event: any, context: any) {
     const todayStr = new Date().toISOString().slice(0, 10);
-    Logger.info(`[Job:DailyGen] Starting for ${todayStr}`);
+    const ctx = createJobContext('DailyGen');
+    Logger.info(`[Job:${ctx.jobName}] START runId=${ctx.runId} date=${todayStr}`);
 
     try {
         const fs = new FirestoreRestService();
@@ -19,7 +29,7 @@ export async function handleDailyGeneration(_event: any, context: any) {
         // 1. Check if exists
         const existing = await fs.getDailyQuizByDate(todayStr);
         if (existing) {
-            Logger.info(`[Job:DailyGen] Quiz for ${todayStr} already exists. Skipping.`);
+            Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=lock skipped_existing`);
             return;
         }
 
@@ -39,6 +49,7 @@ export async function handleDailyGeneration(_event: any, context: any) {
         // 3. Generate Content
         Logger.info(`[Job:DailyGen] Generating topic: ${dailyTopic}`);
         const generated = await generateUnifiedContent(dailyTopic || 'General Knowledge', { isDev: false });
+        Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=generate success`);
 
         const questions = generated.quiz.questions.map((q: any) => ({
             id: `q${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -73,7 +84,7 @@ export async function handleDailyGeneration(_event: any, context: any) {
         const created = await fs.createDailyQuizOnly(todayStr, quizPayload);
 
         if (!created) {
-            Logger.info(`[Job:DailyGen] Race condition detected. Document ${todayStr} was created by another process. Exiting safely.`);
+            Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=lock skipped_existing`);
             return;
         }
 
@@ -82,8 +93,9 @@ export async function handleDailyGeneration(_event: any, context: any) {
         try {
             const post = await createPost(context.reddit);
             redditPostId = post.id;
+            Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=reddit_post success postId=${redditPostId}`);
         } catch (e) {
-            Logger.error('[Job:DailyGen] Authority established but Reddit Post failed. Manual intervention may be needed.', e);
+            Logger.error(`[Job:DailyGen] FAIL runId=${ctx.runId} phase=reddit_post_fail`, e);
             // We established authority but failed the post. 
             // The quiz exists in Firestore, so subsequent runs will exit at step 1 or 4.
             throw e;
@@ -91,11 +103,12 @@ export async function handleDailyGeneration(_event: any, context: any) {
 
         // 6. Update Firestore with Reddit Post ID
         await fs.saveDailyQuizMetadata(todayStr, { redditPostId });
+        Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=firestore_update success`);
 
-        Logger.info(`[Job:DailyGen] Success! Date=${todayStr}, Post=${redditPostId}`);
+        Logger.info(`[Job:DailyGen] END runId=${ctx.runId} durationMs=${Date.now() - ctx.startTime}`);
 
     } catch (e) {
-        Logger.error(`[Job:DailyGen] Failed`, e);
+        Logger.error(`[Job:DailyGen] FAIL runId=${ctx.runId}`, e);
         // Rethrow to let Devvit scheduler know it failed (potentially retrying)
         throw e;
     }
@@ -104,7 +117,8 @@ export async function handleDailyGeneration(_event: any, context: any) {
 // Job Handler: Leaderboard Sync
 export async function handleLeaderboardSync(_event: any, context: any) {
     const todayStr = new Date().toISOString().slice(0, 10);
-    Logger.info(`[Job:Sync] Starting for ${todayStr}`);
+    const ctx = createJobContext('Sync');
+    Logger.info(`[Job:Sync] START runId=${ctx.runId} date=${todayStr}`);
 
     try {
         const fs = new FirestoreRestService();
@@ -125,6 +139,7 @@ export async function handleLeaderboardSync(_event: any, context: any) {
 
         // c. Fetch top 10 leaderboard
         const entries = await fs.getQuizLeaderboard(todayStr, 10);
+        Logger.info(`[Job:Sync] runId=${ctx.runId} entries=${entries.length}`);
 
         // d. Render markdown & Compute Hash
         const mappedEntries = entries.map(e => ({
@@ -140,8 +155,7 @@ export async function handleLeaderboardSync(_event: any, context: any) {
         const currentHash = await sha256(text);
         const storedHash = quiz.metadata?.leaderboardHash || '';
         const changed = currentHash !== storedHash;
-
-        Logger.info(`[Job:Sync] Results: entries=${mappedEntries.length}, changed=${changed}, currentHash=${currentHash.slice(0, 8)}, storedHash=${storedHash.slice(0, 8)}`);
+        Logger.info(`[Job:Sync] runId=${ctx.runId} hashChanged=${changed}`);
 
         // f. Compare
         if (!changed) {
@@ -153,18 +167,15 @@ export async function handleLeaderboardSync(_event: any, context: any) {
 
         // g. Update Comment
         let commentId = quiz.metadata?.leaderboardCommentId;
-        let commentCreated = false;
-        let commentEdited = false;
 
         if (!commentId) {
-            Logger.info('[Job:Sync] No commentId. Creating new comment.');
+            Logger.info(`[Job:Sync] runId=${ctx.runId} phase=create_comment START`);
             const comment = await context.reddit.submitComment({
                 id: postId as string,
                 text: text
             });
             commentId = (comment.id as string);
-            commentCreated = true;
-            Logger.info(`[Job:Sync] Comment created: ${commentId}`);
+            Logger.info(`[Job:Sync] runId=${ctx.runId} createdComment=${commentId}`);
 
             await fs.saveDailyQuizMetadata(todayStr, { leaderboardCommentId: commentId });
         } else {
@@ -173,8 +184,7 @@ export async function handleLeaderboardSync(_event: any, context: any) {
                 id: commentId as string,
                 text: text
             });
-            commentEdited = true;
-            Logger.info(`[Job:Sync] Comment updated: ${commentId}`);
+            Logger.info(`[Job:Sync] runId=${ctx.runId} editedComment=${commentId}`);
         }
 
         // h. Update Hash
@@ -182,10 +192,10 @@ export async function handleLeaderboardSync(_event: any, context: any) {
             leaderboardHash: currentHash
         });
 
-        Logger.info(`[Job:Sync] Completed: created=${commentCreated}, edited=${commentEdited}`);
+        Logger.info(`[Job:Sync] END runId=${ctx.runId} durationMs=${Date.now() - ctx.startTime}`);
 
     } catch (e) {
-        Logger.error(`[Job:Sync] Failed`, e);
+        Logger.error(`[Job:Sync] FAIL runId=${ctx.runId}`, e);
     }
 }
 

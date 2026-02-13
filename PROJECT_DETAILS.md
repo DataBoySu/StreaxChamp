@@ -1,115 +1,148 @@
-PROMPT START
+We have identified a disconnection in the Daily Quiz submission flow.
 
-Implement minimal structured logging for scheduled jobs only.
+Problem:
+The daily leaderboard Firestore collection (daily-quizzes/{date}/leaderboard/{userKey}) is NOT being written during submitDailyScore.
+As a result:
+- /api/quiz/daily/leaderboard returns empty
+- Reddit comment renders placeholder
+- UI shows "No rankings detected"
 
-Scope
+Replay logic may also be interfering.
 
-Only modify:
+Your task is to surgically repair the daily leaderboard write path.
 
-src/server/jobs/DailyScheduler.ts
+--------------------------------------------------
+OBJECTIVE
+--------------------------------------------------
 
-Do NOT touch controllers or services.
+1. Restore persistent daily leaderboard write
+2. Ensure replay logic only prevents duplicate writes for the SAME user on SAME date
+3. Ensure leaderboard write happens BEFORE comment ensure/update
+4. Add minimal structured logging
+5. Do NOT modify scheduler
+6. Do NOT modify topic leaderboard logic
+7. Do NOT reintroduce any in-memory service
 
-1️⃣ Create Job Context Helper
+--------------------------------------------------
+STEP 1 — Locate submitDailyScore
+--------------------------------------------------
 
-At top of file, add:
+File:
+src/server/controllers/QuizController.tsx
 
-import crypto from 'crypto';
+Inside submitDailyScore:
 
-function createJobContext(jobName: string) {
-  return {
-    jobName,
-    runId: crypto.randomUUID().slice(0, 8),
-    startTime: Date.now()
-  };
+After verifying:
+- !isReplay
+- username exists
+- score computed
+
+ADD:
+
+await fs.saveQuizLeaderboardEntry({
+    date: quizDate,
+    userKey: username,
+    nickname,
+    score,
+    completedAt: new Date().toISOString()
+});
+
+This must happen:
+- BEFORE CommentLeaderboardService.ensureComment
+- BEFORE topic bridging
+
+--------------------------------------------------
+STEP 2 — Fix Replay Logic Guard
+--------------------------------------------------
+
+Ensure replay logic only blocks if:
+
+const history = await fs.getDailyPlayHistory(username, quizDate);
+
+If history exists AND history.completed === true:
+    treat as replay
+
+If no history:
+    NOT replay
+
+Make sure leaderboard write only skips if replay === true.
+
+DO NOT skip leaderboard write based on other conditions.
+
+--------------------------------------------------
+STEP 3 — Implement saveQuizLeaderboardEntry
+--------------------------------------------------
+
+If not present or broken, ensure FirestoreRestService has:
+
+async saveQuizLeaderboardEntry({
+    date,
+    userKey,
+    nickname,
+    score,
+    completedAt
+})
+
+Firestore path:
+
+daily-quizzes/{date}/leaderboard/{userKey}
+
+Use PATCH or commit with upsert behavior.
+
+Document body:
+
+{
+  userKey,
+  nickname,
+  score,
+  completedAt
 }
 
-2️⃣ Instrument handleDailyGeneration
+Do NOT use collectionGroup write.
+Do NOT write anywhere else.
 
-At start:
+--------------------------------------------------
+STEP 4 — Add Minimal Logs
+--------------------------------------------------
 
-const ctx = createJobContext('DailyGen');
-Logger.info(`[Job:${ctx.jobName}] START runId=${ctx.runId} date=${todayStr}`);
+Inside submitDailyScore add:
 
+Logger.info(
+  `[SubmitDaily] DailyLB WRITE user=${username} score=${score} date=${quizDate}`
+);
 
-Add phase logs:
+If skipped due to replay:
 
-After AI generation success:
+Logger.info(
+  `[SubmitDaily] DailyLB SKIPPED replay user=${username} date=${quizDate}`
+);
 
-Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=generate success`);
+--------------------------------------------------
+STEP 5 — Verify Ordering
+--------------------------------------------------
 
+Final order inside submitDailyScore must be:
 
-If lock fails (document already exists):
+1. Validate
+2. Check replay
+3. Write daily leaderboard entry (if not replay)
+4. Save daily-play-history
+5. Ensure comment
+6. Topic bridge
+7. Return response
 
-Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=lock skipped_existing`);
+--------------------------------------------------
+IMPORTANT
+--------------------------------------------------
 
+Do NOT change scheduler.
+Do NOT change sync job.
+Do NOT change hashing logic.
+Do NOT change generation job.
 
-After Reddit post:
+Only repair submission path.
 
-Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=reddit_post success postId=${redditPostId}`);
-
-
-After Firestore metadata update:
-
-Logger.info(`[Job:DailyGen] runId=${ctx.runId} phase=firestore_update success`);
-
-
-At end:
-
-Logger.info(`[Job:DailyGen] END runId=${ctx.runId} durationMs=${Date.now() - ctx.startTime}`);
-
-
-In catch block:
-
-Logger.error(`[Job:DailyGen] FAIL runId=${ctx.runId}`, e);
-
-3️⃣ Instrument handleLeaderboardSync
-
-At start:
-
-const ctx = createJobContext('Sync');
-Logger.info(`[Job:Sync] START runId=${ctx.runId} date=${todayStr}`);
-
-
-After fetching entries:
-
-Logger.info(`[Job:Sync] runId=${ctx.runId} entries=${entries.length}`);
-
-
-After hash comparison:
-
-Logger.info(`[Job:Sync] runId=${ctx.runId} hashChanged=${currentHash !== storedHash}`);
-
-
-When creating comment:
-
-Logger.info(`[Job:Sync] runId=${ctx.runId} createdComment=${commentId}`);
-
-
-When editing comment:
-
-Logger.info(`[Job:Sync] runId=${ctx.runId} editedComment=${commentId}`);
-
-
-At end:
-
-Logger.info(`[Job:Sync] END runId=${ctx.runId} durationMs=${Date.now() - ctx.startTime}`);
-
-
-In catch block:
-
-Logger.error(`[Job:Sync] FAIL runId=${ctx.runId}`, e);
-
-4️⃣ Do NOT modify:
-
-FirestoreRestService
-
-CommentLeaderboardService
-
-Controllers
-
-Scheduler registration logic
-
-Return full updated DailyScheduler.ts only.
-
-PROMPT END
+Return:
+- Diff summary
+- Updated submitDailyScore function
+- Updated FirestoreRestService method

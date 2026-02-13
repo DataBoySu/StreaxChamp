@@ -1576,9 +1576,16 @@ export class FirestoreRestService {
    * Path: daily-quizzes/{date}/leaderboard/{userId}
    * STRICT: Only insert if missing to prevent replays from overwriting first score.
    */
-  async saveQuizLeaderboardEntry(date: string, userId: string, data: { score: number, completedAt: string, nickname: string }): Promise<void> {
+  async saveQuizLeaderboardEntry(entry: {
+    date: string;
+    userKey: string;
+    nickname: string;
+    score: number;
+    completedAt: string;
+  }): Promise<void> {
+    const { date, userKey, nickname, score, completedAt } = entry;
     try {
-      const path = `daily-quizzes/${date}/leaderboard/${userId}`;
+      const path = `daily-quizzes/${date}/leaderboard/${userKey}`;
       const url = `${this.baseUrl}/${path}`;
 
       // Check existence first
@@ -1586,17 +1593,17 @@ export class FirestoreRestService {
         const check = await fetch(url, { method: 'GET' });
         if (check.ok) {
           // Entry exists - DO NOT OVERWRITE
-          Logger.info('[Firestore] saveQuizLeaderboardEntry skipped (exists)', { userId, date });
+          Logger.info('[Firestore] saveQuizLeaderboardEntry skipped (exists)', { userKey, date });
           return;
         }
       } catch { /* ignore check error, proceed to try write */ }
 
       const body = {
         fields: {
-          score: { integerValue: String(data.score) },
-          completedAt: { stringValue: data.completedAt },
-          nickname: { stringValue: data.nickname },
-          userId: { stringValue: userId }
+          score: { integerValue: String(score) },
+          completedAt: { stringValue: completedAt },
+          nickname: { stringValue: nickname },
+          userId: { stringValue: userKey }
         }
       };
 

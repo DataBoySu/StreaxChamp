@@ -11,12 +11,21 @@
       ]
     },
     "redis": true,
-    "scheduler": true,
     "reddit": {
       "asUser": [
         "SUBMIT_COMMENT",
         "SUBSCRIBE_TO_SUBREDDIT"
       ]
+    }
+  },
+  "scheduler": {
+    "tasks": {
+      "daily-quiz-generation": {
+        "endpoint": "/internal/jobs/daily-generation"
+      },
+      "daily-quiz-leaderboard-sync": {
+        "endpoint": "/internal/jobs/leaderboard-sync"
+      }
     }
   },
   "post": {
