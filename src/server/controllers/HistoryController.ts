@@ -27,6 +27,12 @@ export class HistoryController {
                 return res.status(400).json({ ok: false, error: 'Missing required fields' });
             }
 
+            // Block persistence for guest "Player" users
+            if (username === 'Player' || nickname === 'Player') {
+                Logger.info(`[History] Skipping save for anonymous 'Player'`);
+                return res.json({ ok: true });
+            }
+
             const fs = new FirestoreRestService();
             const us = new UserService();
 

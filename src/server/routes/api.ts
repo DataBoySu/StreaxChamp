@@ -10,6 +10,7 @@ import { FirestoreRestService } from '../services/FirestoreRestService';
 import { LimitController } from '../controllers/LimitController';
 import { context } from '@devvit/web/server';
 import { reddit, redis } from '@devvit/web/server';
+import { CONFIG } from '../../shared/constants';
 
 const router = Router();
 
@@ -144,6 +145,11 @@ router.post('/share/comment', async (req, res) => {
             return res.status(401).json({ error: 'User not authenticated' });
         }
 
+        // Block anonymous "Player" users from sharing
+        if (username === 'Player') {
+            return res.status(403).json({ error: 'Anonymous users cannot share scores' });
+        }
+
         // We need quizId to track state. It's not in the body but we can infer or pass it.
         // Let's pass quizId from client. The client knows it.
         const { quizId } = req.body;
@@ -165,27 +171,55 @@ router.post('/share/comment', async (req, res) => {
         console.log("[SHARE] Resolved userStats:", userStats);
         console.log("[SHARE] hasShared =", userStats?.hasShared);
 
-        if (userStats?.hasShared === true) {
+        // Allow DEV users to bypass limit
+        const isDev = CONFIG.DEV.USERNAMES.includes(username);
+        if (isDev) {
+            console.log(`[SHARE] User ${username} is DEV. Bypassing share limit.`);
+        } else if (userStats?.hasShared === true) {
             console.log("[SHARE] User already shared score for this quiz.");
             return res.status(409).json({ error: 'Already shared' });
         }
 
-        await reddit.submitComment({
+        // Use context.reddit if available for user-authenticated action
+        // Cast context to 'any' or proper type to access reddit/ui if imported context is plain object
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ctx: any = context;
+        console.log('[SHARE] Context keys:', Object.keys(ctx));
+        console.log('[SHARE] Has context.reddit?', !!ctx.reddit);
+
+        // Attempt user-authenticated submit
+        // Attempt user-authenticated submit
+        // In Web API context, `ctx.reddit` may be undefined.
+        // We rely on the imported `reddit` client which SHOULD handle user context if `asUser` permission is enabled.
+        const client = reddit;
+
+        console.log('[SHARE] Utilizing imported reddit client for submission.');
+
+        await client.submitComment({
             id: targetPostId,
-            text: text
+            text: text,
+            // @ts-ignore: Devvit Typings may be outdated for runAs
+            runAs: 'USER'
         });
 
-        const commentId = 'posted'; // reddit.submitComment returns Promise<Comment> in updated versions, checking signatures...
-        // The mock type definitions or real ones usually return the comment object.
-        // For now logging "posted" is safe.
+        const commentId = 'posted';
 
         console.log("[SHARE] Comment posted successfully", { commentId });
 
-        // Update state
+        // Update state (Still track it even for devs, just don't block them)
         await fs.updateUserTopicStats(username, quizId, { hasShared: true } as any);
 
+        // Native Toast (if supported in API context) or standard response
+        if (ctx.ui && ctx.ui.showToast) {
+            try {
+                ctx.ui.showToast({ text: 'Score shared successfully!', appearance: 'success' });
+            } catch (uiErr) {
+                console.warn('[SHARE] Native toast failed (expected in API route if no UI context):', uiErr);
+            }
+        }
+
         res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
         console.error("[SHARE] Comment post failed", error);
         res.status(500).json({ error: 'Failed to post comment' });
     }

@@ -4,7 +4,6 @@ import { UserService } from '../services/UserService';
 import { Logger } from '../Logger';
 import { generateUnifiedContent, validateGeminiKey } from '../services/GeminiService';
 import { CacheService } from '../services/CacheService';
-import { LeaderboardService } from '../services/LeaderboardService'; // NEW
 import { reddit, redis } from '@devvit/web/server';
 import { CONFIG } from '../../shared/constants';
 
@@ -209,6 +208,12 @@ export class QuizController {
 
             if (!effectiveUserId) return res.status(401).json({ error: 'User required' });
 
+            // Block persistence for guest "Player" users
+            if (effectiveNickname === 'Player') {
+                Logger.info(`[Quiz] Skipping daily score submit for anonymous 'Player'`);
+                return res.json({ ok: true, isReplay: false });
+            }
+
             const fs = new FirestoreRestService();
 
             // 1. Replay Check (Authority)
@@ -290,7 +295,8 @@ export class QuizController {
             // NEW: Read from Memory
             const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
             const mem = LeaderboardMemoryService.getInstance();
-            const raw = mem.get(`daily:${date}`);
+            // detailed generic type? LeaderboardEntry[]
+            const raw = mem.get(`daily:${date}`).slice(0, limit);
 
             // Map to client format
             const entries = raw.map(e => ({
@@ -458,6 +464,11 @@ export class QuizController {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
+            // Block anonymous "Player" users from creating persistent quizzes
+            if (username === 'Player') {
+                return res.status(403).json({ error: 'Anonymous users cannot create quizzes' });
+            }
+
             const fs = new FirestoreRestService();
             const identifier = `${username}_${topic}`;
 
@@ -535,6 +546,11 @@ export class QuizController {
             if (!title || !quizId) {
                 Logger.error('[PostUserQuiz] Missing required fields', { title, quizId });
                 return res.status(400).json({ error: 'Title and Quiz ID are required' });
+            }
+
+            // Block anonymous "Player" users from posting
+            if (username === 'Player') {
+                return res.status(403).json({ error: 'Anonymous users cannot post quizzes' });
             }
 
             const subreddit = await reddit.getCurrentSubreddit();

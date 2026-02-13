@@ -25,6 +25,12 @@ export class LeaderboardMemoryService {
      * Retains only top 10 unique users, sorted by score (desc) then timestamp (asc).
      */
     public submit(key: string, username: string, score: number): void {
+        // Block anonymous "Player" users from leaderboard
+        if (username === 'Player') {
+            Logger.info(`[LeaderboardMemory] Rejected submission from anonymous 'Player' user`);
+            return;
+        }
+
         const currentEntries = this.leaderboards.get(key) || [];
 
         // Check if user exists

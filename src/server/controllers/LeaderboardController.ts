@@ -41,6 +41,11 @@ export class LeaderboardController {
                 return res.status(400).json({ error: 'Invalid submission payload' });
             }
 
+            // Block anonymous "Player" users from submitting scores
+            if (userKey === 'Player' || nickname === 'Player') {
+                return res.status(403).json({ error: 'Anonymous users cannot submit scores' });
+            }
+
             const svc = new LeaderboardService();
 
             // Persist across all relevant leaderboard partitions (IN-MEMORY - Phase 3)

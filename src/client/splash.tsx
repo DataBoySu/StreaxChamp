@@ -30,7 +30,8 @@ const Splash = () => {
         handleOptionSelect,
         handleNext
     } = useInlineQuiz(quizData, async (finalScore) => {
-        if (customQuizMeta && username) {
+        // Block anonymous "Player" users from submitting scores
+        if (customQuizMeta && username && username !== 'Player') {
             console.log(`[Splash] Custom Quiz Complete. Score: ${finalScore}. Submitting to Leaderboard...`);
             try {
                 await fetch(`/api/leaderboard/${customQuizMeta.quizId}/submit`, {
@@ -48,6 +49,8 @@ const Splash = () => {
             } catch (e) {
                 console.error('[Splash] Score submission failed', e);
             }
+        } else if (username === 'Player') {
+            console.log('[Splash] Anonymous user - score not submitted to leaderboard.');
         }
         setMode('RESULTS');
     });
@@ -314,17 +317,20 @@ const Splash = () => {
             {/* Primary Action: Join Community (Native) */}
             <button
                 type="button"
-                className="nes-btn is-primary"
+                className={`nes-btn ${hasSubscribed ? 'is-success' : 'is-primary'}`}
                 style={{ width: '100%' }}
-                onClick={() => {
-                    void requestCommunitySubscribe();
+                disabled={hasSubscribed}
+                onClick={async () => {
+                    void requestCommunitySubscribe().then((success) => {
+                        if (success) setHasSubscribed(true);
+                    });
                 }}
             >
-                {CONFIG.COMMUNITY.CTA.JOIN}
+                {hasSubscribed ? 'Joined!' : CONFIG.COMMUNITY.CTA.JOIN}
             </button>
 
-            {/* Custom: Share Score */}
-            {mode === 'RESULTS' && customQuizMeta && (
+            {/* Custom: Share Score - Hidden for anonymous users */}
+            {mode === 'RESULTS' && customQuizMeta && username && username !== 'Player' && (
                 <button
                     type="button"
                     className={`nes-btn ${hasShared ? 'is-disabled' : 'is-success'}`}
