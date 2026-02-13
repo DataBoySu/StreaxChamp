@@ -9,10 +9,19 @@ export interface CommentLeaderboardEntry {
 
 export class CommentLeaderboardService {
     private fs: FirestoreRestService;
+    private static instance: CommentLeaderboardService;
 
     constructor() {
         this.fs = new FirestoreRestService();
     }
+
+    public static getInstance(): CommentLeaderboardService {
+        if (!CommentLeaderboardService.instance) {
+            CommentLeaderboardService.instance = new CommentLeaderboardService();
+        }
+        return CommentLeaderboardService.instance;
+    }
+
 
     /**
      * Ensures a leaderboard comment exists on the daily quiz post.

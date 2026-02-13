@@ -72,97 +72,173 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
 }) => {
     return (
         <div className="lg:col-span-1">
-            <div className="modern-card p-6 sticky top-6">
-                <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.6, delay: 0.3 }}
-                >
-                    {showScore ? (
-                        <>
-                            <div className="flex items-center gap-3 mb-6">
-                                <h2 className="text-2xl font-bold text-gradient">
-                                    {selectedTopicTitle || 'Topic'} Leaderboard
-                                </h2>
-                            </div>
-                            <div className="relative min-h-[160px] space-y-3">
-                                {topicLbLoading && (
-                                    <div className="py-2 text-center">
-                                        <LoadingDots text="Loading" />
+            <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="w-full"
+            >
+                {showScore ? (
+                    <div
+                        className="nes-container is-dark with-title w-full"
+                        style={{
+                            backgroundColor: '#111827',
+                            border: '4px solid #dc2626',
+                            borderRadius: 0,
+                            boxShadow: '8px 8px 0px rgba(0, 0, 0, 0.4)',
+                            padding: '1.25rem 0.75rem',
+                        }}
+                    >
+                        <p className="title" style={{ backgroundColor: '#dc2626', color: '#fff', fontSize: '0.75rem', padding: '0 10px', margin: 0 }}>
+                            {selectedTopicTitle || 'Topic'} Leaderboard
+                        </p>
+                        <div
+                            className="overflow-y-auto overflow-x-hidden pr-8 space-y-3"
+                            style={{
+                                maxHeight: '480px',
+                                scrollbarGutter: 'stable',
+                                scrollbarWidth: 'thin',
+                                scrollbarColor: '#dc2626 rgba(17, 24, 39, 0.95)'
+                            }}
+                        >
+                            {topicLbLoading && (
+                                <div className="py-2 text-center">
+                                    <LoadingDots text="Loading" />
+                                </div>
+                            )}
+                            {(!topicLeaderboard || topicLeaderboard.length === 0) &&
+                                !topicLbLoading && (
+                                    <div className="text-center py-8 text-slate-400 text-sm font-vt323" style={{ fontSize: '1.2rem' }}>
+                                        No rankings detected in this sector.
                                     </div>
                                 )}
-                                {(!topicLeaderboard || topicLeaderboard.length === 0) &&
-                                    !topicLbLoading && (
-                                        <div className="text-center py-8 text-secondary text-sm">
-                                            No scores yet.
-                                        </div>
-                                    )}
-                                {topicLeaderboard &&
-                                    topicLeaderboard.slice(0, 10).map((e, i) => (
+                            {topicLeaderboard &&
+                                topicLeaderboard.slice(0, 50).map((e, i) => {
+                                    const rank = i + 1;
+                                    let rankClass = 'bg-slate-800/40 border-slate-700/50';
+                                    let rankNumberStyle = 'text-slate-400';
+                                    let trophyIcon = '';
+                                    let nameClass = 'font-semibold truncate text-white';
+                                    let scoreClass = 'font-extrabold text-right text-success';
+
+                                    if (rank === 1) {
+                                        rankClass = 'bg-yellow-900/40 border-yellow-400 shadow-[0_0_15px_rgba(255,215,0,0.3)] border-2';
+                                        rankNumberStyle = 'text-yellow-400';
+                                        trophyIcon = '🥇';
+                                        nameClass = 'font-black truncate text-yellow-100';
+                                        scoreClass = 'font-black text-right text-yellow-400';
+                                    } else if (rank === 2) {
+                                        rankClass = 'bg-slate-700/40 border-slate-300 border-2';
+                                        rankNumberStyle = 'text-slate-300';
+                                        trophyIcon = '🥈';
+                                        nameClass = 'font-bold truncate text-slate-100';
+                                        scoreClass = 'font-bold text-right text-slate-300';
+                                    } else if (rank === 3) {
+                                        rankClass = 'bg-orange-950/40 border-orange-700 border-2';
+                                        rankNumberStyle = 'text-orange-600';
+                                        trophyIcon = '🥉';
+                                        nameClass = 'font-bold truncate text-orange-100';
+                                        scoreClass = 'font-bold text-right text-orange-600';
+                                    }
+
+                                    return (
                                         <div
                                             key={`${e.userKey}-${i}`}
-                                            className="grid grid-cols-[2rem_1fr_3rem] items-center gap-3 bg-base-200/40 border border-base-300/40 rounded-lg px-4 py-2"
+                                            className={`grid items-center border px-3 py-2.5 transition-all ${rankClass} hover:bg-white/5 w-full`}
+                                            style={{
+                                                gridTemplateColumns: '40px 1fr 50px',
+                                                gap: '0.75rem',
+                                                borderRadius: 0,
+                                                boxSizing: 'border-box'
+                                            }}
                                         >
-                                            <span className="font-bold text-accent text-right pr-2">
-                                                {i + 1}.
+                                            <span className={`font-black text-center ${rankNumberStyle}`} style={{
+                                                fontSize: rank <= 3 ? '1.2rem' : '0.8rem',
+                                                fontFamily: "'Press Start 2P', cursive"
+                                            }}>
+                                                {trophyIcon ? trophyIcon : rank}
                                             </span>
-                                            <span className="font-semibold truncate min-w-0" title={e.nickname}>
+                                            <span className={nameClass} style={{
+                                                fontSize: rank <= 3 ? 'clamp(0.85rem, 2.2vw, 1rem)' : 'clamp(0.75rem, 2vw, 0.9rem)',
+                                                fontFamily: "'VT323', monospace",
+                                                minWidth: 0
+                                            }} title={e.nickname}>
                                                 {e.nickname}
                                             </span>
-                                            <span className="text-success font-extrabold text-lg text-right">
+                                            <span className={scoreClass} style={{
+                                                fontSize: rank <= 3 ? 'clamp(0.85rem, 2.2vw, 1rem)' : 'clamp(0.75rem, 2vw, 0.9rem)',
+                                                fontFamily: "'VT323', monospace"
+                                            }}>
                                                 {e.score}
                                             </span>
                                         </div>
-                                    ))}
-                            </div>
-                        </>
-                    ) : (
-                        !hideRecentPlays && (
-                            <>
-                                <div className="flex items-center gap-3 mb-6">
-                                    <h2 className="text-2xl font-bold text-gradient">Recent Plays</h2>
-                                </div>
-                                <div className="relative min-h-[160px] max-h-[400px] overflow-y-auto space-y-2 pr-1">
-                                    {historyLoading && (
-                                        <div className="text-center py-4 text-secondary text-xs">
-                                            <LoadingDots text="Loading" />
-                                        </div>
-                                    )}
-
-                                    {!historyLoading && history.length === 0 && (
-                                        <div className="text-center py-8 text-secondary text-sm">
-                                            No plays yet.
-                                        </div>
-                                    )}
-                                    {history.map((h, i) => {
-                                        const timeAgo = formatRelativeTime(h.timestamp);
-                                        return (
-                                            <div
-                                                key={h.id || i}
-                                                className="px-3 py-2 bg-base-200/40 border-b border-base-300/40 last:border-0 hover:bg-base-200/60 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-3 text-xs w-full">
-                                                    <span className="font-bold text-accent shrink-0 min-w-[1.2rem]">{i + 1}.</span>
-                                                    <span className="font-semibold text-primary truncate min-w-0 flex-1" title={h.nickname}>
-                                                        {h.nickname || 'Player'}
-                                                    </span>
-                                                    <span className="opacity-60 text-[10px] whitespace-nowrap shrink-0">played</span>
-                                                    <span className="font-medium text-secondary truncate max-w-[130px] shrink-0" title={h.title}>
-                                                        {h.title}
-                                                    </span>
-                                                    <span className="opacity-40 text-[9px] whitespace-nowrap shrink-0 ml-1 min-w-[35px] text-right">
-                                                        {timeAgo}
-                                                    </span>
-                                                </div>
+                                    );
+                                })}
+                        </div>
+                    </div>
+                ) : (
+                    !hideRecentPlays && (
+                        <div
+                            className="nes-container is-dark with-title w-full"
+                            style={{
+                                backgroundColor: '#111827',
+                                border: '4px solid #2097f3',
+                                borderRadius: 0,
+                                boxShadow: '8px 8px 0px rgba(0, 0, 0, 0.4)',
+                                padding: '1.25rem 0.75rem',
+                            }}
+                        >
+                            <p className="title" style={{ backgroundColor: '#2097f3', color: '#fff', fontSize: '0.75rem', padding: '0 10px', margin: 0 }}>
+                                Recent Plays
+                            </p>
+                            <div
+                                className="overflow-y-auto overflow-x-hidden pr-8 space-y-2"
+                                style={{
+                                    maxHeight: '400px',
+                                    scrollbarGutter: 'stable',
+                                    scrollbarWidth: 'thin',
+                                    scrollbarColor: '#2097f3 rgba(17, 24, 39, 0.95)'
+                                }}
+                            >
+                                {historyLoading && (
+                                    <div className="text-center py-4">
+                                        <LoadingDots text="Loading" />
+                                    </div>
+                                )}
+                                {!historyLoading && history.length === 0 && (
+                                    <div className="text-center py-8 text-slate-400 text-sm font-vt323" style={{ fontSize: '1.2rem' }}>
+                                        No plays detected in this sector.
+                                    </div>
+                                )}
+                                {history.map((h, i) => {
+                                    const timeAgo = formatRelativeTime(h.timestamp);
+                                    return (
+                                        <div
+                                            key={h.id || i}
+                                            className="px-3 py-2 bg-slate-800/40 border-b border-slate-700/30 last:border-0 hover:bg-slate-700/40 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3 w-full">
+                                                <span className="font-bold text-blue-400 shrink-0 min-w-[1.2rem] font-pixel text-[10px]">{i + 1}.</span>
+                                                <span className="font-semibold text-slate-100 truncate min-w-0 flex-1 font-vt323 text-lg" title={h.nickname}>
+                                                    {h.nickname || 'Player'}
+                                                </span>
+                                                <span className="text-slate-500 font-vt323 text-sm italic">played</span>
+                                                <span className="font-medium text-blue-300 truncate max-w-[130px] shrink-0 font-vt323 text-base" title={h.title}>
+                                                    {h.title}
+                                                </span>
+                                                <span className="text-slate-600 font-vt323 text-xs ml-1 min-w-[45px] text-right">
+                                                    {timeAgo}
+                                                </span>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )
-                    )}
-                </motion.div>
-            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )
+                )}
+            </motion.div>
         </div>
     );
+
 };

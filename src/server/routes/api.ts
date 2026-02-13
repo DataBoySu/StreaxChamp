@@ -132,14 +132,20 @@ router.get('/init', async (_req, res) => {
 });
 
 router.post('/share/comment', async (req, res) => {
-    const { postId: targetPostId, text } = req.body;
-    // const { postId: contextPostId } = context;
+    let targetPostId = req.body.postId;
+    const { text } = req.body;
 
-    console.log(`[SHARE] Request to post comment on ${targetPostId}`);
+    // [FALLBACK] If client didn't send postId, try to get it from context
+    if (!targetPostId) {
+        const ctx: any = context;
+        targetPostId = ctx.postId;
+        console.log(`[SHARE] Client postId missing. Falling back to context.postId: ${targetPostId}`);
+    }
 
     if (!targetPostId || !text) {
         return res.status(400).json({ error: 'Missing postId or text' });
     }
+
 
     // Ideally we ensure we are commenting on the same post we are running on, or generally allow it if authorized.
     // The prompt says "Use context.reddit.submitComment" and "Use the actual Reddit post ID".

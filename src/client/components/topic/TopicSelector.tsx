@@ -151,9 +151,13 @@ export const TopicSelector: React.FC<{
       e.preventDefault();
       // Ignore Enter if limit reached - can only browse existing topics
       if (limitReached) return;
-      handleAddTopic();
+
+      // [FIX] Explicitly call handleAddTopic when Enter is pressed
+      // This ensures the button logic and loader are triggered.
+      void handleAddTopic();
     }
   };
+
 
   const handleHighlightTopic = (name: string) => {
     const topic = topics.find((t) => t.name.toLowerCase() === name.toLowerCase());
@@ -229,9 +233,15 @@ export const TopicSelector: React.FC<{
     const topicName = query.trim();
     if (!topicName) return;
 
+    setAddingTopic(true);
+    setProgress(5);
+
     // If topic already exists, just highlight it
     if (topicExists) {
+      setAddingTopic(false); // Reset if we're just highlighting
+      setProgress(0);
       const existingTopic = topics.find(
+
         t => t.name.toLowerCase() === topicName.toLowerCase()
       );
       if (existingTopic) {
@@ -240,10 +250,9 @@ export const TopicSelector: React.FC<{
       }
     }
 
-    setAddingTopic(true);
-    console.log('[TopicSelector] setAddingTopic(true) called');
-    setProgress(5);
+    console.log('[TopicSelector] handleAddTopic (NEW TOPIC)');
     try {
+
       const formatted = toTitleCase(topicName);
       // Attempt direct Firestore create (non-CSP) else fallback to REST generation endpoint
       try {

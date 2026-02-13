@@ -175,12 +175,25 @@ export class QuizController {
             let hasCompleted = false;
             let userScore = 0;
             if (userId) {
-                const history = await fs.getDailyPlayHistory(userId, quizData.id);
-                if (history) {
+                // [NEW] Check Memory First (Zero Latency for current session)
+                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+                const mem = LeaderboardMemoryService.getInstance();
+                const memEntries = mem.get(`daily:${quizData.id}`);
+                const memEntry = memEntries.find(e => e.userKey === userId || e.username === userId);
+
+                if (memEntry) {
                     hasCompleted = true;
-                    userScore = history.score;
+                    userScore = memEntry.score;
+                } else {
+                    // Fallback to Firestore for historical data
+                    const history = await fs.getDailyPlayHistory(userId, quizData.id);
+                    if (history) {
+                        hasCompleted = true;
+                        userScore = history.score;
+                    }
                 }
             }
+
 
             return res.json({
                 quiz: quizData,
@@ -391,11 +404,19 @@ export class QuizController {
                     // Check if this specific user completed the current latest quiz
                     let userFinishedLatest = false;
                     if (effectiveUserId) {
-                        const stats = await fs.getUserTopicStats(effectiveUserId, slug);
-                        if (stats && stats.isCompleted && stats.lastQuizId === latest.id) {
+                        // [NEW] Check Memory First
+                        const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
+                        const mem = LeaderboardMemoryService.getInstance();
+                        if (mem.hasAttempted(`topic:${slug}`, effectiveUserId)) {
                             userFinishedLatest = true;
+                        } else {
+                            const stats = await fs.getUserTopicStats(effectiveUserId, slug);
+                            if (stats && stats.isCompleted && stats.lastQuizId === latest.id) {
+                                userFinishedLatest = true;
+                            }
                         }
                     }
+
 
                     if (userFinishedLatest) {
                         shouldGenerate = true;

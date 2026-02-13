@@ -749,6 +749,13 @@ export const App = () => {
       if (isDevMode) {
         console.log('[DevMode] 🛡️ SAFE MODE ACTIVE: Suppressing activity for', nickname);
         setMessage({ type: 'info', text: 'Dev Mode: Results not saved', timesUp: false });
+        // Clear Informational messages after 5 seconds
+        setTimeout(() => {
+          setMessage({ text: '', type: '', timesUp: false });
+          // Assuming setIsReplay is a state setter for a boolean state
+          // If not, this line might need adjustment or removal based on context
+          // setIsReplay(false);
+        }, 5000);
         // Still refresh summary so they see current state without their contribution
         try { void refreshLandingSummary?.(); } catch {/* ignore */ }
         return;
@@ -781,9 +788,11 @@ export const App = () => {
           const data = await res.json();
           if (data.replay) {
             setMessage({ type: 'info', text: '🔁 Replay - Score not recorded', timesUp: false });
+            setTimeout(() => setMessage({ text: '', type: '', timesUp: false }), 5000);
           } else {
             console.log('[App] 📅 Daily Score Submitted Successfully');
           }
+
         } catch (err) {
           console.error('[App] Failed to submit daily score', err);
         }
@@ -953,8 +962,9 @@ export const App = () => {
 
         {/* AuthModal Removed - Implicit Auth Only */}
         <div
-          className={`grid grid-cols-1 gap-4 lg:gap-6 ${!quizStarted || showScore ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}
+          className={`grid grid-cols-1 gap-4 lg:gap-6 ${(!quizStarted || showScore) && !showScore ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}
         >
+
           {/* Archive Modal */}
           {showArchive && (
             <DailyQuizArchive
@@ -1140,15 +1150,15 @@ export const App = () => {
                     score={score}
                     totalQuestions={NUM_QUESTIONS + (showBonusQuestion ? 1 : 0)}
                     sources={(selectedTopic ? selectedTopicQuiz?.sources : dailyQuiz?.metadata?.sources) || []}
-                    isGenerated={!!selectedTopic}
-                    topicTitle={selectedTopic?.title}
-                    currentUser={authUser?.nickname || 'Guest'}
+                    topicTitle={selectedTopic?.title || 'Daily Quiz'}
+                    postId={postId}
                     onGoHome={() => {
                       setShowScore(false);
                       setQuizStarted(false);
                       setSelectedTopic(null);
                     }}
                   />
+
                 ) : (
                   <QuizActiveView
                     question={questions[currentQuestionIndex] || { question: '', answers: [], correctAnswer: '' }}

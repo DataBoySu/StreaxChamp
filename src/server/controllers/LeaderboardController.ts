@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import { reddit } from '@devvit/web/server';
 import { LeaderboardService } from '../services/LeaderboardService';
+
 import { Logger } from '../Logger';
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { CacheService } from '../services/CacheService';
@@ -46,8 +48,6 @@ export class LeaderboardController {
                 return res.status(403).json({ error: 'Anonymous users cannot submit scores' });
             }
 
-            const svc = new LeaderboardService();
-
             // Persist across all relevant leaderboard partitions (IN-MEMORY - Phase 3)
             // const topicRes = await svc.submit(slug || 'global', entry);
 
@@ -66,25 +66,21 @@ export class LeaderboardController {
                 // NEW: Trigger Comment Leaderboard Update (Fire & Forget, but await for context safety)
                 if (postId) {
                     const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
-                    await CommentLeaderboardService.getInstance().checkAndUpdate(postId);
+                    await CommentLeaderboardService.getInstance().ensureComment(reddit, postId, slug || 'custom');
                 }
             } catch (memErr) {
                 Logger.error('[SubmitScore] Memory/Comment Fail', memErr);
             }
 
-            if (slug && !req.body.postId) { // Only update topic stats if it's a topic quiz? Keep existing logic for now
-                // await svc.submitRolling(slug, entry);
-
-                // NEW: Mark this quiz as completed (stays, this is progression)
-                // We resolve the user ID from headers (userKey is often just username in client payload, 
-                // but for security/consistency we try to use the auth header if present, or fallback to userKey)
-                // In Devvit, userKey IS the username. 
+            if (slug && !req.body.postId) {
+                // [DEFERRED] completion and stats now handled by flush cycle in LeaderboardMemoryService
+                /*
                 const fs = new FirestoreRestService();
                 await fs.updateUserTopicStats(userKey, slug, { isCompleted: true });
-
-                // TRIGGER STATS AGGREGATION (Background)
                 void svc.updateQuizStats_FORCE(slug, score, 5).catch(e => Logger.error('[Leaderboard] Stats trigger fail', e));
+                */
             }
+
 
             // Removed addToGlobalTotals – we now query 'users' directly for total scores
             res.json({ ok: true });

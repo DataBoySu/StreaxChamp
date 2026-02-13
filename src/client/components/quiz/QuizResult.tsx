@@ -2,15 +2,13 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { CelebrationBackground } from './CelebrationBackground';
 import { ScoreFace } from './ScoreFace';
-import { InMemoryLeaderboard } from '../leaderboard/InMemoryLeaderboard';
 
 interface QuizResultProps {
     score: number;
     totalQuestions: number;
     sources?: string[];
-    isGenerated?: boolean | undefined;
     topicTitle?: string | undefined;
-    currentUser?: string | undefined;
+    postId?: string | null;
     onGoHome: () => void;
 }
 
@@ -18,12 +16,15 @@ export const QuizResult: React.FC<QuizResultProps> = ({
     score,
     totalQuestions,
     sources = [],
-    isGenerated = false,
     topicTitle = '',
-    currentUser = '',
+    postId = null,
     onGoHome
 }) => {
+
+
     const [subscribed, setSubscribed] = useState(false);
+    const [sharing, setSharing] = useState(false);
+    const [shared, setShared] = useState(false);
 
     const percentage = (score / totalQuestions) * 100;
     const isExcellent = percentage >= 80;
@@ -40,6 +41,36 @@ export const QuizResult: React.FC<QuizResultProps> = ({
             console.error('Subscribe failed', err);
         }
     };
+
+    const handleShare = async () => {
+        if (sharing || shared) return;
+        setSharing(true);
+        try {
+            // [NEW] Share scorecard to Reddit comment
+            const text = `[🎯 SCORECARD] I scored ${score}/${totalQuestions} on Streax! Can you beat my streak? #StreaxChamp`;
+            const slug = topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+            const res = await fetch('/api/share/comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    postId,
+                    quizId: slug,
+                    text
+                })
+            });
+
+
+            if (res.ok) {
+                setShared(true);
+            }
+        } catch (err) {
+            console.error('Share failed', err);
+        } finally {
+            setSharing(false);
+        }
+    };
+
 
     return (
         <motion.div
@@ -177,7 +208,24 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                         {subscribed ? 'Joined! 🎉' : 'Join Sub'}
                     </button>
 
-                    {/* Button 2: Explore Past Quizzes (Return Home) */}
+                    {/* Button 2: Share Score [NEW] */}
+                    <button
+                        onClick={handleShare}
+                        className={`nes-btn ${shared ? 'is-success' : 'is-warning'} transition-transform hover:scale-105 active:scale-95`}
+                        style={{
+                            fontFamily: "'Press Start 2P', cursive",
+                            fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
+                            padding: '1rem 1.5rem',
+                            borderRadius: 0,
+                            boxShadow: shared ? 'none' : '0 0 15px rgba(243, 156, 18, 0.3)',
+                            marginTop: '0.5rem'
+                        }}
+                        disabled={sharing || shared}
+                    >
+                        {shared ? 'Score Shared! 🏆' : sharing ? 'Sharing...' : 'Share Score'}
+                    </button>
+
+                    {/* Button 3: Explore Past Quizzes (Return Home) */}
                     <button
                         onClick={onGoHome}
                         className="nes-btn is-primary transition-transform hover:scale-105 active:scale-95"
@@ -190,21 +238,10 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                             marginTop: '0.5rem'
                         }}
                     >
-                        Explore Past Quizzes
+                        Return Home
                     </button>
                 </div>
 
-                {/* Leaderboard Section (NEW: Outside buttons, only for Generated quizzes) */}
-                {isGenerated && (
-                    <div className="mt-12 w-full max-w-md mx-auto">
-                        <InMemoryLeaderboard
-                            slug={topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}
-                            topicTitle={topicTitle}
-                            currentUser={currentUser}
-                            isDaily={false}
-                        />
-                    </div>
-                )}
 
                 {/* Sources Section */}
                 {sources && sources.length > 0 && (

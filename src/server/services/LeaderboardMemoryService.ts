@@ -17,7 +17,7 @@ export class LeaderboardMemoryService {
     private created: Map<string, number> = new Map(); // Track creation time for flush
     private lastRedditUpdate: Map<string, number> = new Map(); // [NEW] Track 3-hour Reddit update cycle
     private readonly MAX_ENTRIES = 10;
-    private readonly FLUSH_THRESHOLD_MS = 8 * 60 * 60 * 1000; // 8 Hours
+    private readonly FLUSH_THRESHOLD_MS = 3 * 60 * 60 * 1000; // [REFINED] 3 Hours for ALL
     private readonly REDDIT_UPDATE_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 Hours
     private readonly CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 Minutes
     private fs: FirestoreRestService;
@@ -33,6 +33,15 @@ export class LeaderboardMemoryService {
             LeaderboardMemoryService.instance = new LeaderboardMemoryService();
         }
         return LeaderboardMemoryService.instance;
+    }
+
+    /**
+     * Check if a user has attempted a leaderboard in the current memory buffer.
+     */
+    public hasAttempted(key: string, username: string): boolean {
+        const entries = this.leaderboards.get(key);
+        if (!entries) return false;
+        return entries.some(e => e.username === username);
     }
 
     /**
@@ -100,12 +109,9 @@ export class LeaderboardMemoryService {
     private async checkCycles() {
         const now = Date.now();
 
-        // 1. Standard Persistence Flush (8 Hours for topics, 3 Hours for daily)
+        // 1. Standard Persistence Flush (3 Hours for ALL)
         for (const [key, createdAt] of this.created.entries()) {
-            const isDaily = key.startsWith('daily:');
-            const threshold = isDaily ? this.REDDIT_UPDATE_INTERVAL_MS : this.FLUSH_THRESHOLD_MS;
-
-            if (now - createdAt >= threshold) {
+            if (now - createdAt >= this.FLUSH_THRESHOLD_MS) {
                 await this.flush(key);
             }
         }
@@ -157,9 +163,23 @@ export class LeaderboardMemoryService {
     private async flush(key: string) {
         const entries = this.leaderboards.get(key);
         if (entries && entries.length > 0) {
-            Logger.info(`[LeaderboardMemory] Flushing key=${key} to Firestore after 8 hours.`);
+            Logger.info(`[LeaderboardMemory] Flushing key=${key} to Firestore after 3 hours.`);
             const success = await this.fs.saveLeaderboard(key, entries);
             if (success) {
+                // [NEW] Persist user-specific stats upon flush to avoid heavy immediate writes
+                for (const entry of entries) {
+                    try {
+                        const userKey = entry.userKey || entry.username;
+                        if (key.startsWith('topic:')) {
+                            const slug = key.replace('topic:', '');
+                            await this.fs.updateUserTopicStats(userKey, slug, { isCompleted: true });
+                        }
+                        await this.fs.incrementUserTotalScore(userKey, entry.score);
+                    } catch (err) {
+                        Logger.error(`[LeaderboardMemory] User stats persist failed for ${entry.username}`, err);
+                    }
+                }
+
                 this.leaderboards.delete(key);
                 this.created.delete(key);
             } else {
