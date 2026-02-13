@@ -203,7 +203,7 @@ export const CONFIG = {
     },
     LIMITS: {
         dailyUserGen: 1, // Max topics a single user can generate per day
-        dailyGlobalGen: 20, // Max topics the entire platform can generate per day
+        dailyGlobalGen: 10, // Max topics the entire platform can generate per day
     },
     ERRORS: {
         LIMIT_REACHED: {
