@@ -9,8 +9,10 @@ interface QuizResultProps {
     sources?: string[];
     topicTitle?: string | undefined;
     postId?: string | null;
+    isDailyQuiz?: boolean;
     onGoHome: () => void;
 }
+
 
 export const QuizResult: React.FC<QuizResultProps> = ({
     score,
@@ -18,8 +20,10 @@ export const QuizResult: React.FC<QuizResultProps> = ({
     sources = [],
     topicTitle = '',
     postId = null,
+    isDailyQuiz = false,
     onGoHome
 }) => {
+
 
 
     const [subscribed, setSubscribed] = useState(false);
@@ -208,22 +212,25 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                         {subscribed ? 'Joined! 🎉' : 'Join Sub'}
                     </button>
 
-                    {/* Button 2: Share Score [NEW] */}
-                    <button
-                        onClick={handleShare}
-                        className={`nes-btn ${shared ? 'is-success' : 'is-warning'} transition-transform hover:scale-105 active:scale-95`}
-                        style={{
-                            fontFamily: "'Press Start 2P', cursive",
-                            fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
-                            padding: '1rem 1.5rem',
-                            borderRadius: 0,
-                            boxShadow: shared ? 'none' : '0 0 15px rgba(243, 156, 18, 0.3)',
-                            marginTop: '0.5rem'
-                        }}
-                        disabled={sharing || shared}
-                    >
-                        {shared ? 'Score Shared! 🏆' : sharing ? 'Sharing...' : 'Share Score'}
-                    </button>
+                    {/* Button 2: Share Score (ONLY for Daily Quiz) */}
+                    {isDailyQuiz && (
+                        <button
+                            onClick={handleShare}
+                            className={`nes-btn ${shared ? 'is-success' : 'is-warning'} transition-transform hover:scale-105 active:scale-95`}
+                            style={{
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
+                                padding: '1rem 1.5rem',
+                                borderRadius: 0,
+                                boxShadow: shared ? 'none' : '0 0 15px rgba(243, 156, 18, 0.3)',
+                                marginTop: '0.5rem'
+                            }}
+                            disabled={sharing || shared}
+                        >
+                            {shared ? 'Score Shared! 🏆' : sharing ? 'Sharing...' : 'Share Score'}
+                        </button>
+                    )}
+
 
                     {/* Button 3: Explore Past Quizzes (Return Home) */}
                     <button

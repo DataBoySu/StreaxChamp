@@ -1152,7 +1152,9 @@ export const App = () => {
                     sources={(selectedTopic ? selectedTopicQuiz?.sources : dailyQuiz?.metadata?.sources) || []}
                     topicTitle={selectedTopic?.title || 'Daily Quiz'}
                     postId={postId}
+                    isDailyQuiz={!selectedTopic}
                     onGoHome={() => {
+
                       setShowScore(false);
                       setQuizStarted(false);
                       setSelectedTopic(null);
