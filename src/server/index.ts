@@ -21,15 +21,6 @@ Devvit.addSettings({
 
 // Try to load secrets from Devvit settings at startup (non-blocking)
 hydrateGeminiKeyFromSettings();
-
-// Start Comment Leaderboard Service (Background Task)
-import { CommentLeaderboardService } from './services/CommentLeaderboardService';
-try {
-    CommentLeaderboardService.getInstance().start();
-} catch (e) {
-    console.error('Failed to start Comment Service', e);
-}
-
 // Create Express app
 const app = express();
 

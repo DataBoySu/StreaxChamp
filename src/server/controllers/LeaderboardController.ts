@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { LeaderboardService, LeaderboardEntryInput } from '../services/LeaderboardService';
+import { LeaderboardService } from '../services/LeaderboardService';
 import { Logger } from '../Logger';
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { CacheService } from '../services/CacheService';
@@ -34,7 +34,7 @@ export class LeaderboardController {
      */
     static async submitScore(req: Request, res: Response) {
         try {
-            const { userKey, nickname, score, timeTakenMs, slug: bodySlug } = req.body || {};
+            const { userKey, nickname, score, slug: bodySlug } = req.body || {};
             const slug = req.params.slug || bodySlug; // Prioritize URL param
 
             if (!userKey || !nickname || typeof score !== 'number') {
@@ -42,11 +42,9 @@ export class LeaderboardController {
             }
 
             const svc = new LeaderboardService();
-            const entry: LeaderboardEntryInput = { userKey, nickname, score, timeTakenMs: timeTakenMs || 0 };
 
             // Persist across all relevant leaderboard partitions (IN-MEMORY - Phase 3)
             // const topicRes = await svc.submit(slug || 'global', entry);
-            const topicRes = { ok: true, updated: false }; // Mock response for now
 
             // Submit to Memory
             try {
@@ -59,8 +57,14 @@ export class LeaderboardController {
                 const key = postId ? `post:${postId}` : `topic:${slug || 'global'}`;
 
                 mem.submit(key, nickname, score);
+
+                // NEW: Trigger Comment Leaderboard Update (Fire & Forget, but await for context safety)
+                if (postId) {
+                    const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
+                    await CommentLeaderboardService.getInstance().checkAndUpdate(postId);
+                }
             } catch (memErr) {
-                Logger.error('[SubmitScore] Memory Fail', memErr);
+                Logger.error('[SubmitScore] Memory/Comment Fail', memErr);
             }
 
             if (slug && !req.body.postId) { // Only update topic stats if it's a topic quiz? Keep existing logic for now

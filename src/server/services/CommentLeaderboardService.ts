@@ -1,11 +1,8 @@
 import { reddit, redis } from '@devvit/web/server';
-import { LeaderboardMemoryService } from './LeaderboardMemoryService';
 import { Logger } from '../Logger';
 
 export class CommentLeaderboardService {
     private static instance: CommentLeaderboardService;
-    private isRunning = false;
-    private readonly INTERVAL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
     private constructor() { }
 
@@ -16,44 +13,37 @@ export class CommentLeaderboardService {
         return CommentLeaderboardService.instance;
     }
 
-    public start() {
-        if (this.isRunning) return;
-        this.isRunning = true;
-        Logger.info('[CommentService] Started periodic leaderboard updates');
+    public async checkAndUpdate(postId: string) {
+        // Ensure this is called within a Request Context (e.g. from Controller)
+        const commentIdKey = `lb_comment:${postId}`;
+        const lastUpdatedKey = `lb_last_update:${postId}`;
 
-        // Run immediately on start (for testing/init), then interval
-        // But maybe delay slightly to allow server startup?
-        setTimeout(() => this.runUpdateCycle(), 10000);
+        // Rate Limit Check (e.g. max once per 3 hours per post)
+        const lastUpdate = await redis.get(lastUpdatedKey);
+        const now = Date.now();
+        if (lastUpdate && (now - parseInt(lastUpdate)) < 3 * 60 * 60 * 1000) {
+            return;
+        }
 
-        setInterval(() => {
-            this.runUpdateCycle();
-        }, this.INTERVAL_MS);
-    }
+        // Proceed to Update
+        await redis.set(lastUpdatedKey, now.toString());
 
-    private async runUpdateCycle() {
-        Logger.info('[CommentService] Running update cycle...');
+        // Get Data from Memory
+        const { LeaderboardMemoryService } = await import('./LeaderboardMemoryService');
         const mem = LeaderboardMemoryService.getInstance();
-        const keys = mem.getAllKeys();
+        const key = `post:${postId}`;
+        const entries = mem.get(key);
 
-        for (const key of keys) {
-            if (key.startsWith('post:')) {
-                const postId = key.replace('post:', '');
-                const entries = mem.get(key);
-                if (entries.length === 0) continue;
+        if (entries.length === 0) return;
 
-                try {
-                    await this.updatePostComment(postId, entries);
-                } catch (e) {
-                    Logger.error(`[CommentService] Failed to update post ${postId}`, e);
-                }
-            }
+        try {
+            await this.updatePostComment(postId, entries, commentIdKey);
+        } catch (e) {
+            Logger.error(`[CommentService] Failed to update post ${postId}`, e);
         }
     }
 
-    private async updatePostComment(postId: string, entries: any[]) {
-        const commentIdKey = `lb_comment:${postId}`;
-        // const lastUpdatedKey = `lb_last_update:${postId}`;
-
+    private async updatePostComment(postId: string, entries: any[], commentIdKey: string) {
         // Format Comment
         const header = `🏆 **TOP 10 LEADERBOARD**`;
         // const dateStr = new Date().toISOString().split('T')[0];

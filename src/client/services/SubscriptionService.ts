@@ -1,7 +1,7 @@
 
-export const requestCommunitySubscribe = async (): Promise<void> => {
+export const requestCommunitySubscribe = async (): Promise<boolean> => {
     try {
-        const response = await fetch('/api/reddit/subscribe', {
+        const response = await fetch('/api/community/subscribe', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -10,13 +10,13 @@ export const requestCommunitySubscribe = async (): Promise<void> => {
 
         if (response.ok) {
             console.log('Successfully subscribed to subreddit!');
-            // Optional: Show a toast or feedback?
-            // For now, console log is sufficient as the button text change will verify it provided we track state.
-            // But for this stateless call, we rely on the action completion.
+            return true;
         } else {
             console.error('Failed to subscribe to subreddit.');
+            return false;
         }
     } catch (error) {
         console.error('Error subscribing to subreddit:', error);
+        return false;
     }
 };

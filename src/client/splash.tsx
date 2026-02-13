@@ -16,6 +16,8 @@ const Splash = () => {
     const [customQuizMeta, setCustomQuizMeta] = useState<{ title: string; creator?: string; quizId: string; postId: string } | null>(null);
     const [quizStats, setQuizStats] = useState<{ totalPlays: number; perfectScores: number } | null>(null);
     const [hasShared, setHasShared] = useState(false);
+    const [hasSubscribed, setHasSubscribed] = useState(false); // NEW
+    const [hasVoted, setHasVoted] = useState(false); // NEW
     const [quizData, setQuizData] = useState<DailyQuiz | null>(null);
     const [quizLoading, setQuizLoading] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -203,29 +205,34 @@ const Splash = () => {
                     Generate
                 </button>
             </div>
-            {/* 2 Small Buttons: Hackathon & Join Community */}
+            {/* 2 Small Buttons: Vote & Join Community */}
             <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
                 <button
                     type="button"
-                    className="nes-btn"
+                    className={`nes-btn ${hasVoted ? 'is-success' : ''}`}
                     style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.6rem', padding: '0.75rem' }}
-                    onClick={() => navigateTo('https://devpost.com/software/streax-champ')}
+                    onClick={() => {
+                        navigateTo('https://devpost.com/software/streax-champ');
+                        setHasVoted(true);
+                    }}
                 >
-                    Hackathon
+                    {hasVoted ? 'Redirected!' : 'Vote for App'}
                 </button>
                 <button
                     type="button"
-                    className="nes-btn"
+                    className={`nes-btn ${hasSubscribed ? 'is-success' : ''}`}
                     style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.6rem', padding: '0.75rem' }}
+                    disabled={hasSubscribed}
                     onClick={async () => {
                         try {
-                            await fetch('/api/community/subscribe', { method: 'POST' });
+                            const success = await requestCommunitySubscribe();
+                            if (success) setHasSubscribed(true);
                         } catch (err) {
                             console.error('Subscribe failed', err);
                         }
                     }}
                 >
-                    Join Community
+                    {hasSubscribed ? 'Joined!' : 'Join Community'}
                 </button>
             </div>
         </div>
@@ -264,17 +271,21 @@ const Splash = () => {
                     <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '8px' }}>
                         <button
                             type="button"
-                            className="nes-btn"
-                            style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.6rem', padding: '0.75rem' }}
                             onClick={async () => {
                                 try {
-                                    await fetch('/api/community/subscribe', { method: 'POST' });
+                                    const success = await requestCommunitySubscribe();
+                                    if (success) {
+                                        setHasSubscribed(true);
+                                    }
                                 } catch (err) {
                                     console.error('Subscribe failed', err);
                                 }
                             }}
+                            className={`nes-btn ${hasSubscribed ? 'is-success' : ''}`}
+                            style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.6rem', padding: '0.75rem' }}
+                            disabled={hasSubscribed}
                         >
-                            Subscribe
+                            {hasSubscribed ? 'Joined!' : 'Join Sub'}
                         </button>
                         <button
                             type="button"
@@ -286,8 +297,9 @@ const Splash = () => {
                         </button>
                     </div>
                 </>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 
     const renderResults = () => (
