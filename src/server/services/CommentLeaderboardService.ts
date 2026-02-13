@@ -1,98 +1,85 @@
-import { reddit, redis } from '@devvit/web/server';
+import { FirestoreRestService } from './FirestoreRestService';
 import { Logger } from '../Logger';
 
+export interface CommentLeaderboardEntry {
+    username: string;
+    score: number;
+    timestamp: number;
+}
+
 export class CommentLeaderboardService {
-    private static instance: CommentLeaderboardService;
+    private fs: FirestoreRestService;
 
-    private constructor() { }
-
-    public static getInstance(): CommentLeaderboardService {
-        if (!CommentLeaderboardService.instance) {
-            CommentLeaderboardService.instance = new CommentLeaderboardService();
-        }
-        return CommentLeaderboardService.instance;
+    constructor() {
+        this.fs = new FirestoreRestService();
     }
 
-    public async checkAndUpdate(postId: string) {
-        // Ensure this is called within a Request Context (e.g. from Controller)
-        const commentIdKey = `lb_comment:${postId}`;
-        const lastUpdatedKey = `lb_last_update:${postId}`;
-
-        // Rate Limit Check (e.g. max once per 3 hours per post)
-        const lastUpdate = await redis.get(lastUpdatedKey);
-        const now = Date.now();
-        if (lastUpdate && (now - parseInt(lastUpdate)) < 3 * 60 * 60 * 1000) {
-            return;
-        }
-
-        // Proceed to Update
-        await redis.set(lastUpdatedKey, now.toString());
-
-        // Get Data from Memory
-        const { LeaderboardMemoryService } = await import('./LeaderboardMemoryService');
-        const mem = LeaderboardMemoryService.getInstance();
-        const key = `post:${postId}`;
-        const entries = mem.get(key);
-
-        if (entries.length === 0) return;
-
+    /**
+     * Ensures a leaderboard comment exists on the daily quiz post.
+     * Returns the comment ID.
+     */
+    async ensureComment(reddit: any, postId: string, date: string): Promise<string | null> {
         try {
-            await this.updatePostComment(postId, entries, commentIdKey);
+            // Check Firestore for existing commentId
+            const meta = await this.fs.getDailyQuizMetadata(date);
+            if (meta && meta.leaderboardCommentId) {
+                return meta.leaderboardCommentId;
+            }
+
+            // Create new comment if missing
+            const comment = await reddit.submitComment({
+                id: postId,
+                text: this.formatLeaderboard([], date)
+            });
+
+            // Save commentId to Firestore
+            await this.fs.saveDailyQuizMetadata(date, { leaderboardCommentId: comment.id });
+            Logger.info(`[CommentLeaderboard] Created new comment ${comment.id} for post ${postId}`);
+            return comment.id;
         } catch (e) {
-            Logger.error(`[CommentService] Failed to update post ${postId}`, e);
+            Logger.error('[CommentLeaderboard] ensureComment failed', e);
+            return null;
         }
     }
 
-    private async updatePostComment(postId: string, entries: any[], commentIdKey: string) {
-        // Format Comment
-        const header = `🏆 **TOP 10 LEADERBOARD**`;
-        // const dateStr = new Date().toISOString().split('T')[0];
-        const rows = entries.map((e, i) => {
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
-            return `${medal} u/${e.username} — **${e.score}/5**`;
-        });
-
-        const footer = `\n\n*Last updated: ${new Date().toISOString()}*`;
-        const body = `${header}\n\n${rows.join('\n')}${footer}`;
-
-        // Check Redis for existing comment
-        const existingCommentId = await redis.get(commentIdKey);
-
-        if (existingCommentId) {
-            // Edit existing
-            try {
-                // Fetch comment to edit? Or invoke generic edit?
-                // Devvit SDK: typically reddit.getCommentById(id).edit(body)
-                // BUT we need to check if we can simply "submitComment" with update? No.
-                // Assuming we can get a comment object.
-                // NOTE: reddit.getCommentById might not be exposed in all contexts or requires ID format.
-                // If it fails, we might just post a new one? No, spam.
-                // Let's assume reddit.getCommentById works.
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const comment = await reddit.getCommentById(existingCommentId as any);
-                await comment.edit({ text: body });
-                Logger.info(`[CommentService] Edited comment ${existingCommentId} on ${postId}`);
-            } catch (e) {
-                Logger.warn(`[CommentService] Edit failed for ${existingCommentId}. Might be deleted.`, e);
-                // If edit fails (e.g. deleted), clear key and potentially repost?
-                // For safety, let's just log. If we want to recover, we'd delete the key.
-                // await redis.del(commentIdKey);
-            }
-        } else {
-            // Create new
-            try {
-                const comment = await reddit.submitComment({
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    id: postId as any,
-                    text: body
-                });
-                if (comment && comment.id) {
-                    await redis.set(commentIdKey, comment.id);
-                    Logger.info(`[CommentService] Created new comment ${comment.id} on ${postId}`);
-                }
-            } catch (e) {
-                Logger.error(`[CommentService] Create failed on ${postId}`, e);
-            }
+    /**
+     * Updates the existing leaderboard comment with new scores.
+     */
+    async updateLeaderboardComment(reddit: any, commentId: string, entries: CommentLeaderboardEntry[], date: string): Promise<boolean> {
+        try {
+            const text = this.formatLeaderboard(entries, date);
+            await reddit.editComment({
+                id: commentId,
+                text: text
+            });
+            Logger.info(`[CommentLeaderboard] Updated comment ${commentId} with ${entries.length} entries`);
+            return true;
+        } catch (e) {
+            Logger.error('[CommentLeaderboard] updateLeaderboardComment failed', e);
+            return false;
         }
+    }
+
+    private formatLeaderboard(entries: CommentLeaderboardEntry[], date: string): string {
+        const header = `### Daily Quiz Leaderboard: ${date}\n\n`;
+
+        if (entries.length === 0) {
+            return header + `Be the first to play and claim your spot!\n\n*Updated every 3 hours*`;
+        }
+
+        // Use a bolded list format instead of a table to avoid dashes and emojis
+        const lines = entries.slice(0, 10).map((e, i) => {
+            const rank = i + 1;
+            const isTop3 = rank <= 3;
+            const playerLabel = isTop3 ? `**Rank ${rank}**` : `Rank ${rank}`;
+            const timeStr = new Date(e.timestamp).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZoneName: 'short'
+            });
+            return `${playerLabel} : u/${e.username} : **${e.score} points** at ${timeStr}`;
+        }).join('\n\n');
+
+        return header + lines + `\n\n*Updated every 3 hours . Only first attempt counts*`;
     }
 }

@@ -4,7 +4,10 @@ import { QuizController } from '../controllers/QuizController';
 import { RobotController } from '../controllers/RobotController';
 import { UserController } from '../controllers/UserController';
 import { LeaderboardController } from '../controllers/LeaderboardController';
+import { InMemoryLeaderboardController } from '../controllers/InMemoryLeaderboardController'; // NEW
 import { LandingController } from '../controllers/LandingController';
+
+
 import { HistoryController } from '../controllers/HistoryController'; // Added import
 import { FirestoreRestService } from '../services/FirestoreRestService';
 import { LimitController } from '../controllers/LimitController';
@@ -43,6 +46,10 @@ router.get('/stats/:quizId', LeaderboardController.getQuizStats); // NEW: Stats 
 router.post('/leaderboard/:slug/submit', LeaderboardController.submitScore);
 router.post('/leaderboard/submit', LeaderboardController.submitScore); // Fallback for any legacy calls
 router.get('/topics/:slug/leaderboard', LeaderboardController.listTopicLeaderboard);
+
+// --- Memory Leaderboard (Server-Only, No Firestore) ---
+router.post('/leaderboard/memory/:slug/submit', InMemoryLeaderboardController.submitScore);
+router.get('/leaderboard/memory/:slug', InMemoryLeaderboardController.getLeaderboard);
 
 // --- History ---
 router.get('/history/global', HistoryController.getGlobalHistory);

@@ -200,7 +200,7 @@ export class QuizController {
      */
     static async submitDailyScore(req: Request, res: Response) {
         try {
-            const { quizDate, score, totalQuestions, nickname } = req.body;
+            const { quizDate, score, totalQuestions, nickname, timeTakenMs } = req.body;
             // 0. Resolve User
             const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
             const effectiveUserId = userId; // username is not available from getDevvitUserId
@@ -236,7 +236,7 @@ export class QuizController {
             try {
                 const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
                 const mem = LeaderboardMemoryService.getInstance();
-                mem.submit(`daily:${quizDate}`, effectiveNickname, score);
+                mem.submit(`daily:${quizDate}`, effectiveNickname, score, { timeTakenMs: Number(timeTakenMs || 0) });
             } catch (memErr) {
                 Logger.error('[SubmitDaily] Memory Leaderboard Fail', memErr);
             }

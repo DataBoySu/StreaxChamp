@@ -798,12 +798,53 @@ export class FirestoreRestService {
       }
 
       const data = await res.json();
+
       return Array.isArray(data) ? data : [];
     } catch (e) {
       Logger.error('[FirestoreRest.runQuery] exception', e);
       return [];
     }
   }
+
+  /**
+   * Saves a full leaderboard snapshot to Firestore.
+   * Path: leaderboards/{slug}
+   */
+  async saveLeaderboard(slug: string, entries: Array<{ username: string; score: number; timestamp: number }>): Promise<boolean> {
+    try {
+      const url = `${this.baseUrl}/leaderboards/${slug}`;
+      const entriesValues = entries.map(e => ({
+        mapValue: {
+          fields: {
+            username: { stringValue: e.username },
+            score: { integerValue: String(e.score) },
+            timestamp: { integerValue: String(e.timestamp) }
+          }
+        }
+      }));
+
+      const body = {
+        fields: {
+          id: { stringValue: slug },
+          slug: { stringValue: slug },
+          entries: { arrayValue: { values: entriesValues } },
+          updatedAt: { stringValue: new Date().toISOString() }
+        }
+      };
+
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      return res.ok;
+    } catch (e) {
+      Logger.error('[FirestoreRest.saveLeaderboard] error', e);
+      return false;
+    }
+  }
+
 
   /**
    * Increment user's total score (Atomic Commit)
@@ -1439,28 +1480,69 @@ export class FirestoreRestService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+
     } catch (e) {
       Logger.error('[Firestore] saveQuizLeaderboardEntry failed', e);
     }
   }
 
   /**
+   * Retrieves metadata for a daily quiz, such as the leaderboard comment ID.
+   */
+  async getDailyQuizMetadata(date: string): Promise<{ leaderboardCommentId?: string } | null> {
+    try {
+      const url = `${this.baseUrl}/daily-quizzes/${date}`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+
+      const data: any = await res.json();
+      const fields = data.fields;
+      if (!fields) return null;
+
+      return {
+        leaderboardCommentId: fields.leaderboardCommentId?.stringValue
+      };
+    } catch (e) {
+      Logger.error('[Firestore] getDailyQuizMetadata failed', e);
+      return null;
+    }
+  }
+
+  /**
+   * Saves metadata for a daily quiz.
+   */
+  async saveDailyQuizMetadata(date: string, metadata: { leaderboardCommentId?: string }): Promise<void> {
+    try {
+      const url = `${this.baseUrl}/daily-quizzes/${date}`;
+      const fields: any = {};
+
+      if (metadata.leaderboardCommentId) {
+        fields.leaderboardCommentId = { stringValue: metadata.leaderboardCommentId };
+      }
+
+      const body = { fields };
+
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    } catch (e) {
+      Logger.error('[Firestore] saveDailyQuizMetadata failed', e);
+    }
+  }
+
+  /**
    * Get leaderboard for a specific daily quiz.
-   * Query: daily-quizzes/{date}/leaderboard
-   * Sort: score DESC, completedAt ASC
    */
   async getQuizLeaderboard(date: string, limit: number = 25): Promise<Array<{ userKey: string; nickname: string; score: number; completedAt: string }>> {
     try {
-      // Parent path: projects/.../documents/daily-quizzes/{date}
-      // This limits the query to the subcollection of this specific document.
       const parent = `projects/${this.projectId}/databases/(default)/documents/daily-quizzes/${date}`;
       const url = `https://firestore.googleapis.com/v1/${parent}:runQuery`;
 
       const query = {
         structuredQuery: {
           from: [{ collectionId: 'leaderboard' }],
-          // Sort ONLY by score to avoid composite index requirement (FAILED_PRECONDITION).
-          // Secondary sort (completedAt) will be done in-memory.
           orderBy: [
             { field: { fieldPath: 'score' }, direction: 'DESCENDING' }
           ],
@@ -1478,11 +1560,9 @@ export class FirestoreRestService {
         throw new Error(`Firestore query failed: ${res.statusText}`);
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const results: any = await res.json();
+      if (!Array.isArray(results)) return [];
 
-      // Parse results
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return results.map((r: any) => {
         const fields = r.document?.fields;
         if (!fields) return null;
@@ -1492,7 +1572,7 @@ export class FirestoreRestService {
           score: parseInt(fields.score?.integerValue || '0'),
           completedAt: fields.completedAt?.stringValue || '',
         };
-      }).filter(Boolean);
+      }).filter((x): x is { userKey: string; nickname: string; score: number; completedAt: string } => x !== null);
 
     } catch (e) {
       Logger.error('[Firestore] getQuizLeaderboard failed', e);
@@ -1500,3 +1580,4 @@ export class FirestoreRestService {
     }
   }
 }
+

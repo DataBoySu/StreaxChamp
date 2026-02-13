@@ -190,8 +190,6 @@ export const App = () => {
     setIsSavingQuiz(true);
     try {
       console.log('Sending request to /api/quizzes/post', {
-        title: topic,
-        quizId: quizId,
         username: authUser?.nickname
       });
       const res = await fetch('/api/quizzes/post', {
@@ -452,8 +450,8 @@ export const App = () => {
       if (timer !== null) clearInterval(timer as unknown as number);
       setSelectedAnswer(selected);
       setCorrectAnswer(correct);
-
       const isCorrect = selected === correct;
+
       let newScore = score;
 
       const getProgressiveMessage = (consecutiveCount: number) => {
@@ -744,9 +742,6 @@ export const App = () => {
     const quizId = (selectedTopic ? selectedTopicQuiz?.id : dailyQuiz?.id);
     const submissionPayload = { userKey: key, nickname, score, timeTakenMs: totalMs, ...(quizId ? { quizId } : {}) };
 
-    // Check if replay (correctly using Daily status vs Topic cache)
-    const isReplay = selectedTopic ? hasPlayed(slug, key) : hasDailyCompleted;
-
     // Unified Play Handler: Log history AND submit score
     const finalizePlay = async () => {
       // Check for Dev Mode (Invisible Activity)
@@ -796,10 +791,20 @@ export const App = () => {
       // Step 2: Submit to TOPIC Leaderboard
       // ALWAYS submit to allow score improvements. Server handles "only update if better".
       if (selectedTopic) {
-        await submitLeaderboardScore(slug, submissionPayload);
-        if (isReplay) {
-          console.log('[App] Replay submission sent');
+        // [MODIFIED] Generated Quizzes now use In-Memory Leaderboard (No Firestore)
+        try {
+          await fetch(`/api/leaderboard/memory/${encodeURIComponent(slug)}/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(submissionPayload)
+          });
+          console.log('[App] 🧠 Submitted to Memory Leaderboard');
+        } catch (e) {
+          console.error('[App] Failed to submit to memory leaderboard', e);
         }
+
+        // Removed Firestore submission for generated topics as per request
+        // await submitLeaderboardScore(slug, submissionPayload); 
       }
 
       // Step 3: Refresh local state
@@ -1134,10 +1139,12 @@ export const App = () => {
                     score={score}
                     totalQuestions={NUM_QUESTIONS + (showBonusQuestion ? 1 : 0)}
                     onPlayAgain={startQuiz}
-                    onReset={resetQuiz}
                     sources={(selectedTopic ? selectedTopicQuiz?.sources : dailyQuiz?.metadata?.sources) || []}
                     quizId={selectedTopic ? selectedTopicQuiz?.id : dailyQuiz?.id}
                     postId={postId}
+                    isGenerated={!!selectedTopic} // NEW: Flag for conditional UI
+                    topicTitle={selectedTopic?.title} // NEW: For header
+                    currentUser={authUser?.nickname || 'Guest'} // NEW: For highlighting
                   />
                 ) : (
                   <QuizActiveView

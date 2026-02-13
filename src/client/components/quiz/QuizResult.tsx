@@ -3,15 +3,18 @@ import { motion } from 'framer-motion';
 import { navigateTo } from '@devvit/web/client';
 import { CelebrationBackground } from './CelebrationBackground';
 import { ScoreFace } from './ScoreFace';
+import { InMemoryLeaderboard } from '../leaderboard/InMemoryLeaderboard'; // NEW
 
 interface QuizResultProps {
     score: number;
     totalQuestions: number;
     onPlayAgain: () => void;
-    onReset: () => void;
     sources?: string[];
-    quizId?: string | undefined; // NEW
-    postId?: string | null; // NEW
+    quizId?: string | undefined;
+    postId?: string | null;
+    isGenerated?: boolean | undefined; // NEW
+    topicTitle?: string | undefined;   // NEW
+    currentUser?: string | undefined;  // NEW
 }
 
 export const QuizResult: React.FC<QuizResultProps> = ({
@@ -20,7 +23,10 @@ export const QuizResult: React.FC<QuizResultProps> = ({
     onPlayAgain,
     sources = [],
     postId,
-    quizId // NEW
+    quizId,
+    isGenerated = false,
+    topicTitle = '',
+    currentUser = ''
 }) => {
     const [subscribed, setSubscribed] = useState(false);
     const [sharing, setSharing] = useState(false);
@@ -42,7 +48,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     postId,
-                    quizId, // NEW: Required by backend
+                    quizId,
                     text: shareText
                 })
             });
@@ -191,7 +197,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                         fontFamily: "'Press Start 2P', cursive",
                     }}
                 >
-                    {/* Button 1: Explore More Quizzes (navigates to sub) */}
+                    {/* Button 1: Explore More Quizzes (Always show) */}
                     <button
                         onClick={() => navigateTo('https://reddit.com/r/streaxchamp')}
                         className="nes-btn is-warning transition-transform hover:scale-105 active:scale-95"
@@ -206,24 +212,26 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                         Explore More Quizzes
                     </button>
 
-                    {/* Button 2: Share Score */}
-                    <button
-                        onClick={handleShare}
-                        disabled={!postId || sharing || shared}
-                        className={`nes-btn ${shared ? 'is-disabled' : 'is-success'} transition-transform hover:scale-105 active:scale-95`}
-                        style={{
-                            fontFamily: "'Press Start 2P', cursive",
-                            fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
-                            padding: '1rem 1.5rem',
-                            borderRadius: 0,
-                            boxShadow: shared ? 'none' : '0 0 15px rgba(0, 255, 136, 0.3)',
-                            opacity: (!postId || sharing || shared) ? 0.7 : 1
-                        }}
-                    >
-                        {sharing ? 'Sharing...' : shared ? 'Shared! 🚀' : 'Share Score'}
-                    </button>
+                    {/* Button 2: Share Score (Conditional: Hide if Generated) */}
+                    {!isGenerated && (
+                        <button
+                            onClick={handleShare}
+                            disabled={!postId || sharing || shared}
+                            className={`nes-btn ${shared ? 'is-disabled' : 'is-success'} transition-transform hover:scale-105 active:scale-95`}
+                            style={{
+                                fontFamily: "'Press Start 2P', cursive",
+                                fontSize: 'clamp(0.65rem, 1.8vw, 0.85rem)',
+                                padding: '1rem 1.5rem',
+                                borderRadius: 0,
+                                boxShadow: shared ? 'none' : '0 0 15px rgba(0, 255, 136, 0.3)',
+                                opacity: (!postId || sharing || shared) ? 0.7 : 1
+                            }}
+                        >
+                            {sharing ? 'Sharing...' : shared ? 'Shared! 🚀' : 'Share Score'}
+                        </button>
+                    )}
 
-                    {/* Button 3: Join Sub */}
+                    {/* Button 3: Join Sub (Always show) */}
                     <button
                         onClick={handleJoin}
                         className={`nes-btn ${subscribed ? 'is-success' : 'is-error'} transition-transform hover:scale-105 active:scale-95`}
@@ -239,17 +247,28 @@ export const QuizResult: React.FC<QuizResultProps> = ({
                         {subscribed ? 'Joined! 🎉' : 'Join Sub'}
                     </button>
 
-                    {/* Replay Button (Optional/Secondary) */}
-                    <button
-                        onClick={onPlayAgain}
-                        className="nes-btn"
-                        style={{
-                            marginTop: '1rem',
-                            fontSize: '0.7rem'
-                        }}
-                    >
-                        Replay
-                    </button>
+                    {/* Replay Button (Conditional: Hide if Generated) */}
+                    {!isGenerated && (
+                        <button
+                            onClick={onPlayAgain}
+                            className="nes-btn"
+                            style={{
+                                marginTop: '1rem',
+                                fontSize: '0.7rem'
+                            }}
+                        >
+                            Replay
+                        </button>
+                    )}
+
+                    {/* In-Memory Leaderboard (Conditional: Show ONLY if Generated) */}
+                    {isGenerated && quizId && (
+                        <InMemoryLeaderboard
+                            slug={topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')} // Use robust slug generation if quizId is generic
+                            topicTitle={topicTitle}
+                            currentUser={currentUser}
+                        />
+                    )}
                 </div>
 
                 {/* Sources Section */}
