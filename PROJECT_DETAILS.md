@@ -1,29 +1,38 @@
-Add version control to topic quizzes.
+Implement a one-time Legacy Snapshot Freezer for topic leaderboards.
 
-Modify topic generation logic to:
+Task:
 
-Generate new quizId (use ISO date or UUID)
+For each document in collection:
+leaderboards/{slug}
 
-Create document at:
-topics/{slug}/quizzes/{quizId}
+If document exists:
 
-Update parent:
-topics/{slug}
-activeQuizId: quizId
-generationVersion: increment by 1
-lastGenerated: REQUEST_TIME
+Create new quiz version:
+topics/{slug}/quizzes/legacy_snapshot
 
-Modify TopicLeaderboardService.submitScore to:
+Write metadata:
+source: "memory_snapshot"
+migratedAt: REQUEST_TIME
+generationVersion: -1
+legacy: true
 
-Read topics/{slug}.activeQuizId
+For each entry in entries array:
+Create:
+topics/{slug}/quizzes/legacy_snapshot/leaderboard/{username}
 
-If provided quizId !== activeQuizId:
-return { accepted: false, reason: "stale_version" }
+Fields:
+username
+score
+timestamp
+legacy: true
 
-Do NOT delete anything.
+After successful migration:
+Delete leaderboards/{slug}
 
-Do NOT touch daily system.
+Do not modify daily quiz system.
+Do not remove LeaderboardMemoryService yet.
+Do not change submission flow.
+This is archival only.
 
-Do NOT remove memory yet.
-
-Only add version enforcement.
+Ensure idempotency:
+If legacy_snapshot already exists, skip.

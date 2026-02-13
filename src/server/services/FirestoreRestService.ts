@@ -270,6 +270,7 @@ export class FirestoreRestService {
           lastGenerated: { stringValue: new Date().toISOString() },
           createdAt: { stringValue: new Date().toISOString() },
           hasQuiz: { booleanValue: false },
+          generationVersion: { integerValue: "0" },
           ...(topic.model ? { model: { stringValue: topic.model } } : {}),
           ...(topic.genLatencyMs ? { genLatencyMs: { integerValue: String(Math.round(topic.genLatencyMs)) } } : {}),
         },
@@ -365,6 +366,63 @@ export class FirestoreRestService {
       return res.ok;
     } catch (error) {
       Logger.error('[Firestore] patchTopic failed', { slug, error });
+      return false;
+    }
+  }
+
+  /**
+   * Promotes a quiz to active status and increments the topic's generation version.
+   * Path: topics/{slug}
+   */
+  async promoteTopicQuiz(slug: string, quizId: string): Promise<boolean> {
+    try {
+      const dbPath = `projects/${this.projectId}/databases/(default)/documents`;
+      const topicDocPath = `${dbPath}/topics/${slug}`;
+
+      const writes: any[] = [
+        {
+          transform: {
+            document: topicDocPath,
+            fieldTransforms: [
+              {
+                fieldPath: 'generationVersion',
+                increment: { integerValue: "1" }
+              },
+              {
+                fieldPath: 'lastGenerated',
+                setToServerValue: 'REQUEST_TIME'
+              }
+            ]
+          }
+        },
+        {
+          update: {
+            name: topicDocPath,
+            fields: {
+              activeQuizId: { stringValue: quizId },
+              hasQuiz: { booleanValue: true }
+            }
+          },
+          updateMask: { fieldPaths: ['activeQuizId', 'hasQuiz'] }
+        }
+      ];
+
+      const body = { writes };
+      const url = `${this.baseUrl}:commit`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        Logger.error('[FirestoreRest.promoteTopicQuiz] commit failed', txt);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      Logger.error('[FirestoreRest.promoteTopicQuiz] error', e);
       return false;
     }
   }

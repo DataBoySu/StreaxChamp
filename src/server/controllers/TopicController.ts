@@ -166,6 +166,8 @@ export class TopicController {
             const slug = topicData.slug || slugify(title);
             const sources = topicData.sources;
             const today = new Date().toISOString().slice(0, 10);
+            const quizId = new Date().toISOString(); // Unique Quiz ID
+
 
             // Prepare quiz payload with correctAnswer validation
             const questions: GeneratedQuizQuestion[] = quizData.questions.map((q: any, idx: number) => {
@@ -233,6 +235,8 @@ export class TopicController {
                 topicId: slug,
                 topicSlug: slug,
                 date: today,
+                quizId: quizId,
+
                 questions,
                 totalQuestions: questions.length,
                 createdAt: new Date().toISOString()
@@ -278,8 +282,9 @@ export class TopicController {
             // Save quiz (since we validated everything, this should succeed)
             let savedQuiz: boolean;
             try {
-                savedQuiz = await fs.saveTopicQuiz(slug, today, quizPayload);
-                Logger.db(`[Generate] ✓ Quiz saved for "${title}"`, { saved: !!savedQuiz });
+                savedQuiz = await fs.saveTopicQuiz(slug, quizId, quizPayload);
+                Logger.db(`[Generate] ✓ Quiz saved for "${title}"`, { saved: !!savedQuiz, quizId });
+
             } catch (quizError: any) {
                 Logger.error('[Generate] Quiz save failed - DATA WAS VALIDATED', {
                     error: quizError.message,
@@ -297,18 +302,18 @@ export class TopicController {
                 throw AppError.dbFailure('Quiz save verification failed - check Firestore connection');
             }
 
-            // Update hasQuiz flag to true (quiz is confirmed saved)
+            // Update activeQuizId and increment version
             try {
-                await fs.patchTopic(slug, { hasQuiz: true });
-                Logger.db('[Generate] ✓ hasQuiz=true patched successfully', { slug });
-            } catch (patchError: any) {
-                Logger.error('[Generate] Failed to patch hasQuiz flag', {
-                    error: patchError.message,
+                await fs.promoteTopicQuiz(slug, quizId);
+                Logger.db('[Generate] ✓ Topic promoted successfully', { slug, quizId });
+            } catch (promoteError: any) {
+                Logger.error('[Generate] Failed to promote topic', {
+                    error: promoteError.message,
                     slug,
-                    note: 'Quiz exists but flag is wrong - not critical'
+                    quizId
                 });
-                // Don't throw - quiz exists, just flag is inconsistent
             }
+
 
             Logger.info('[Generate] ✅ Pipeline complete', { slug, title });
 

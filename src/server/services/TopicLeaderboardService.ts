@@ -31,8 +31,31 @@ export class TopicLeaderboardService {
     async submitScore(entry: TopicLeaderboardEntry): Promise<{ accepted: boolean; reason?: string }> {
         try {
             const dbPath = `projects/${this.projectId}/databases/(default)/documents`;
-            const leaderboardDocPath = `${dbPath}/topics/${entry.slug}/quizzes/${entry.quizId}/leaderboard/${entry.userId}`;
             const topicDocPath = `${dbPath}/topics/${entry.slug}`;
+            const leaderboardDocPath = `${dbPath}/topics/${entry.slug}/quizzes/${entry.quizId}/leaderboard/${entry.userId}`;
+
+            // 1. Fetch activeQuizId from topic parent to verify version
+            const topicUrl = `${this.baseUrl}/topics/${entry.slug}`;
+            const topicRes = await fetch(topicUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+
+            if (!topicRes.ok) {
+                Logger.error('[TopicLeaderboardService.submitScore] Topic fetch failed', { status: topicRes.status });
+                return { accepted: false, reason: "topic_not_found" };
+            }
+
+            const topicData: any = await topicRes.json();
+            const activeQuizId = topicData.fields?.activeQuizId?.stringValue;
+
+            // 2. Version Enforcement
+            if (activeQuizId && entry.quizId !== activeQuizId) {
+                Logger.warn('[TopicLeaderboardService.submitScore] Stale quiz version submission rejected', {
+                    slug: entry.slug,
+                    submitted: entry.quizId,
+                    active: activeQuizId
+                });
+                return { accepted: false, reason: "stale_version" };
+            }
+
 
             const writes: any[] = [
                 {
