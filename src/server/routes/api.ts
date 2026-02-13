@@ -128,16 +128,8 @@ router.get('/init', async (_req, res) => {
         try {
             const todayStr = new Date().toISOString().slice(0, 10);
 
-            // Check Memory First
-            const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-            const mem = LeaderboardMemoryService.getInstance();
-            const memEntries = mem.get(`daily:${todayStr}`);
-            const hasPlayedMem = username && memEntries.some(e => e.username === username);
-
-            if (hasPlayedMem) {
-                dailyQuizStatus = 'COMPLETED';
-            } else if (username) {
-                // Check Firestore
+            // [NEW] Daily Quiz Status via Firestore
+            if (username) {
                 const fs = new FirestoreRestService();
                 const history = await fs.getDailyPlayHistory(username, todayStr);
                 if (history && history.completed) {
@@ -214,36 +206,9 @@ router.post('/share/comment', async (req, res) => {
         console.log("[SHARE] Resolved userStats:", userStats);
         console.log("[SHARE] hasShared =", userStats?.hasShared);
 
-        // [Moved Up] Opt-in Daily Leaderboard Submission (Prioritize Leaderboard over Comment)
-        // If this is a daily quiz (quizId is a date), add to Memory Leaderboard unconditionally
-        if (quizId.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            try {
-                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-                const mem = LeaderboardMemoryService.getInstance();
-
-                // Priority: Use score from client (most reliable context), fallback to Firestore
-                let scoreToSubmit = req.body.score;
-
-                if (typeof scoreToSubmit !== 'number') {
-                    // Fallback to Firestore play history
-                    console.log('[SHARE] Score not provided in body, fetching from Firestore...');
-                    const history = await fs.getDailyPlayHistory(username, quizId);
-                    if (history) {
-                        scoreToSubmit = history.score;
-                    }
-                }
-
-                if (typeof scoreToSubmit === 'number') {
-                    // Submit to Memory (Key: daily:YYYY-MM-DD)
-                    mem.submit(`daily:${quizId}`, username, scoreToSubmit);
-                    console.log(`[SHARE] ✅ Added ${username} to Memory Leaderboard (daily:${quizId}) with score ${scoreToSubmit}`);
-                } else {
-                    console.warn(`[SHARE] ⚠️ Could not resolve score for ${username}, Memory Leaderboard skipped.`);
-                }
-            } catch (memErr) {
-                console.error('[SHARE] Memory Leaderboard Update Error', memErr);
-            }
-        }
+        // [REMOVED] Daily Leaderboard Submission to Memory. 
+        // Now fully Firestore-based via QuizController.submitDailyScore.
+        // We still check userStats for duplicate share check below.
 
         // Allow DEV users to bypass limit
         const isDev = CONFIG.DEV.USERNAMES.includes(username);

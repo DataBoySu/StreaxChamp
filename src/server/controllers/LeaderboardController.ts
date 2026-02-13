@@ -52,21 +52,25 @@ export class LeaderboardController {
             // Persist across all relevant leaderboard partitions (IN-MEMORY - Phase 3)
             // const topicRes = await svc.submit(slug || 'global', entry);
 
-            // Submit to Memory or Topic Service (Persistent)
+            // Submit to Persistent Firestore Service
             try {
-                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-                const mem = LeaderboardMemoryService.getInstance();
-
-                // If we have a specific PostID (Custom Quiz), use that key
-                // Otherwise use topic slug
+                const svc = new LeaderboardService();
                 const postId = req.body.postId;
 
                 if (postId) {
-                    // Custom Posts still use Memory + Comment Side Effect
-                    const key = `post:${postId}`;
-                    mem.submit(key, nickname, score);
+                    // Custom Posts: Use Rolling Leaderboard + Stats
+                    await svc.submitRolling(postId, {
+                        userKey,
+                        nickname,
+                        score,
+                        timeTakenMs: req.body.timeTakenMs || 0
+                    });
+
                     const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
                     await CommentLeaderboardService.getInstance().ensureComment(reddit, postId, slug || 'custom');
+
+                    // Trigger stats update
+                    void svc.updateQuizStats_FORCE(postId, score, 5).catch(e => Logger.error('[Leaderboard] Stats trigger fail', e));
                 } else if (slug && slug !== 'global') {
                     // TOPIC BRANCH: Use TopicLeaderboardService (Persistent + Atomic)
                     const fs = new FirestoreRestService();
@@ -95,16 +99,20 @@ export class LeaderboardController {
                         return res.status(500).json({ error: 'SUBMISSION_FAILED', reason: result.reason });
                     }
                 } else {
-                    // Global / Default fallback
-                    const key = `topic:${slug || 'global'}`;
-                    mem.submit(key, nickname, score);
+                    // Global / Default fallback: Use persistent LeaderboardService
+                    await svc.submit(slug || 'global', {
+                        userKey,
+                        nickname,
+                        score,
+                        timeTakenMs: req.body.timeTakenMs || 0
+                    });
                 }
-            } catch (memErr) {
-                Logger.error('[SubmitScore] Submission Fail', memErr);
+            } catch (err) {
+                Logger.error('[SubmitScore] Submission Fail', err);
             }
 
             if (slug && !req.body.postId) {
-                // [DEFERRED] completion and stats now handled by flush cycle in LeaderboardMemoryService
+                // [DEFERRED] completion and stats now handled by direct persistent service calls
                 /*
                 const fs = new FirestoreRestService();
                 await fs.updateUserTopicStats(userKey, slug, { isCompleted: true });

@@ -865,44 +865,6 @@ export class FirestoreRestService {
     }
   }
 
-  /**
-   * Saves a full leaderboard snapshot to Firestore.
-   * Path: leaderboards/{slug}
-   */
-  async saveLeaderboard(slug: string, entries: Array<{ username: string; score: number; timestamp: number }>): Promise<boolean> {
-    try {
-      const url = `${this.baseUrl}/leaderboards/${slug}`;
-      const entriesValues = entries.map(e => ({
-        mapValue: {
-          fields: {
-            username: { stringValue: e.username },
-            score: { integerValue: String(e.score) },
-            timestamp: { integerValue: String(e.timestamp) }
-          }
-        }
-      }));
-
-      const body = {
-        fields: {
-          id: { stringValue: slug },
-          slug: { stringValue: slug },
-          entries: { arrayValue: { values: entriesValues } },
-          updatedAt: { stringValue: new Date().toISOString() }
-        }
-      };
-
-      const res = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      return res.ok;
-    } catch (e) {
-      Logger.error('[FirestoreRest.saveLeaderboard] error', e);
-      return false;
-    }
-  }
 
 
   /**
@@ -1611,7 +1573,8 @@ export class FirestoreRestService {
         structuredQuery: {
           from: [{ collectionId: 'leaderboard' }],
           orderBy: [
-            { field: { fieldPath: 'score' }, direction: 'DESCENDING' }
+            { field: { fieldPath: 'score' }, direction: 'DESCENDING' },
+            { field: { fieldPath: 'completedAt' }, direction: 'ASCENDING' }
           ],
           limit: limit
         }

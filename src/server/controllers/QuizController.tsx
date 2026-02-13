@@ -184,22 +184,11 @@ export class QuizController {
             let hasCompleted = false;
             let userScore = 0;
             if (userId) {
-                // [NEW] Check Memory First (Zero Latency for current session)
-                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-                const mem = LeaderboardMemoryService.getInstance();
-                const memEntries = mem.get(`daily:${quizData.id}`);
-                const memEntry = memEntries.find(e => e.userKey === userId || e.username === userId);
-
-                if (memEntry) {
+                // FALLBACK: Read from persistent Daily Play History
+                const history = await fs.getDailyPlayHistory(userId, quizData.id);
+                if (history) {
                     hasCompleted = true;
-                    userScore = memEntry.score;
-                } else {
-                    // Fallback to Firestore for historical data
-                    const history = await fs.getDailyPlayHistory(userId, quizData.id);
-                    if (history) {
-                        hasCompleted = true;
-                        userScore = history.score;
-                    }
+                    userScore = history.score;
                 }
             }
 
@@ -279,30 +268,17 @@ export class QuizController {
                 lastQuizId: quizDate
             });
 
-            // 3. Quiz-Specific Leaderboard (IN-MEMORY - Phase 3)
-            // REMOVED: Auto-submission to memory leaderboard is now OPT-IN via /api/share/comment
-
-            /*
-            try {
-                const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-                const mem = LeaderboardMemoryService.getInstance();
-
-                if (!isReplay) {
-                    mem.submit(`daily:${quizDate}`, effectiveNickname, score, {
-                        timeTakenMs: Number(timeTakenMs || 0),
-                        userKey: effectiveUserId
-                    });
-
-                    if (postId) {
-                        const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
-                        const commentService = new CommentLeaderboardService();
-                        await commentService.ensureComment(reddit, postId, quizDate);
-                    }
+            // 3. Quiz-Specific Leaderboard (Firestore Canonical)
+            // No longer writes to memory buffer. Each play is persistent in daily-quizzes/{date}/leaderboard.
+            if (!isReplay && _postId) {
+                try {
+                    const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
+                    const commentService = new CommentLeaderboardService();
+                    await commentService.ensureComment(reddit, _postId, quizDate);
+                } catch (ce) {
+                    Logger.error('[SubmitDaily] Reddit Comment Check Fail', ce);
                 }
-            } catch (memErr) {
-                Logger.error('[SubmitDaily] Memory Leaderboard Fail', memErr);
             }
-            */
 
 
             if (isReplay) {
@@ -363,21 +339,16 @@ export class QuizController {
             const date = req.query.date as string || new Date().toISOString().slice(0, 10);
             const limit = parseInt(req.query.limit as string || '25');
 
-            // const fs = new FirestoreRestService();
-            // const entries = await fs.getQuizLeaderboard(date, limit); // OLD
-
-            // NEW: Read from Memory
-            const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-            const mem = LeaderboardMemoryService.getInstance();
-            // detailed generic type? LeaderboardEntry[]
-            const raw = mem.get(`daily:${date}`).slice(0, limit);
+            // NEW: Read from Firestore (Persistent Canonical Path)
+            const fs = new FirestoreRestService();
+            const raw = await fs.getQuizLeaderboard(date, limit);
 
             // Map to client format
             const entries = raw.map(e => ({
-                nickname: e.username,
+                nickname: e.nickname,
                 score: e.score,
-                submittedAt: new Date(e.timestamp).toISOString(),
-                userKey: e.username, // Approximation
+                submittedAt: e.completedAt,
+                userKey: e.userKey,
                 timeTakenMs: 0
             }));
 
@@ -446,16 +417,9 @@ export class QuizController {
                     // Check if this specific user completed the current latest quiz
                     let userFinishedLatest = false;
                     if (effectiveUserId) {
-                        // [NEW] Check Memory First
-                        const { LeaderboardMemoryService } = await import('../services/LeaderboardMemoryService');
-                        const mem = LeaderboardMemoryService.getInstance();
-                        if (mem.hasAttempted(`topic:${slug}`, effectiveUserId)) {
+                        const stats = await fs.getUserTopicStats(effectiveUserId, slug);
+                        if (stats && stats.isCompleted && stats.lastQuizId === latest.id) {
                             userFinishedLatest = true;
-                        } else {
-                            const stats = await fs.getUserTopicStats(effectiveUserId, slug);
-                            if (stats && stats.isCompleted && stats.lastQuizId === latest.id) {
-                                userFinishedLatest = true;
-                            }
                         }
                     }
 

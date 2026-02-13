@@ -1,33 +1,32 @@
-Perform structural verification of topic cutover integrity.
+Remove LeaderboardMemoryService entirely.
 
-Do NOT modify code.
+Tasks:
 
-Report only.
+1️⃣ Delete:
 
-1️⃣ Search entire codebase for:
-LeaderboardMemoryService.submit
-with keys starting with "topic:"
+LeaderboardMemoryService.ts
 
-List all occurrences.
+flush()
 
-2️⃣ Search entire codebase for writes to:
+setInterval usage
+
+Any memoryCache maps
+
+leaderboards/{slug} snapshot logic
+
+2️⃣ Remove all imports referencing LeaderboardMemoryService.
+
+3️⃣ Ensure:
+
+Topic uses TopicLeaderboardService
+
+Daily uses FirestoreRestService.getQuizLeaderboard
+
+Global uses Firestore users query
+
+4️⃣ Confirm no code references:
+mem.get
+mem.submit
 leaderboards/{slug}
 
-List all remaining write paths.
-
-3️⃣ In LeaderboardController.submitScore:
-Show exact code where quizId is determined.
-Confirm whether quizId comes from:
-- client input
-- or Firestore topics/{slug}.activeQuizId
-
-4️⃣ In QuizController (bridging logic):
-Show exact logic that routes daily score into topic leaderboard.
-Confirm it uses TopicLeaderboardService.
-
-5️⃣ In LeaderboardMemoryService:
-Show the new guard logic.
-Confirm it rejects topic keys BEFORE mutating memory.
-
-No commentary.
-Just code paths and confirmations.
+Return full list of removed references.
