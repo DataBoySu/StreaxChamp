@@ -215,9 +215,23 @@ export class QuizController {
 
             // 1. Replay Check (Authority)
             const existing = await fs.getDailyPlayHistory(effectiveUserId, quizDate);
-            const isReplay = !!(existing && existing.completed);
+            const isReplay = !!(existing && existing.completed === true);
 
-            // 2. Save History (New Record) - Upsert to ensure latest metadata
+            if (!isReplay) {
+                // 2. Write daily leaderboard entry
+                await fs.saveQuizLeaderboardEntry({
+                    date: quizDate,
+                    userKey: effectiveUserId,
+                    nickname: effectiveNickname,
+                    score: score,
+                    completedAt: new Date().toISOString()
+                });
+                Logger.info(`[SubmitDaily] DailyLB WRITE user=${effectiveUserId} score=${score} date=${quizDate}`);
+            } else {
+                Logger.info(`[SubmitDaily] DailyLB SKIPPED replay user=${effectiveUserId} date=${quizDate}`);
+            }
+
+            // 3. Save History (New Record) - Upsert to ensure latest metadata
             await fs.saveDailyPlayHistory(effectiveUserId, quizDate, {
                 score,
                 totalQuestions,
@@ -225,15 +239,14 @@ export class QuizController {
                 timeTakenMs: Number(timeTakenMs || 0)
             });
 
-            // 2b. Sync User Topic Stats (Ensure isCompleted is true)
+            // 3b. Sync User Topic Stats (Ensure isCompleted is true)
             await fs.updateUserTopicStats(effectiveUserId, quizDate, {
                 isCompleted: true,
                 lastAttemptDate: new Date().toISOString(),
                 lastQuizId: quizDate
             });
 
-            // 3. Quiz-Specific Leaderboard (Firestore Canonical)
-            // No longer writes to memory buffer. Each play is persistent in daily-quizzes/{date}/leaderboard.
+            // 4. Quiz-Specific Leaderboard (Firestore Canonical)
             if (!isReplay && _postId) {
                 try {
                     const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
@@ -247,15 +260,15 @@ export class QuizController {
 
             if (isReplay) {
                 Logger.info(`[DAILY QUIZ] Replay play processed`, { userId: effectiveUserId, date: quizDate });
-                // Return replay: true so client shows badge, but we attempted recovery above
+                // Return replay: true so client shows badge
                 return res.json({ success: true, replay: true });
             }
 
 
-            // 4. Update Global XP (Only on first play)
+            // 5. Update Global XP (Only on first play)
             await fs.incrementUserTotalScore(effectiveUserId, score);
 
-            // 5. [NEW] Bridge to Topic Leaderboard (IN-MEMORY - Phase 3)
+            // 6. Bridge to Topic Leaderboard
             try {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const quizContent: any = await fs.getDailyQuizByDate(quizDate);
@@ -266,7 +279,6 @@ export class QuizController {
                     const slug = topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
                     if (slug && slug !== 'mixed-general-knowledge' && slug !== 'general-knowledge') {
-                        Logger.info(`[SubmitDaily] Mem-Bridging score to Topic: ${slug}`, { nickname: effectiveNickname, score });
                         Logger.info(`[SubmitDaily] Persist-Bridging score to Topic: ${slug}`, { nickname: effectiveNickname, score });
 
                         const topic = await fs.getTopic(slug);
