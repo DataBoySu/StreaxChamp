@@ -16,6 +16,9 @@ export default defineConfig({
     outDir: '../../dist/server',
     target: 'node22',
     sourcemap: true,
+    commonjsOptions: {
+      ignoreDynamicRequires: true,
+    },
     rollupOptions: {
       external: [...builtinModules],
 

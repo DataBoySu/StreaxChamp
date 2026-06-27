@@ -31,6 +31,23 @@ const toTitleCase = (s: string) =>
 
 import { useSystemStatus } from '../../hooks/useSystemStatus'; // NEW
 
+// Sanitize query to prevent typing more than 10 words or 12 letters
+const sanitizeTopicQuery = (val: string): string => {
+  let result = '';
+  for (let i = 0; i < val.length; i++) {
+    const char = val[i];
+    const nextResult = result + char;
+    const words = nextResult.trim().split(/\s+/).filter(Boolean);
+    const lettersCount = (nextResult.match(/[a-zA-Z]/g) || []).length;
+    if (words.length <= 10 && lettersCount <= 12) {
+      result = nextResult;
+    } else {
+      break;
+    }
+  }
+  return result;
+};
+
 export const TopicSelector: React.FC<{
   onClose?: () => void;
   initialQuery?: string;
@@ -373,10 +390,13 @@ export const TopicSelector: React.FC<{
       >
         <div className="max-w-[95%] mx-auto flex gap-3 items-center flex-wrap">
           {/* Search Input - NES Style */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-[200px] flex flex-col gap-1">
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                const sanitized = sanitizeTopicQuery(e.target.value);
+                setQuery(sanitized);
+              }}
               onKeyDown={handleSearchKeyDown}
               placeholder={limitReached ? "Search existing topics (limit reached)" : "Search or add topics..."}
               className="nes-input w-full"
@@ -388,6 +408,16 @@ export const TopicSelector: React.FC<{
               aria-label="Search or add topics"
               autoComplete="off"
             />
+            {query.length > 0 && (
+              <div className="flex gap-4 px-1" style={{ fontSize: '9px', fontFamily: "'Press Start 2P', cursive" }}>
+                <span className={((query.match(/[a-zA-Z]/g) || []).length >= 12) ? 'text-red-500 font-bold animate-pulse' : 'text-gray-500'}>
+                  Letters: {(query.match(/[a-zA-Z]/g) || []).length}/12
+                </span>
+                <span className={(query.trim().split(/\s+/).filter(Boolean).length >= 10) ? 'text-red-500 font-bold animate-pulse' : 'text-gray-500'}>
+                  Words: {query.trim().split(/\s+/).filter(Boolean).length}/10
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons - NES Style */}
