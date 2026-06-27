@@ -1,3 +1,6 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+
 // Multiplier Pop Component - Modernized with NES.css
 export const MultiplierPop: React.FC<{
     multiplier: number;

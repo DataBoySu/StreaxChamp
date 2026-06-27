@@ -10,8 +10,10 @@ interface QuizResultProps {
     topicTitle?: string | undefined;
     postId?: string | null;
     isDailyQuiz?: boolean;
-    quizId?: string;
-    nickname?: string;
+    quizId?: string | undefined;
+    nickname?: string | undefined;
+    userRank?: number | undefined;
+    onShareSuccess?: (() => void) | undefined;
     onGoHome: () => void;
 }
 
@@ -25,6 +27,8 @@ export const QuizResult: React.FC<QuizResultProps> = ({
     isDailyQuiz = false,
     quizId,
     nickname = 'Player',
+    userRank,
+    onShareSuccess,
     onGoHome
 }) => {
 
@@ -56,11 +60,10 @@ export const QuizResult: React.FC<QuizResultProps> = ({
         try {
             // [NEW] Single Line Share Format
             // Requested: "telling their rank, username and score"
-            // Since rank is TBD on client, we show TBD.
-            const dateStr = isDailyQuiz && quizId ? quizId : new Date().toISOString().slice(0, 10);
+            const rankStr = userRank !== undefined ? `${userRank}` : 'TBD';
 
-            // Format: 🏆 Rank: TBD | 👤 Username | 🎯 Score: X/Y
-            const text = `🏆 Rank: TBD | 👤 ${nickname} | 🎯 Score: ${score}/${totalQuestions}`;
+            // Format: 🏆 Rank: X | 👤 Username | 🎯 Score: X/Y
+            const text = `🏆 Rank: ${rankStr} | 👤 ${nickname} | 🎯 Score: ${score}/${totalQuestions}`;
             const slug = quizId || topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
             const res = await fetch('/api/share/comment', {
@@ -77,6 +80,7 @@ export const QuizResult: React.FC<QuizResultProps> = ({
 
             if (res.ok) {
                 setShared(true);
+                onShareSuccess?.();
             }
         } catch (err) {
             console.error('Share failed', err);
