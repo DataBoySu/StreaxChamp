@@ -118,19 +118,81 @@ export class QuizController {
                 quizData = await fs.getDailyQuizByDate(targetDate);
 
                 if (!quizData && isToday) {
-                    // Fallback: Fetch latest available quiz ID
-                    Logger.warn('[Quiz] Today\'s quiz not found. Falling back to latest available.');
-                    const availableDates = await fs.listDailyQuizDates();
-                    const latestDate = availableDates[0];
+                    // Lazy generate today's quiz
+                    Logger.info('[Quiz] Today\'s quiz not found. Lazy generating a new one.');
+                    const isDev = CONFIG.DEV.USERNAMES.includes(userId || '');
+                    
+                    const dayOfWeek = new Date().getDay();
+                    const topicRotation = [
+                        'Mixed General Knowledge',
+                        'Science & Technology',
+                        'History & Geography',
+                        'Arts & Literature',
+                        'Sports & Entertainment',
+                        'Nature & Animals',
+                        'World Cultures & Traditions'
+                    ];
+                    const dailyTopic = topicRotation[dayOfWeek];
 
-                    if (latestDate) {
-                        Logger.info(`[Quiz] Falling back to latest quiz: ${latestDate}`);
-                        quizData = await fs.getDailyQuizByDate(latestDate);
+                    try {
+                        const generated = await generateUnifiedContent(dailyTopic || 'General Knowledge', { isDev });
+                        
+                        const questions = generated.quiz.questions.map((q: any) => ({
+                            id: `q${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                            question: q.question,
+                            options: q.options,
+                            correctAnswer: Number(q.correctAnswer) || 0,
+                            difficulty: String(q.difficulty || 'medium'),
+                            category: String(q.category || 'General'),
+                            explanation: q.explanation,
+                            createdAt: new Date().toISOString()
+                        }));
+
+                        const quizPayload = {
+                            questions,
+                            metadata: {
+                                generatedAt: new Date().toISOString(),
+                                sourceWikis: generated.topic.sources,
+                                version: 'v6-divers-lazy',
+                                model: generated.model,
+                                generator: 'gemini',
+                                topic: dailyTopic,
+                                difficulty: 'mixed',
+                                redditPostId: '', // Lazy generated quizzes might not have post ID initially
+                                leaderboardHash: '',
+                                leaderboardCommentId: '',
+                                generationSource: 'lazy'
+                            }
+                        };
+                        
+                        // Try to create the daily quiz
+                        const created = await fs.createDailyQuizOnly(targetDate, quizPayload);
+                        if (created) {
+                            Logger.info(`[Quiz] Lazy generation successful for date: ${targetDate}`);
+                            quizData = { id: targetDate, ...quizPayload };
+                        } else {
+                            // If another request beat us to it, fetch what they generated
+                            quizData = await fs.getDailyQuizByDate(targetDate);
+                        }
+                    } catch (e) {
+                        Logger.error('[Quiz] Lazy generation failed.', e);
                     }
 
                     if (!quizData) {
-                        Logger.error('[Quiz] No quizzes available in system.');
-                        return res.status(503).json({ error: 'DAILY_NOT_READY' });
+                        // Fallback: Fetch latest available quiz ID
+                        Logger.warn('[Quiz] Lazy generation did not produce a quiz. Falling back to latest available.');
+                        const availableDates = await fs.listDailyQuizDates();
+                        const latestDate = availableDates[0];
+
+                        if (latestDate) {
+                            Logger.info(`[Quiz] Falling back to latest quiz: ${latestDate}`);
+                            quizData = await fs.getDailyQuizByDate(latestDate);
+                        }
+
+                        if (!quizData) {
+                            Logger.error('[Quiz] No quizzes available in system.');
+                            return res.status(503).json({ error: 'DAILY_NOT_READY' });
+                        }
                     }
                 }
 
