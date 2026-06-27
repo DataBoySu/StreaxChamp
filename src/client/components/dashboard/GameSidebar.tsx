@@ -70,6 +70,18 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
     history,
     hideRecentPlays = false,
 }) => {
+    const uniqueHistory = React.useMemo(() => {
+        const unique: HistoryEntry[] = [];
+        const seen = new Set<string>();
+        for (const h of (history || [])) {
+            const name = h.nickname || 'Player';
+            if (!seen.has(name)) {
+                seen.add(name);
+                unique.push(h);
+            }
+        }
+        return unique;
+    }, [history]);
     // console.log('[GameSidebar] History Prop:', history);
     return (
         <div className="lg:col-span-1">
@@ -206,12 +218,12 @@ export const GameSidebar: React.FC<GameSidebarProps> = ({
                                         <LoadingDots text="Loading" />
                                     </div>
                                 )}
-                                {!historyLoading && history.length === 0 && (
+                                {!historyLoading && uniqueHistory.length === 0 && (
                                     <div className="text-center py-8 text-slate-400 text-sm font-vt323" style={{ fontSize: '1.2rem' }}>
                                         No plays detected in this sector.
                                     </div>
                                 )}
-                                {history.map((h, i) => {
+                                {uniqueHistory.map((h, i) => {
                                     const timeAgo = formatRelativeTime(h.timestamp);
                                     return (
                                         <div

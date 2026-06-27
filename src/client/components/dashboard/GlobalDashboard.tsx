@@ -52,6 +52,18 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
     history,
     historyLoading,
 }) => {
+    const uniqueHistory = React.useMemo(() => {
+        const unique: any[] = [];
+        const seen = new Set<string>();
+        for (const h of (history || [])) {
+            const name = h.nickname || 'Player';
+            if (!seen.has(name)) {
+                seen.add(name);
+                unique.push(h);
+            }
+        }
+        return unique;
+    }, [history]);
     return (
         <div className="grid gap-6 md:gap-10 w-full" style={{ marginRight: '0.5rem' }}>
             {/* Window 3: Global Leaderboard */}
@@ -196,12 +208,12 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
                         </div>
                     )}
 
-                    {!historyLoading && (history || []).length === 0 && (
+                    {!historyLoading && uniqueHistory.length === 0 && (
                         <div className="text-center py-8 text-secondary text-sm">
                             No plays yet.
                         </div>
                     )}
-                    {(history || []).map((h, i) => {
+                    {uniqueHistory.map((h, i) => {
                         const timeAgo = formatRelativeTime(h.timestamp);
                         return (
                             <div
