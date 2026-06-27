@@ -213,10 +213,11 @@ const Splash = () => {
                 <button
                     type="button"
                     className="nes-btn is-primary"
-                    style={{ flex: 1, fontFamily: "'Press Start 2P'", fontSize: '0.8rem', padding: '1.25rem' }}
+                    style={{ flex: 1, fontFamily: "'Press Start 2P'", padding: '0.75rem 0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                     onClick={handleGenerate}
                 >
-                    Generate
+                    <span style={{ fontSize: '0.6rem', animation: 'pulse-random 1.5s infinite alternate' }}>Generate</span>
+                    <span style={{ fontSize: '0.9rem', animation: 'pulse-random-delayed 1.2s infinite alternate ease-in-out', color: '#fff', textShadow: '2px 2px 0 #000' }}>PLAY</span>
                 </button>
             </div>
             {/* 2 Small Buttons: Vote & Join Community */}

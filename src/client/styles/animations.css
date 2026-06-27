@@ -360,3 +360,21 @@
         transform: translateX(4px);
     }
 }
+
+@keyframes pulse-random {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+@keyframes pulse-random-delayed {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.15);
+    }
+}
