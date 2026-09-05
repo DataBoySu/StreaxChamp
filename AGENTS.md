@@ -1,3 +1,5 @@
+@C:\Users\SystemSu\.codex\RTK.md
+
 You are writing a Devvit Web application that runs on Reddit.com. Use the Devvit MCP when configured or consult https://developers.reddit.com/docs/llms.txt.
 
 ## Tech stack
@@ -45,6 +47,18 @@ Use `requestExpandedMode` to move from inline to expanded view.
 - Keep secrets in Devvit settings or local environment files; never expose them to the client bundle.
 - Treat post context and Redis post-to-quiz mappings as server-owned authorization data.
 
+## Current submission architecture
+
+- `src/server/core/scoreSubmission.ts` owns the strict Zod schemas for quiz submissions and share requests, plus canonical score calculation.
+- Quiz clients submit `quizId`, exactly five answer indexes, elapsed time, and an optional Reddit post ID. They do not submit a trusted score or identity.
+- `QuizController.submitDailyScore` loads the canonical daily quiz, calculates the score, and writes the authenticated Reddit username.
+- `LeaderboardController.submitScore` handles persistent topic and custom-post leaderboards. Topic submissions must match the topic's active quiz. Custom-post submissions must match both `context.postId` and the Redis post-to-quiz mapping.
+- `FirestoreRestService.saveQuizLeaderboardEntry` creates a deterministic per-user document atomically. HTTP 409 means the daily attempt is a replay; other failed writes must surface as errors.
+- `/api/share/comment` validates the request, requires matching post context, calls `reddit.submitComment`, and only then records the shared state.
+- User quiz creation and posting resolve the creator through Reddit. Posting also verifies that the stored quiz belongs to the current user.
+
+Do not restore the removed client-supplied score, username query/header fallbacks, legacy history write route, or generic leaderboard submission route.
+
 ## Development
 
 - Run `npm run type-check` after changes.
@@ -62,6 +76,23 @@ Use `requestExpandedMode` to move from inline to expanded view.
 ## Testing
 
 Use the initialized `@devvit/test` harness in `src/server/test.ts` for server tests. Each test receives isolated in-memory Devvit capabilities. Mock the Reddit API only when the harness reports that a Reddit call requires it.
+
+The security regression suite currently covers:
+
+- canonical scoring from numeric and text answer formats;
+- rejection of client-supplied scores and invalid answer arrays;
+- share-text limits;
+- atomic Firestore leaderboard creation, replay conflicts, and failed-write propagation.
+
+`npm run check` is non-mutating and runs type checking, ESLint, all Vitest tests, and both production builds.
+
+## Dependencies and release baseline
+
+- Keep `@devvit/web`, `devvit`, and `@devvit/test` aligned on version `0.13.11`.
+- Devvit 0.14 is a separate project-wide migration. Do not mix that upgrade into feature or maintenance work.
+- Gemini's production API key is declared as the secret `gemini-api-key` in `devvit.json` and read through `settings` from `@devvit/web/server`.
+- The repository release version is `0.1.0`.
+- Before publishing, run `npm run check`, confirm the Devvit account and target subreddit, verify production Firestore rules, and confirm the Gemini secret is configured.
 
 ## Legacy rules
 
