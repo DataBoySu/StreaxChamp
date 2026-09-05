@@ -1,4 +1,4 @@
-import { Devvit } from '@devvit/public-api';
+import { settings } from '@devvit/web/server';
 import { Logger } from '../Logger';
 import { CONFIG } from '../../shared/constants';
 import { AppError } from '../utils/AppError';
@@ -65,18 +65,16 @@ export interface GeneratedQuizPayload {
 }
 
 // --- Key Management ---
-export function hydrateGeminiKeyFromSettings(): void {
+export async function hydrateGeminiKeyFromSettings(): Promise<void> {
     try {
-        const anyDevvit = Devvit as unknown as { settings?: { get?: (k: string) => Promise<unknown> } };
-        anyDevvit.settings?.get?.('gemini-api-key')
-            .then((val) => {
-                if (typeof val === 'string' && val.trim()) {
-                    GEMINI_API_KEY = val.trim();
-                    Logger.info('[AI] Gemini key loaded from Devvit settings');
-                }
-            })
-            .catch(() => { });
-    } catch { }
+        const value = await settings.get('gemini-api-key');
+        if (typeof value === 'string' && value.trim()) {
+            GEMINI_API_KEY = value.trim();
+            Logger.info('[AI] Gemini key loaded from Devvit settings');
+        }
+    } catch (error) {
+        Logger.warn('[AI] Gemini key was not available from Devvit settings', error);
+    }
 }
 
 /**

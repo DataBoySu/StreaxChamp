@@ -31,8 +31,8 @@ export const QuizAdminPanel: React.FC = () => {
 
   // Load initial status
   useEffect(() => {
-    loadStatus();
-    loadLogs();
+    void loadStatus();
+    void loadLogs();
   }, []);
 
   const loadStatus = async () => {
@@ -73,8 +73,8 @@ export const QuizAdminPanel: React.FC = () => {
       
       // Refresh status after generation
       setTimeout(() => {
-        loadStatus();
-        loadLogs();
+        void loadStatus();
+        void loadLogs();
       }, 1000);
       
     } catch (error) {
@@ -241,7 +241,7 @@ export const QuizAdminPanel: React.FC = () => {
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => { loadStatus(); loadLogs(); }}
+          onClick={() => { void loadStatus(); void loadLogs(); }}
           disabled={loading}
           style={{
             padding: '12px 24px',

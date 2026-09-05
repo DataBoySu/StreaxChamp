@@ -704,7 +704,9 @@ export class FirestoreRestService {
       const current = parseInt(data.fields?.playCount?.integerValue || '0', 10) || 0;
       const body = { fields: { playCount: { integerValue: String(current + 1) }, updatedAt: { stringValue: new Date().toISOString() } } };
       await fetch(`${url}?updateMask.fieldPaths=playCount&updateMask.fieldPaths=updatedAt`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    } catch { }
+    } catch (error) {
+      console.error('[FirestoreRestService] Failed to increment topic play count', error);
+    }
   }
 
   /**
@@ -1582,41 +1584,35 @@ export class FirestoreRestService {
     nickname: string;
     score: number;
     completedAt: string;
-  }): Promise<void> {
+  }): Promise<boolean> {
     const { date, userKey, nickname, score, completedAt } = entry;
-    try {
-      const path = `daily-quizzes/${date}/leaderboard/${userKey}`;
-      const url = `${this.baseUrl}/${path}`;
+    const collectionPath = `daily-quizzes/${encodeURIComponent(date)}/leaderboard`;
+    const url = `${this.baseUrl}/${collectionPath}?documentId=${encodeURIComponent(userKey)}`;
+    const body = {
+      fields: {
+        userKey: { stringValue: userKey },
+        nickname: { stringValue: nickname },
+        score: { integerValue: String(score) },
+        completedAt: { stringValue: completedAt },
+      },
+    };
 
-      // Check existence first
-      try {
-        const check = await fetch(url, { method: 'GET' });
-        if (check.ok) {
-          // Entry exists - DO NOT OVERWRITE
-          Logger.info('[Firestore] saveQuizLeaderboardEntry skipped (exists)', { userKey, date });
-          return;
-        }
-      } catch { /* ignore check error, proceed to try write */ }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-      const body = {
-        fields: {
-          score: { integerValue: String(score) },
-          completedAt: { stringValue: completedAt },
-          nickname: { stringValue: nickname },
-          userId: { stringValue: userKey }
-        }
-      };
-
-      // Using PATCH as verified upsert mechanism but gated by check above
-      await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-    } catch (e) {
-      Logger.error('[Firestore] saveQuizLeaderboardEntry failed', e);
+    if (response.status === 409) {
+      Logger.info('[Firestore] saveQuizLeaderboardEntry skipped (exists)', { userKey, date });
+      return false;
     }
+
+    if (!response.ok) {
+      throw new Error(`Firestore leaderboard write failed: ${response.status}`);
+    }
+
+    return true;
   }
 
   /**
@@ -1728,7 +1724,7 @@ export class FirestoreRestService {
         const fields = r.document?.fields;
         if (!fields) return null;
         return {
-          userKey: fields.userId?.stringValue || '',
+          userKey: fields.userKey?.stringValue || fields.userId?.stringValue || '',
           nickname: fields.nickname?.stringValue || 'Anonymous',
           score: parseInt(fields.score?.integerValue || '0'),
           completedAt: fields.completedAt?.stringValue || '',

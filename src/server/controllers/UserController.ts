@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { Logger } from '../Logger';
 import { FirestoreRestService } from '../services/FirestoreRestService';
-import { getDevvitUserId } from '../context/userContext';
 import { UserService } from '../services/UserService';
 import { reddit } from '@devvit/web/server';
 
@@ -12,7 +11,7 @@ export class UserController {
     /**
      * Resolves the current Devvit user identity from the request context.
      */
-    static async resolveContextUser(req: Request, res: Response) {
+    static async resolveContextUser(_req: Request, res: Response) {
         try {
             // 1. Prioritize SDK for full username resolution
             const sdkUser = await reddit.getCurrentUser();
@@ -26,20 +25,11 @@ export class UserController {
                 });
             }
 
-            // 2. Fallback to headers (ID only)
-            const { userId, source } = getDevvitUserId(req);
-            if (userId && /^t2_/.test(userId)) {
-                Logger.info('[ContextUser] resolved ID via headers', { userId });
-                // We have ID but no username, fallback to "Player" for display
-                return res.json({ ok: true, userId, username: 'Player', source });
-            }
-
-            // 3. Absolute Fallback: Return "Guest/Player" instead of error
-            // User requested robust fallback for "no local dev" scenario
+            // Anonymous viewers remain guests and never receive a synthetic identity.
             Logger.info('[ContextUser] resolution failed, defaulting to Guest');
             return res.status(200).json({
                 ok: true,
-                userId: 'guest_player',
+                userId: null,
                 username: 'Player',
                 source: 'fallback'
             });
@@ -47,7 +37,7 @@ export class UserController {
         } catch (e) {
             Logger.error('[ContextUser] error', e);
             // Critical failure fallback
-            return res.status(200).json({ ok: true, userId: 'guest_error', username: 'Player', source: 'error_fallback' });
+            return res.status(200).json({ ok: true, userId: null, username: 'Player', source: 'error_fallback' });
         }
     }
 
@@ -75,8 +65,9 @@ export class UserController {
      * Registers a new user or returns the existing profile if already registered.
      */
     static async signup(req: Request, res: Response) {
-        const { userId, nickname } = req.body || {};
-        if (!userId || typeof userId !== 'string') return res.status(400).json({ ok: false, error: 'userId required' });
+        const { nickname } = req.body || {};
+        const userId = await reddit.getCurrentUsername();
+        if (!userId) return res.status(401).json({ ok: false, error: 'AUTHENTICATION_REQUIRED' });
         if (!nickname || typeof nickname !== 'string') return res.status(400).json({ ok: false, error: 'nickname required' });
 
         const trimmedNick = nickname.trim();

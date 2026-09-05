@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { DailyQuiz } from './useQuizData';
 
-export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: (finalScore: number) => void) => {
+export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: (finalScore: number, answers: (number | null)[]) => void) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [selectedAnswerIndex, setSelectedAnswerIndex] = useState<number | null>(null);
     const [score, setScore] = useState(0);
+    const [answers, setAnswers] = useState<(number | null)[]>([]);
 
     const handleOptionSelect = (index: number) => {
         console.log(`[InlineQuiz] Option selected: ${index}`);
@@ -17,6 +18,10 @@ export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: (finalScor
         // Check answer using index
         const currentQ = quizData.questions[currentIndex];
         if (!currentQ) return;
+
+        const completedAnswers = [...answers];
+        completedAnswers[currentIndex] = selectedAnswerIndex;
+        setAnswers(completedAnswers);
 
         // Ensure we find the normalized options list same as renderQuiz
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,7 +52,7 @@ export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: (finalScor
             setSelectedAnswerIndex(null); // Reset for next question
         } else {
             console.log('[InlineQuiz] End of quiz reached. Final Score:', nextScore);
-            onComplete(nextScore);
+            onComplete(nextScore, completedAnswers);
         }
     };
 
@@ -55,6 +60,7 @@ export const useInlineQuiz = (quizData: DailyQuiz | null, onComplete: (finalScor
         currentIndex,
         selectedAnswerIndex,
         score,
+        answers,
         handleOptionSelect,
         handleNext
     };

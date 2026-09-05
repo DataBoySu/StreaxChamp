@@ -18,7 +18,7 @@ export const usePostId = () => {
                 console.warn('[usePostId] Failed to fetch postId', e);
             }
         };
-        fetchInit();
+        void fetchInit();
     }, []);
 
     return postId;

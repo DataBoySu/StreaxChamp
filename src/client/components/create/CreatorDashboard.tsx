@@ -82,7 +82,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
             }
         }
 
-        load();
+        void load();
 
         return () => { cancelled = true; };
     }, [username]);
@@ -127,13 +127,13 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
                 onSave={async (t, q) => {
                     await onSave(t, q);
                     setInEditor(false);
-                    refreshLibrary();
+                    await refreshLibrary();
                 }}
                 onPost={async (t, q) => {
                     if (onPost) {
                         await onPost(t, q);
                         setInEditor(false);
-                        refreshLibrary();
+                        await refreshLibrary();
                     }
                 }}
                 onBack={() => {
@@ -345,7 +345,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ username, on
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation(); // Prevent card hover interference
-                                                    handleEdit(q.id);
+                                                    void handleEdit(q.id);
                                                 }}
                                                 className="px-6 py-4 text-sm font-black uppercase tracking-wider"
                                                 style={{

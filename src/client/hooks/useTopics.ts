@@ -18,7 +18,7 @@ export function useTopics() {
     }
 
     // Cache miss - fetch from API
-    refresh();
+    void refresh();
   }, []);
 
   function getCachedTopics(): { data: any[]; ts: number } | null {

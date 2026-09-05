@@ -1,6 +1,16 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
   "name": "streax-champ",
+  "settings": {
+    "global": {
+      "gemini-api-key": {
+        "type": "string",
+        "label": "Gemini API Key",
+        "defaultValue": "",
+        "isSecret": true
+      }
+    }
+  },
   "permissions": {
     "http": {
       "enable": true,

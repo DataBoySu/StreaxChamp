@@ -1,108 +1,69 @@
-You are writing a Devvit web application that will be executed on Reddit.com. To learn more about Devvit, use the devvit-mcp if configured or go to https://developers.reddit.com/docs/llms.txt.
+You are writing a Devvit Web application that runs on Reddit.com. Use the Devvit MCP when configured or consult https://developers.reddit.com/docs/llms.txt.
 
-## Tech Stack
+## Tech stack
 
-- **Frontend**: React 19, Tailwind CSS 4, Vite
-- **Backend**: Node.js serverless environment (Devvit), Hono, TRPC
-- **Communication**: tRPC v11 for end-to-end type safety
-- **Testing**: Vitest
+- Frontend: React 19, TypeScript, Tailwind CSS 4, Vite
+- Backend: Express 5 in the Devvit Node.js serverless runtime
+- Communication: REST endpoints called with `fetch`
+- Persistence: Firestore and Devvit Redis
+- Testing: Vitest and `@devvit/test`
 
-## Layout & Architecture
+## Layout and architecture
 
-- `/src/server`: **Backend Code**. This runs in a secure, serverless environment.
-  - `trpc.ts`: Defines the API router and procedures.
-  - `index.ts`: Main server entry point (Hono app).
-  - Access `redis`, `reddit`, and `context` here via `@devvit/web/server`.
-- `/src`: **Frontend Code**. This runs in the user's browser (WebView).
-  - `game.tsx`: The main React entry point (Expanded View).
-  - `splash.tsx`: The initial React entry point (Inline View).
-  - `trpc.ts`: The tRPC client instance.
-  - Access navigation and UI utilities here via `@devvit/web/client`.
+- `src/client`: browser WebView code.
+  - `splash.tsx`: inline feed entry point.
+  - `game.tsx`: expanded-view entry point.
+  - `App.tsx`: main expanded application.
+  - Access navigation and client UI utilities through `@devvit/web/client`.
+- `src/server`: secure serverless code.
+  - `index.ts`: Express server entry point.
+  - `routes/api.ts`: REST and internal route registration.
+  - `controllers`: request handling and authorization.
+  - `services`: Firestore, Redis, Reddit, AI, and leaderboard integrations.
+  - Access `redis`, `reddit`, `context`, and `settings` through `@devvit/web/server`.
+- `src/shared`: types, schemas, and constants shared between client and server.
 
-## Data Fetching (tRPC)
+Do not introduce Hono or tRPC unless the repository is deliberately migrated as a separate project-wide change. The current production path is Express and REST.
 
-This project uses tRPC for communication between the client and server.
+## Platform integration
 
-1. **Define Procedure**: Add a new query or mutation in `src/server/trpc.ts`.
-2. **Call in Client**: Use `trpc.procedureName.query()` or `.mutate()` in your React components.
+Menu items, settings, permissions, scheduled tasks, and WebView entry points are declared in `devvit.json`. Internal menu and scheduler endpoints are mounted under `/internal`.
 
-## Platform Integration (Menu, Forms, & Triggers)
+The application uses two WebViews:
 
-Devvit platform features like Menu Items, Forms, and Triggers are handled via Hono routes and `devvit.json` configuration.
+1. `splash.tsx` is the inline feed experience configured as `default`.
+2. `game.tsx` is the expanded experience configured as `game`.
 
-1. **Define Route**: Add a route in `src/server/routes/` (e.g., `menu.ts`) and mount it in `src/server/index.ts` under `/internal`.
-2. **Configure**: Add the mapping in `devvit.json` pointing to the route (e.g., `/internal/menu/post-create`).
+Use `requestExpandedMode` to move from inline to expanded view.
 
-## WebView Architecture
+## Security boundaries
 
-This template uses a two-stage WebView pattern:
+- Never accept a username, user ID, score, completion state, or ownership claim from the client as authoritative.
+- Resolve identity with the Reddit server API.
+- Calculate scores from canonical server-side quiz data and submitted answer indexes.
+- Validate request bodies at the route or controller boundary.
+- Keep secrets in Devvit settings or local environment files; never expose them to the client bundle.
+- Treat post context and Redis post-to-quiz mappings as server-owned authorization data.
 
-1.  **Inline View (`splash.tsx`)**: The default view shown in the feed. Defined as `default` in `devvit.json`. Use `requestExpandedMode` to transition to the game view.
-2.  **Expanded View (`game.tsx`)**: The immersive view. Defined as `game` in `devvit.json`.
+## Development
 
-## Dev Environment Tips
+- Run `npm run type-check` after changes.
+- Run `npm run lint` for static checks.
+- Run `npm test -- <file-name>` for focused tests.
+- Run `npm run check` before committing or deploying.
 
-- After making changes, run `npm run type-check` to make sure the Typescript types are compiling correctly.
-- Use `npm run test -- my-file-name` to run isolated tests against files
+## Code style
 
-## Code Style
-
-- Prefer type aliases over interfaces when writing typescript
-- Prefer named exports over default exports
-- Never cast typescript types
+- Prefer type aliases over interfaces in new TypeScript code.
+- Prefer named exports over default exports.
+- Do not use TypeScript casts to bypass type checking.
+- Handle every promise by awaiting it, returning it, attaching rejection handling, or explicitly marking intentional fire-and-forget work with `void`.
 
 ## Testing
 
-For all server tests, utilize the initialized `@devvit/test` harness located here: `src/server/test.ts`. It is a Vitest compatible API that runs in-memory mocks for all of the `@devvit/web/server` capabilities. This makes it to where you will rarely need to use or reset mocks (except for the reddit API where you will receive a helpful error when you need to mock). Each test runs completely isolated from another so you should not need `beforeAll`, `afterAll`, or similar lifecycle hooks either.
+Use the initialized `@devvit/test` harness in `src/server/test.ts` for server tests. Each test receives isolated in-memory Devvit capabilities. Mock the Reddit API only when the harness reports that a Reddit call requires it.
 
-For example, given this file:
+## Legacy rules
 
-```ts
-// src/server/core/increment.ts
-import { redis } from '@devvit/web/server';
-
-const key = 'count';
-
-export const countGet = async () => {
-  return Number((await redis.get(key)) ?? 0);
-};
-
-export const countIncrement = async () => {
-  return await redis.incrBy(key, 1);
-};
-
-export const countDecrement = async () => {
-  return await redis.incrBy(key, -1);
-};
-```
-
-The tests can be:
-
-```ts
-// src/server/core/increment.test.ts
-import { expect } from 'vitest';
-import { test } from '../test';
-import { countDecrement, countGet, countIncrement } from './increment';
-
-test('Should increment the count', async () => {
-  const count = await countGet();
-  expect(count).toBe(0);
-  const newCount = await countIncrement();
-  expect(newCount).toBe(1);
-});
-
-test('Should decrement the count', async () => {
-  // Note how this is running against the same key as the previous function
-  // and no mocks or resetting of mocks was needed!
-  const count = await countGet();
-  expect(count).toBe(0);
-  const newCount = await countDecrement();
-  expect(newCount).toBe(-1);
-});
-```
-
-Learn more about the test harness here: https://developers.reddit.com/docs/next/guides/tools/devvit_test
-
-## Legacy Rules
-
-- You may find code that references blocks or `@devvit/public-api` while building a feature. Do NOT use this code as this project is configured to use Devvit web only.
+- Do not use blocks or `@devvit/public-api`; this repository uses Devvit Web.
+- Do not restore the removed in-memory leaderboard. Persistent leaderboard writes belong in the server services.

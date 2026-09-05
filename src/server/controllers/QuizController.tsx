@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
 import { FirestoreRestService } from '../services/FirestoreRestService';
-import { UserService } from '../services/UserService';
 import { Logger } from '../Logger';
 import { generateUnifiedContent, validateGeminiKey } from '../services/GeminiService';
 import { CacheService } from '../services/CacheService';
-import { reddit, redis } from '@devvit/web/server';
+import { context, reddit, redis } from '@devvit/web/server';
 import { CONFIG } from '../../shared/constants';
+import { calculateQuizScore, parseQuizSubmission } from '../core/scoreSubmission';
 
 /**
  * Controller for managing quizzes, including daily bonus questions and full daily/topic quizzes.
@@ -80,17 +80,8 @@ export class QuizController {
             const cache = CacheService.getInstance();
             const todayStr = new Date().toISOString().slice(0, 10);
 
-            // 0. Resolve User
-            let userId: string | null = null;
-            try {
-                const curr = await reddit.getCurrentUsername();
-                if (curr) userId = curr;
-            } catch { /* ignore */ }
-
-            if (!userId) {
-                const ctx = await import('../context/userContext').then(m => m.getDevvitUserId(req));
-                userId = ctx.userId;
-            }
+            // Identity comes from Reddit context only. Anonymous users can still read the quiz.
+            const userId = await reddit.getCurrentUsername().catch(() => null);
 
             // 1. Determine Requested Date
             let reqDate = req.query.date as string;
@@ -237,111 +228,85 @@ export class QuizController {
      */
     static async submitDailyScore(req: Request, res: Response) {
         try {
-            const { quizDate, score, totalQuestions, nickname, timeTakenMs, postId: _postId } = req.body;
-            // 0. Resolve User
-            let effectiveUserId: string | null = null;
-            let effectiveNickname: string = 'Player';
+            const parsed = parseQuizSubmission(req.body);
+            if (!parsed.success) {
+                return res.status(400).json({ error: 'INVALID_SUBMISSION' });
+            }
 
-            // Try SDK first (Production/Devvit)
-            try {
-                const curr = await reddit.getCurrentUsername();
-                if (curr) {
-                    effectiveUserId = curr;
-                    effectiveNickname = curr;
-                }
-            } catch (e) { /* ignore SDK error */ }
-
-            // Fallback to Header/Context (Local Dev) if SDK failed
+            const submission = parsed.data;
+            const effectiveUserId = await reddit.getCurrentUsername();
             if (!effectiveUserId) {
-                const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
-                effectiveUserId = userId;
+                return res.status(401).json({ error: 'AUTHENTICATION_REQUIRED' });
             }
 
-            // FINAL FALLBACK: Trust the nickname in the body (Local Dev / "App knows who it is")
-            if (!effectiveUserId && nickname && nickname !== 'Player') {
-                effectiveUserId = nickname;
-                effectiveNickname = nickname;
-            }
-
-            effectiveNickname = nickname || effectiveUserId || 'Player';
-
-            if (!effectiveUserId) return res.status(401).json({ error: 'User required' });
-
-            // Block persistence for guest "Player" users
-            if (effectiveNickname === 'Player') {
-                Logger.info(`[Quiz] Skipping daily score submit for anonymous 'Player'`);
-                return res.json({ ok: true, isReplay: false });
+            if (submission.postId && submission.postId !== context.postId) {
+                return res.status(403).json({ error: 'POST_CONTEXT_MISMATCH' });
             }
 
             const fs = new FirestoreRestService();
-
-            // 1. Replay Check (Authority)
-            const existing = await fs.getDailyPlayHistory(effectiveUserId, quizDate);
-            const isReplay = !!(existing && existing.completed === true);
-
-            if (!isReplay) {
-                // 2. Write daily leaderboard entry
-                await fs.saveQuizLeaderboardEntry({
-                    date: quizDate,
-                    userKey: effectiveUserId,
-                    nickname: effectiveNickname,
-                    score: score,
-                    completedAt: new Date().toISOString()
-                });
-                Logger.info(`[SubmitDaily] DailyLB WRITE user=${effectiveUserId} score=${score} date=${quizDate}`);
-            } else {
-                Logger.info(`[SubmitDaily] DailyLB SKIPPED replay user=${effectiveUserId} date=${quizDate}`);
+            const quiz = await fs.getDailyQuizByDate(submission.quizId);
+            if (!quiz) {
+                return res.status(404).json({ error: 'QUIZ_NOT_FOUND' });
             }
 
-            // 3. Save History (New Record) - Upsert to ensure latest metadata
-            await fs.saveDailyPlayHistory(effectiveUserId, quizDate, {
+            const { score, totalQuestions } = calculateQuizScore(quiz.questions, submission.answers);
+
+            const existing = await fs.getDailyPlayHistory(effectiveUserId, submission.quizId);
+            const isReplay = !!(existing && existing.completed === true);
+            if (isReplay) {
+                Logger.info(`[SubmitDaily] DailyLB SKIPPED replay user=${effectiveUserId} date=${submission.quizId}`);
+                return res.json({ success: true, replay: true, score: existing?.score ?? score, totalQuestions });
+            }
+
+            const created = await fs.saveQuizLeaderboardEntry({
+                date: submission.quizId,
+                userKey: effectiveUserId,
+                nickname: effectiveUserId,
+                score,
+                completedAt: new Date().toISOString()
+            });
+            if (!created) {
+                Logger.info(`[SubmitDaily] DailyLB SKIPPED replay user=${effectiveUserId} date=${submission.quizId}`);
+                return res.json({ success: true, replay: true, score, totalQuestions });
+            }
+            Logger.info(`[SubmitDaily] DailyLB WRITE user=${effectiveUserId} score=${score} date=${submission.quizId}`);
+
+            const historySaved = await fs.saveDailyPlayHistory(effectiveUserId, submission.quizId, {
                 score,
                 totalQuestions,
                 isPerfect: score === totalQuestions,
-                timeTakenMs: Number(timeTakenMs || 0)
+                timeTakenMs: submission.timeTakenMs
             });
+            if (!historySaved) {
+                throw new Error('DAILY_HISTORY_WRITE_FAILED');
+            }
 
-            // 3b. Sync User Topic Stats (Ensure isCompleted is true)
-            await fs.updateUserTopicStats(effectiveUserId, quizDate, {
+            await fs.updateUserTopicStats(effectiveUserId, submission.quizId, {
                 isCompleted: true,
                 lastAttemptDate: new Date().toISOString(),
-                lastQuizId: quizDate
+                lastQuizId: submission.quizId
             });
 
-            // 4. Quiz-Specific Leaderboard (Firestore Canonical)
-            if (!isReplay && _postId) {
+            if (submission.postId) {
                 try {
                     const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
                     const commentService = new CommentLeaderboardService();
-                    await commentService.ensureComment(reddit, _postId, quizDate);
+                    await commentService.ensureComment(reddit, submission.postId, submission.quizId);
                 } catch (ce) {
                     Logger.error('[SubmitDaily] Reddit Comment Check Fail', ce);
                 }
             }
 
-
-            if (isReplay) {
-                Logger.info(`[DAILY QUIZ] Replay play processed`, { userId: effectiveUserId, date: quizDate });
-                // Return replay: true so client shows badge
-                return res.json({ success: true, replay: true });
-            }
-
-
-            // 5. Update Global XP (Only on first play)
             await fs.incrementUserTotalScore(effectiveUserId, score);
 
-            // 6. Bridge to Topic Leaderboard
             try {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const quizContent: any = await fs.getDailyQuizByDate(quizDate);
-                const topicTitle = quizContent?.metadata?.topic || quizContent?.topic;
+                const topicTitle = quiz.metadata?.topic;
 
                 if (topicTitle && typeof topicTitle === 'string') {
-                    // Simple slugify: lowercase, replace non-alphanum with hyphens, trim
                     const slug = topicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
                     if (slug && slug !== 'mixed-general-knowledge' && slug !== 'general-knowledge') {
-                        Logger.info(`[SubmitDaily] Persist-Bridging score to Topic: ${slug}`, { nickname: effectiveNickname, score });
+                        Logger.info(`[SubmitDaily] Persist-Bridging score to Topic: ${slug}`, { nickname: effectiveUserId, score });
 
                         const topic = await fs.getTopic(slug);
                         if (topic && topic.activeQuizId) {
@@ -351,7 +316,7 @@ export class QuizController {
                                 slug,
                                 quizId: topic.activeQuizId,
                                 userId: effectiveUserId,
-                                nickname: effectiveNickname,
+                                nickname: effectiveUserId,
                                 score,
                                 submittedAt: new Date().toISOString()
                             });
@@ -362,7 +327,7 @@ export class QuizController {
                 Logger.error('[SubmitDaily] Bridge Failed', bridgeErr);
             }
 
-            return res.json({ success: true, replay: false });
+            return res.json({ success: true, replay: false, score, totalQuestions });
         } catch (e) {
             Logger.error('[SubmitDaily] Error', e);
             res.status(500).json({ error: 'Submission failed' });
@@ -400,12 +365,12 @@ export class QuizController {
     /**
      * List all available daily quizzes for the archive.
      */
-    static async listDailyQuizzes(req: Request, res: Response) {
+    static async listDailyQuizzes(_req: Request, res: Response) {
         try {
             const fs = new FirestoreRestService();
             const dates = await fs.listDailyQuizDates();
 
-            const { userId } = await import('../context/userContext').then(m => m.getDevvitUserId(req));
+            const userId = await reddit.getCurrentUsername().catch(() => null);
             let completedDates: string[] = [];
 
             if (userId) {
@@ -430,19 +395,14 @@ export class QuizController {
             const slug: string = rawSlug;
             const fs = new FirestoreRestService();
             const todayStr = new Date().toISOString().split('T')[0] || '';
-            // USE USERNAME as the Primary Key (Devvit nickname)
-            const queryUser = (req.query.username as string || '').trim();
-            const us = new UserService();
-            const realUser = queryUser ? await us.getUser(queryUser) : null;
-
-            const effectiveUserId = queryUser || (realUser ? realUser.userId : null);
-            const effectiveNickname = queryUser || (realUser ? realUser.nickname : 'Player');
+            const effectiveUserId = await reddit.getCurrentUsername();
+            const effectiveNickname = effectiveUserId || 'Player';
 
             Logger.info(`[TopicQuiz] Request received for slug="${slug}"`, { userId: effectiveUserId, nickname: effectiveNickname }, 'API');
 
             // 2. Simplified "Global Latest with Personal Trigger" Logic
             const latest = await fs.getLatestTopicQuiz(slug);
-            let quizToServe = latest;
+            const quizToServe = latest;
             let shouldGenerate = false;
 
             if (!latest) {
@@ -540,24 +500,22 @@ export class QuizController {
      */
     static async createUserQuiz(req: Request, res: Response) {
         try {
-            const { username, topic, quiz } = req.body;
+            const { topic, quiz } = req.body;
+            const username = await reddit.getCurrentUsername();
             Logger.info('[CreateUserQuiz] Request:', { username, topic, hasQuiz: !!quiz });
 
-            if (!username || !topic || !quiz) {
+            if (!username) return res.status(401).json({ error: 'AUTHENTICATION_REQUIRED' });
+
+            if (!topic || !quiz) {
                 Logger.error('[CreateUserQuiz] Missing fields:', { username, topic, hasQuiz: !!quiz });
                 return res.status(400).json({ error: 'Missing required fields' });
-            }
-
-            // Block anonymous "Player" users from creating persistent quizzes
-            if (username === 'Player') {
-                return res.status(403).json({ error: 'Anonymous users cannot create quizzes' });
             }
 
             const fs = new FirestoreRestService();
             const identifier = `${username}_${topic}`;
 
             // Augment quiz with stats shell
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const quizWithStats = {
                 ...(quiz as any),
                 stats: {
@@ -624,7 +582,8 @@ export class QuizController {
      */
     static async postUserQuiz(req: Request, res: Response) {
         try {
-            const { title, quizId, username } = req.body;
+            const { title, quizId } = req.body;
+            const username = await reddit.getCurrentUsername();
             Logger.info(`[PostUserQuiz] Received Request: Title="${title}", QuizID=${quizId}, User=${username}`);
 
             if (!title || !quizId) {
@@ -632,9 +591,12 @@ export class QuizController {
                 return res.status(400).json({ error: 'Title and Quiz ID are required' });
             }
 
-            // Block anonymous "Player" users from posting
-            if (username === 'Player') {
-                return res.status(403).json({ error: 'Anonymous users cannot post quizzes' });
+            if (!username) return res.status(401).json({ error: 'AUTHENTICATION_REQUIRED' });
+
+            const fs = new FirestoreRestService();
+            const quiz = await fs.getUserQuiz(quizId);
+            if (!quiz || quiz.metadata?.creator !== username) {
+                return res.status(403).json({ error: 'QUIZ_OWNERSHIP_REQUIRED' });
             }
 
             const subreddit = await reddit.getCurrentSubreddit();
@@ -657,7 +619,7 @@ export class QuizController {
                 const mappingPayload = {
                     postId: post.id,
                     quizId: quizId,
-                    creatorId: username, // 'username' from request body is the creator
+                    creatorId: username,
                     topic: title, // Using title as topic name
                     createdAt: new Date().toISOString()
                 };

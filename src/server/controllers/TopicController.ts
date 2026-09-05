@@ -93,7 +93,7 @@ export class TopicController {
      */
     static async generateTopic(req: Request, res: Response) {
         try {
-            const { topic, userKey } = req.body || {};
+            const { topic } = req.body || {};
             if (!topic || typeof topic !== 'string') {
                 return res.status(400).json({ error: 'Topic is required' });
             }
@@ -101,17 +101,9 @@ export class TopicController {
             // 0. CHECK RATE LIMITS
             const { RateLimitService } = await import('../services/RateLimitService');
 
-            // Resolve username: try context first, then userKey, then 'anon'
-            let username = 'anon';
-            try {
-                // Try to get from Devvit context (secure)
-                const curr = await reddit.getCurrentUsername();
-                if (curr) username = curr;
-            } catch { /* ignore */ }
-
-            // Fallback to client-provided key if server-side resolution fails (less secure but needed if context missing)
-            if (username === 'anon' && userKey) {
-                username = String(userKey);
+            const username = await reddit.getCurrentUsername();
+            if (!username) {
+                return res.status(401).json({ error: 'AUTHENTICATION_REQUIRED' });
             }
 
             // Bypass for Developer
@@ -248,7 +240,7 @@ export class TopicController {
                 sources,
                 model,
                 genLatencyMs: latencyMs,
-                requestedBy: userKey,
+                requestedBy: username,
                 hasQuiz: false, // Will be set to true after quiz save succeeds
                 status: 'ready',
                 lastQuizDate: today,

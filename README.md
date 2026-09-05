@@ -1,74 +1,117 @@
-# ✨ StreaxChamp ✨
-|  |
-| :---: |
-| ![StreaxChamp Poster](https://raw.githubusercontent.com/DataBoySu/StreaxChamp/main/src/client/public/assets/poster.png) |
+# StreaxChamp
 
-**(˶ᵔ ᵕ ᵔ˶) Helping your subreddit reach its final form! (˶ᵔ ᵕ ᵔ˶)**
+StreaxChamp is a Reddit-native trivia game built with Devvit Web. Players can take a daily quiz, explore community topics, create quizzes, and compete on persistent leaderboards from Reddit's inline and expanded post views.
 
-StreaxChamp is a magical, AI-powered trivia game designed specifically for Reddit communities. It brings your subreddit to life with infinite knowledge, friendly competition, and a slightly grumpy (but lovable) robot buddy! 🤖✨
+![StreaxChamp poster](src/client/public/assets/poster.png)
 
-**Start Playing Now!**
-*   **For Players:** You can play any existing quiz instantly! (Testers limited to 1 Generation/Day).
-*   **For Developers:** Help us polish the code or add features.
-*   **❤️ PLEASE UPVOTE & SHARE if you enjoy the app! It helps us a ton! (˶ᵔ ᵕ ᵔ˶)**
+## Features
 
----
+- Daily five-question trivia with streaks, timers, XP, and rankings
+- AI-generated topic quizzes powered by Google Gemini
+- Player-created quizzes with a moderator post flow
+- Inline feed play and a full expanded game view
+- Persistent daily, topic, and creator leaderboards
+- Reddit comments for score sharing
+- Light and dark themes, music, animation, and responsive layouts
 
-### 💖 Why your community will love it...
+Scores and player identity are verified by the server. The client submits answer indexes, the server loads the canonical quiz, calculates the score, and uses the authenticated Reddit username for persistence. Daily leaderboard writes use one entry per user and quiz to reject replay submissions.
 
-*   **Infinite Variety** 🧠: Powered by Google Gemini AI, it can generate high-quality quizzes on *anything*. Whether your sub is about space, retro games, or medieval history—we've got it covered!
-*   **The Topic Marketplace** 🛒: Mods and players can discover "Hot Topics" or request a brand new quiz category in seconds. The AI does all the research so you don't have to!
-*   **Friendly Rivalries** 🏆: Interactive leaderboards keep the energy high. See who has the longest streak and who truly knows their stuff.
-*   **A Splash of Personality** 🤖: Meet StreaxBot! Our interactive mascot greets players with witty banter and reacts to every play with charming animations.
+## Architecture
 
----
+- **Client:** React 19, TypeScript, Tailwind CSS 4, Vite
+- **Server:** Express 5 in the Devvit serverless runtime
+- **API:** REST endpoints consumed with `fetch`
+- **Platform:** `@devvit/web` for Reddit context, Redis, comments, subscriptions, menus, and scheduled jobs
+- **Persistence:** Firestore for quizzes, profiles, history, and leaderboards; Redis for post mappings and platform state
+- **AI:** Google Gemini
+- **Validation and tests:** Zod, Vitest, and `@devvit/test`
 
-### 🎀 Perfectly Mod-Friendly
+The two-stage WebView is configured in `devvit.json`:
 
-*   **Zero Maintenance** 🛠️: No need to spend hours writing questions. The AI handles the generation, verification, and formatting automatically.
-*   **Built for Engagement** 📈: Deeply integrated with Reddit's Devvit platform for a seamless experience that feels native to your subreddit.
-*   **Premium Aesthetic** 💅: Dark-mode-first design, smooth animations, and a polished interface that makes your sub look *incredible*.
+- `src/client/splash.tsx` renders the inline feed experience.
+- `src/client/game.tsx` renders the expanded application.
+- `src/server/index.ts` starts the Express server.
+- `src/server/routes/api.ts` mounts public and internal routes.
 
----
+## Local development
 
-### ✨ Bringing the Magic to Your Sub
+Requirements:
 
-Ready to start the trivia revolution? (˶˃ ᵕ ˂˶)
+- Node.js 22 or newer
+- npm
+- A Reddit developer account with Devvit access
+- A Firebase project
+- A Google Gemini API key for quiz generation
 
-1.  **Install**: Use the standard Devvit installation flow for your subreddit.
-2.  **Choose a Topic**: Select from the curated list or generate a custom one that fits your sub's niche perfectly!
-3.  **Play & Compete**: Let your members battle for the top spot on the leaderboard while the background music sets the vibe.
+Install dependencies and sign in:
 
----
+```bash
+npm install
+npm run login
+```
 
+Create a `.env` file for local builds:
 
-## 📚 Project Overview
+```dotenv
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_API_KEY=your-web-api-key
+FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+FIREBASE_APP_ID=your-app-id
+GEMINI_API_KEY=your-local-gemini-key
+```
 
-- **Platform**: Reddit Devvit
-- **Modes**: Optimized for both Inline (Feed) and Expanded modes.
-- **AI**: Leverages Google Gemini for dynamic, infinite quiz generation.
-- **Community**: Creator-driven content allows any user to curate knowledge for their subreddit.
+Set the production Gemini secret through Devvit:
 
----
+```bash
+npx devvit settings set gemini-api-key
+```
 
-## 📖 Documentation Index
+Run the Reddit playtest environment:
 
-If you are working on this project, please read these documents in order:
+```bash
+npm run dev
+```
 
-1.  **[Overview](docs/00-overview.md)**: Orientation and project scope.
-2.  **[Devvit Inline Learnings](docs/01-devvit-inline-learnings.md)**: **REQUIRED.** Hard-won layout knowledge to prevent breaking the UI.
-3.  **[Inline State Machine](docs/02-inline-state-machine.md)**: The technical "constitution" for interaction and data flow.
-4.  **[Flow UI Primitives](docs/03-flow-ui-primitives.md)**: Guide to shared structure and consistent components.
-5.  **[Visual System & Tokens](docs/04-visual-system.md)**: Single source of truth for colors, depth, and typography.
-6.  **[Creator Flow](docs/05-creator-flow.md)**: Narrative and technical design of the quiz creation loop.
+The playtest subreddit is configured as `r/streax_champ_dev` in `devvit.json`.
 
----
+## Quality checks
 
-### 💌 Join the Party!
-**We are actively looking for play-testers and fellow developers!**
+```bash
+npm run check
+```
 
-👉 **Development Subreddit:** [/r/streax_champ_dev](https://www.reddit.com/r/streax_champ_dev)
+The release gate runs TypeScript compilation, ESLint, Vitest, and production client/server builds. Individual commands are also available:
 
-👉 **GitHub Repository:** [DataBoySu/StreaxChamp](https://github.com/DataBoySu/StreaxChamp)
+```bash
+npm run type-check
+npm run lint
+npm test
+npm run build
+```
 
-*(ฅ•ω•ฅ) Made with love for the Reddit Developer Community (˶˃ ᵕ ˂˶)*
+Run a focused test with `npm test -- <file-name>`.
+
+## Deployment
+
+```bash
+npm run deploy
+npm run launch
+```
+
+`deploy` builds and uploads the app. `launch` builds, uploads, and publishes it. Confirm the target subreddit, Devvit account, Firestore rules, and configured Gemini secret before publishing.
+
+## Project documentation
+
+- [Project overview](docs/00-overview.md)
+- [Devvit inline layout notes](docs/01-devvit-inline-learnings.md)
+- [Inline state machine](docs/02-inline-state-machine.md)
+- [UI primitives](docs/03-flow-ui-primitives.md)
+- [Visual system](docs/04-visual-system.md)
+- [Creator flow](docs/05-creator-flow.md)
+- [Architecture](ARCHITECTURE.md)
+
+## License
+
+BSD-3-Clause

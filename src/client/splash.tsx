@@ -30,7 +30,7 @@ const Splash = () => {
         score,
         handleOptionSelect,
         handleNext
-    } = useInlineQuiz(quizData, async (finalScore) => {
+    } = useInlineQuiz(quizData, async (finalScore, answers) => {
         // Block anonymous "Player" users from submitting scores
         if (customQuizMeta && username && username !== 'Player') {
             console.log(`[Splash] Custom Quiz Complete. Score: ${finalScore}. Submitting to Leaderboard...`);
@@ -39,10 +39,8 @@ const Splash = () => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        userKey: username,
-                        nickname: username,
-                        score: finalScore,
-                        slug: customQuizMeta.quizId,
+                        quizId: customQuizMeta.quizId,
+                        answers,
                         postId: customQuizMeta.postId // NEW: Pass PostID for comment service
                     })
                 });
@@ -125,7 +123,7 @@ const Splash = () => {
                 console.error('[Splash] Context check failed', e);
             }
         };
-        checkContext();
+        void checkContext();
     }, []);
 
     const handleStartQuiz = () => {

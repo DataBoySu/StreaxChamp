@@ -1,196 +1,151 @@
-import { Request, Response } from 'express';
-import { reddit } from '@devvit/web/server';
-import { LeaderboardService } from '../services/LeaderboardService';
-
+import { context, reddit, redis } from '@devvit/web/server';
+import type { Request, Response } from 'express';
+import { calculateQuizScore, parseQuizSubmission } from '../core/scoreSubmission';
 import { Logger } from '../Logger';
-import { FirestoreRestService } from '../services/FirestoreRestService';
 import { CacheService } from '../services/CacheService';
+import { FirestoreRestService } from '../services/FirestoreRestService';
+import { LeaderboardService } from '../services/LeaderboardService';
 import { TopicLeaderboardService } from '../services/TopicLeaderboardService';
 
-/**
- * Controller for managing global and topic-specific leaderboards.
- */
 export class LeaderboardController {
-    /**
-     * Retrieves the top 50 users for the global totals leaderboard.
-     */
-    static async listGlobal(_req: Request, res: Response) {
-        try {
-            const cache = CacheService.getInstance();
-            const cached = await cache.get('lb_global');
-            if (cached) return res.json(cached);
-
-            // Switch to using FirestoreRestService.getTopUsers (Total Scores)
-            const fs = new FirestoreRestService();
-            const list = await fs.getTopUsers(50);
-
-            await cache.set('lb_global', list, 300); // Cache for 5 mins
-            res.json(list);
-        } catch (e) {
-            Logger.error('[Leaderboard] List global error', e);
-            res.status(500).json({ error: 'Failed' });
-        }
+  static async listGlobal(_req: Request, res: Response) {
+    try {
+      const cache = CacheService.getInstance();
+      const cached = await cache.get('lb_global');
+      if (cached) return res.json(cached);
+      const fs = new FirestoreRestService();
+      const list = await fs.getTopUsers(50);
+      await cache.set('lb_global', list, 300);
+      return res.json(list);
+    } catch (error) {
+      Logger.error('[Leaderboard] List global error', error);
+      return res.status(500).json({ error: 'Failed' });
     }
+  }
 
-    /**
-     * Submits a fresh score to the topic, rolling, and global leaderboards.
-     */
-    static async submitScore(req: Request, res: Response) {
-        try {
-            const { userKey, nickname, score, slug: bodySlug } = req.body || {};
-            const slug = req.params.slug || bodySlug; // Prioritize URL param
+  static async submitScore(req: Request, res: Response) {
+    try {
+      const parsed = parseQuizSubmission(req.body);
+      if (!parsed.success) return res.status(400).json({ error: 'INVALID_SUBMISSION' });
 
-            if (!userKey || !nickname || typeof score !== 'number') {
-                return res.status(400).json({ error: 'Invalid submission payload' });
-            }
+      const username = await reddit.getCurrentUsername();
+      if (!username) return res.status(401).json({ error: 'AUTHENTICATION_REQUIRED' });
 
-            // Block anonymous "Player" users from submitting scores
-            if (userKey === 'Player' || nickname === 'Player') {
-                return res.status(403).json({ error: 'Anonymous users cannot submit scores' });
-            }
+      const submission = parsed.data;
+      const slugParam = req.params.slug;
+      const slug = typeof slugParam === 'string' ? slugParam : undefined;
+      const fs = new FirestoreRestService();
 
-            // Persist across all relevant leaderboard partitions (IN-MEMORY - Phase 3)
-            // const topicRes = await svc.submit(slug || 'global', entry);
-
-            // Submit to Persistent Firestore Service
-            try {
-                const svc = new LeaderboardService();
-                const postId = req.body.postId;
-
-                if (postId) {
-                    // Custom Posts: Use Rolling Leaderboard + Stats
-                    await svc.submitRolling(postId, {
-                        userKey,
-                        nickname,
-                        score,
-                        timeTakenMs: req.body.timeTakenMs || 0
-                    });
-
-                    const { CommentLeaderboardService } = await import('../services/CommentLeaderboardService');
-                    await CommentLeaderboardService.getInstance().ensureComment(reddit, postId, slug || 'custom');
-
-                    // Trigger stats update
-                    void svc.updateQuizStats_FORCE(postId, score, 5).catch(e => Logger.error('[Leaderboard] Stats trigger fail', e));
-                } else if (slug && slug !== 'global') {
-                    // TOPIC BRANCH: Use TopicLeaderboardService (Persistent + Atomic)
-                    const fs = new FirestoreRestService();
-                    const topic = await fs.getTopic(slug);
-                    if (!topic || !topic.activeQuizId) {
-                        return res.status(404).json({ error: 'TOPIC_NOT_FOUND_OR_NO_QUIZ' });
-                    }
-
-                    const topicSvc = new TopicLeaderboardService();
-                    const result = await topicSvc.submitScore({
-                        slug,
-                        quizId: topic.activeQuizId,
-                        userId: userKey,
-                        nickname,
-                        score,
-                        submittedAt: new Date().toISOString()
-                    });
-
-                    if (!result.accepted) {
-                        if (result.reason === 'stale_version') {
-                            return res.status(409).json({ error: 'STALE_QUIZ_VERSION', reason: 'A new quiz has been generated for this topic.' });
-                        }
-                        if (result.reason === 'already_played') {
-                            return res.status(403).json({ error: 'ALREADY_PLAYED', reason: 'You have already submitted a score for this version.' });
-                        }
-                        return res.status(500).json({ error: 'SUBMISSION_FAILED', reason: result.reason });
-                    }
-                } else {
-                    // Global / Default fallback: Use persistent LeaderboardService
-                    await svc.submit(slug || 'global', {
-                        userKey,
-                        nickname,
-                        score,
-                        timeTakenMs: req.body.timeTakenMs || 0
-                    });
-                }
-            } catch (err) {
-                Logger.error('[SubmitScore] Submission Fail', err);
-            }
-
-            if (slug && !req.body.postId) {
-                // [DEFERRED] completion and stats now handled by direct persistent service calls
-                /*
-                const fs = new FirestoreRestService();
-                await fs.updateUserTopicStats(userKey, slug, { isCompleted: true });
-                void svc.updateQuizStats_FORCE(slug, score, 5).catch(e => Logger.error('[Leaderboard] Stats trigger fail', e));
-                */
-            }
-
-
-            // Removed addToGlobalTotals – we now query 'users' directly for total scores
-            res.json({ ok: true });
-        } catch (e) {
-            Logger.error('[Leaderboard] Submit Error', e);
-            res.status(500).json({ error: 'Failed to submit score' });
+      if (submission.postId) {
+        if (submission.postId !== context.postId) {
+          return res.status(403).json({ error: 'POST_CONTEXT_MISMATCH' });
         }
-    }
 
-    /**
-     * Lists entries for a specific topic's daily leaderboard.
-     */
-    static async listTopicLeaderboard(req: Request, res: Response) {
-        try {
-            const slug = String(req.params.slug || '');
-            const date = req.params.date ? String(req.params.date) : 'today'; // Use today as default key suffix
-
-            if (!slug) return res.status(400).json({ error: 'Slug required' });
-
-            const cacheKey = `lb_${slug}_${date}`;
-            const cache = CacheService.getInstance();
-            const cached = await cache.get(cacheKey);
-            if (cached) return res.json(cached);
-
-            // const svc = new LeaderboardService();
-            // const dateParam = typeof req.params.date === 'string' ? req.params.date : undefined;
-            // const list = await svc.list(slug, dateParam); // OLD
-
-            // NEW: Read from TopicLeaderboardService
-            const fs = new FirestoreRestService();
-            const topic = await fs.getTopic(slug);
-
-            if (!topic || !topic.activeQuizId) {
-                return res.json([]);
+        const allowed = await redis.get(`custom_post_allowlist:${submission.postId}`);
+        const rawMapping = await redis.get(`post_quiz:${submission.postId}`);
+        let mappedQuizId: string | null = null;
+        if (rawMapping) {
+          try {
+            const mapping: unknown = JSON.parse(rawMapping);
+            if (typeof mapping === 'object' && mapping !== null && 'quizId' in mapping && typeof mapping.quizId === 'string') {
+              mappedQuizId = mapping.quizId;
             }
-
-            const topicSvc = new TopicLeaderboardService();
-            const raw = await topicSvc.getLeaderboard(slug, topic.activeQuizId, 10);
-
-            const list = raw.map((e: any) => ({
-                nickname: e.nickname,
-                score: e.score,
-                submittedAt: e.submittedAt,
-                userKey: e.userId,
-                timeTakenMs: 0
-            }));
-
-            await cache.set(cacheKey, list, 10); // Cache for 10s
-            res.json(list);
-        } catch (e) {
-            Logger.error('[Leaderboard] List topic error', e);
-            res.status(500).json({ error: 'Failed' });
+          } catch {
+            mappedQuizId = rawMapping;
+          }
         }
-    }
-
-    /**
-     * Retrieves aggregated stats for a specific quiz (Custom).
-     */
-    static async getQuizStats(req: Request, res: Response) {
-        try {
-            const quizId = String(req.params.quizId || '');
-            if (!quizId) return res.status(400).json({ error: 'Quiz ID required' });
-
-            const svc = new LeaderboardService();
-            const stats = await svc.getQuizStats(quizId);
-
-            // If missing, return null or empty (client handles)
-            res.json(stats || {});
-        } catch (e) {
-            Logger.error('[Leaderboard] Get Stats Error', e);
-            res.status(500).json({ error: 'Failed' });
+        if (allowed !== 'true' || mappedQuizId !== submission.quizId) {
+          return res.status(403).json({ error: 'CUSTOM_QUIZ_CONTEXT_INVALID' });
         }
+
+        const quiz = await fs.getUserQuiz(submission.quizId);
+        if (!quiz) return res.status(404).json({ error: 'QUIZ_NOT_FOUND' });
+
+        const { score, totalQuestions } = calculateQuizScore(quiz.questions, submission.answers);
+        const service = new LeaderboardService();
+        await service.submitRolling(submission.postId, {
+          userKey: username,
+          nickname: username,
+          score,
+          timeTakenMs: submission.timeTakenMs,
+        });
+        await service.updateQuizStats_FORCE(submission.postId, score, totalQuestions);
+        return res.json({ ok: true, score, totalQuestions });
+      }
+
+      if (!slug || slug === 'global') return res.status(400).json({ error: 'TOPIC_REQUIRED' });
+      const topic = await fs.getTopic(slug);
+      if (!topic || topic.activeQuizId !== submission.quizId) {
+        return res.status(409).json({ error: 'STALE_QUIZ_VERSION' });
+      }
+
+      const quiz = await fs.getTopicQuiz(slug, submission.quizId);
+      if (!quiz) return res.status(404).json({ error: 'QUIZ_NOT_FOUND' });
+
+      const { score, totalQuestions } = calculateQuizScore(quiz.questions, submission.answers);
+      const topicService = new TopicLeaderboardService();
+      const result = await topicService.submitScore({
+        slug,
+        quizId: submission.quizId,
+        userId: username,
+        nickname: username,
+        score,
+        submittedAt: new Date().toISOString(),
+      });
+      if (!result.accepted) {
+        if (result.reason === 'already_played') return res.status(403).json({ error: 'ALREADY_PLAYED' });
+        return res.status(409).json({ error: 'SUBMISSION_REJECTED', reason: result.reason });
+      }
+
+      return res.json({ ok: true, score, totalQuestions });
+    } catch (error) {
+      Logger.error('[Leaderboard] Submit Error', error);
+      return res.status(500).json({ error: 'Failed to submit score' });
     }
+  }
+
+  static async listTopicLeaderboard(req: Request, res: Response) {
+    try {
+      const slug = String(req.params.slug || '');
+      const date = req.params.date ? String(req.params.date) : 'today';
+      if (!slug) return res.status(400).json({ error: 'Slug required' });
+
+      const cacheKey = `lb_${slug}_${date}`;
+      const cache = CacheService.getInstance();
+      const cached = await cache.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const fs = new FirestoreRestService();
+      const topic = await fs.getTopic(slug);
+      if (!topic || !topic.activeQuizId) return res.json([]);
+
+      const topicService = new TopicLeaderboardService();
+      const raw = await topicService.getLeaderboard(slug, topic.activeQuizId, 10);
+      const list = raw.map((entry: { nickname: string; score: number; submittedAt: string; userId: string }) => ({
+        nickname: entry.nickname,
+        score: entry.score,
+        submittedAt: entry.submittedAt,
+        userKey: entry.userId,
+        timeTakenMs: 0,
+      }));
+      await cache.set(cacheKey, list, 10);
+      return res.json(list);
+    } catch (error) {
+      Logger.error('[Leaderboard] List topic error', error);
+      return res.status(500).json({ error: 'Failed' });
+    }
+  }
+
+  static async getQuizStats(req: Request, res: Response) {
+    try {
+      const quizId = String(req.params.quizId || '');
+      if (!quizId) return res.status(400).json({ error: 'Quiz ID required' });
+      const service = new LeaderboardService();
+      const stats = await service.getQuizStats(quizId);
+      return res.json(stats || {});
+    } catch (error) {
+      Logger.error('[Leaderboard] Get Stats Error', error);
+      return res.status(500).json({ error: 'Failed' });
+    }
+  }
 }

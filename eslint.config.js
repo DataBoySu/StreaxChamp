@@ -1,15 +1,25 @@
-import { defineConfig } from 'eslint/config';
-import globals from 'globals';
 import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import globals from 'globals';
+import { defineConfig } from 'eslint/config';
+import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  tseslint.configs.recommended,
   {
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/coverage/**',
+      'src/dataconnect-generated/**',
+      'eslint.config.js',
+      '**/vite.config.ts',
+    ],
+  },
+  {
+    files: ['src/server/**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['src/server/**/*.{ts,tsx,mjs,cjs,js}'],
     languageOptions: {
       ecmaVersion: 2023,
       globals: globals.node,
@@ -20,12 +30,11 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/client/**/*.{ts,tsx}', 'src/shared/**/*.{ts,tsx}', 'src/main.tsx'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/server/**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2023,
-      globals: globals.browser,
+      globals: { ...globals.browser, process: 'readonly' },
       parserOptions: {
         project: ['./tools/tsconfig.client.json'],
         tsconfigRootDir: import.meta.dirname,
@@ -37,33 +46,16 @@ export default defineConfig([
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
   {
-    files: ['**/*.{js,mjs,cjs,ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}'],
     rules: {
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-unused-vars': ['off'],
-      'no-unused-vars': ['off'],
+      '@typescript-eslint/no-unused-vars': 'off',
+      'no-unused-vars': 'off',
     },
-    ignores: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/build/**',
-      'eslint.config.js',
-      '**/vite.config.ts',
-      'devvit.config.ts',
-    ],
-    languageOptions: {
-      parserOptions: {
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-    plugins: { js },
-    extends: ['js/recommended'],
   },
 ]);

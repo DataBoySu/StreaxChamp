@@ -45,6 +45,7 @@ export const App = () => {
   const [quizStarted, setQuizStarted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
+  const [answerIndexes, setAnswerIndexes] = useState<(number | null)[]>(() => Array(NUM_QUESTIONS).fill(null));
   const [consecutiveCorrectAnswers, setConsecutiveCorrectAnswers] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
@@ -135,13 +136,11 @@ export const App = () => {
         metadata: {
           title: topicTitle,
           description: `Created by ${authUser.nickname}`,
-          creator: authUser.nickname,
           createdAt: new Date().toISOString()
         }
       };
 
       console.log('[handleSaveQuiz] Saving payload:', {
-        username: authUser.nickname,
         topic: slug,
         quiz: quizData
       });
@@ -150,7 +149,6 @@ export const App = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: authUser.nickname,
           topic: slug,
           topicTitle: topicTitle,
           quiz: quizData
@@ -228,7 +226,7 @@ export const App = () => {
   const pollingEnabled = isUserActive;
 
   // Leaderboards
-  const { entries: topicLeaderboard, loading: topicLbLoading, submitScore: submitLeaderboardScore, refresh: refreshTopicLeaderboard } = useLeaderboard({
+  const { entries: topicLeaderboard, loading: topicLbLoading, refresh: refreshTopicLeaderboard } = useLeaderboard({
     slug: selectedTopic ? selectedTopic.slug : null,
     enabled: !!selectedTopic
   });
@@ -241,7 +239,7 @@ export const App = () => {
   const { username: hookUsername } = useUsername();
 
   // Use new global play history hook
-  const { history: globalHistory, loading: globalHistoryLoading, savePlay, hasPlayed } = useHistory(!quizStarted && !isCreating, pollingEnabled && !isCreating);
+  const { history: globalHistory, loading: globalHistoryLoading } = useHistory(!quizStarted && !isCreating, pollingEnabled && !isCreating);
 
   // Robot error message queue (for user-friendly error feedback)
   const { currentError, addError, queueLength, clearErrors } = useRobotError();
@@ -451,6 +449,13 @@ export const App = () => {
       if (timer !== null) clearInterval(timer as unknown as number);
       setSelectedAnswer(selected);
       setCorrectAnswer(correct);
+      const currentAnswers = questions[currentQuestionIndex]?.answers ?? [];
+      const selectedIndex = selected === null ? null : currentAnswers.indexOf(selected);
+      setAnswerIndexes((previous) => {
+        const next = [...previous];
+        next[currentQuestionIndex] = selectedIndex !== null && selectedIndex >= 0 ? selectedIndex : null;
+        return next;
+      });
       const isCorrect = selected === correct;
 
       let newScore = score;
@@ -678,6 +683,7 @@ export const App = () => {
     setQuizStarted(true);
     setCurrentQuestionIndex(0);
     setScore(0);
+    setAnswerIndexes(Array(NUM_QUESTIONS).fill(null));
     setConsecutiveCorrectAnswers(0);
     setShowBonusQuestion(false);
     setShowScore(false);
@@ -741,7 +747,7 @@ export const App = () => {
       }
     } catch {/* ignore */ }
     const quizId = (selectedTopic ? selectedTopicQuiz?.id : dailyQuiz?.id);
-    const submissionPayload = { userKey: key, nickname, score, timeTakenMs: totalMs, ...(quizId ? { quizId } : {}) };
+    const submissionPayload = { quizId, answers: answerIndexes, timeTakenMs: totalMs };
 
     // Unified Play Handler: Log history AND submit score
     const finalizePlay = async () => {
@@ -762,32 +768,18 @@ export const App = () => {
         return;
       }
 
-      // Step 1: Save to History (ALWAYS, even on replays, unless Dev Mode)
-      await savePlay(
-        key, // username
-        nickname, // nickname
-        slug, // topicSlug
-        selectedTopic?.title || 'Daily Quiz', // topicTitle
-        score
-      );
-
-      // Step 1.5: Submit Daily Score (New Architecture)
+      // Step 1: Submit answers. The server calculates the persisted score.
       if (!selectedTopic) {
         try {
-          console.log('[App] 📤 Submitting Daily Score...', { nickname, headers: { 'x-devvit-user-id': nickname } });
-          const res = await fetch(`/api/quiz/daily/submit?userId=${encodeURIComponent(nickname)}`, {
+          console.log('[App] 📤 Submitting Daily Quiz answers...');
+          const res = await fetch('/api/quiz/daily/submit', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-devvit-user-id': nickname // Pass nickname as ID for local dev environment
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              quizDate: dailyQuiz?.id || new Date().toISOString().slice(0, 10),
-              score,
-              totalQuestions: NUM_QUESTIONS,
-              nickname, // Pass nickname for leaderboard
-              timeTakenMs: totalMs, // Pass timeTakenMs for tie breaking
-              postId // [NEW] Pass postId to link comment leaderboard
+              quizId: dailyQuiz?.id,
+              answers: answerIndexes,
+              timeTakenMs: totalMs,
+              ...(postId ? { postId } : {})
             })
           });
           const data = await res.json();
@@ -803,23 +795,18 @@ export const App = () => {
         }
       }
 
-      // Step 2: Submit to TOPIC Leaderboard
-      // ALWAYS submit to allow score improvements. Server handles "only update if better".
+      // Step 2: Submit topic answers to the persistent leaderboard.
       if (selectedTopic) {
-        // [MODIFIED] Generated Quizzes now use In-Memory Leaderboard (No Firestore)
         try {
-          await fetch(`/api/leaderboard/memory/${encodeURIComponent(slug)}/submit`, {
+          await fetch(`/api/leaderboard/${encodeURIComponent(slug)}/submit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(submissionPayload)
           });
-          console.log('[App] 🧠 Submitted to Memory Leaderboard');
+          console.log('[App] Submitted to persistent topic leaderboard');
         } catch (e) {
-          console.error('[App] Failed to submit to memory leaderboard', e);
+          console.error('[App] Failed to submit to topic leaderboard', e);
         }
-
-        // Removed Firestore submission for generated topics as per request
-        // await submitLeaderboardScore(slug, submissionPayload); 
       }
 
       // Step 3: Refresh local state
@@ -842,7 +829,7 @@ export const App = () => {
 
 
     void finalizePlay();
-  }, [showScore, selectedTopic?.slug, authUser?.nickname, authUser?.redditUsername, hookUsername, score, totalTime, submitLeaderboardScore, topicLeaderboard, refreshTopicLeaderboard, dailyQuiz?.id, refreshDailyLeaderboard, hasPlayed, hasDailyCompleted, savePlay, selectedTopic?.title, selectedTopicQuiz?.id]);
+  }, [showScore, selectedTopic?.slug, authUser?.nickname, authUser?.redditUsername, hookUsername, score, totalTime, topicLeaderboard, refreshTopicLeaderboard, dailyQuiz?.id, refreshDailyLeaderboard, answerIndexes, postId, refreshLandingSummary, loadUserData, refetchDaily, selectedTopicQuiz?.id]);
 
   useEffect(() => { if (!showScore) submittedRef.current = false; }, [showScore]);
 
@@ -1168,7 +1155,7 @@ export const App = () => {
                     })()}
                     onShareSuccess={() => {
                       console.log('[App] 🔄 Refreshing Daily Leaderboard after Share...');
-                      refreshDailyLeaderboard?.();
+                      void refreshDailyLeaderboard?.();
                     }}
                     onGoHome={() => {
 

@@ -58,7 +58,7 @@ export const useSystemStatus = (pollingIntervalMs = 60000) => {
 
     useEffect(() => {
         // Initial check
-        checkSystem();
+        void checkSystem();
 
         // Poll
         const timer = setInterval(checkSystem, pollingIntervalMs);

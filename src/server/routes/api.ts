@@ -4,7 +4,6 @@ import { QuizController } from '../controllers/QuizController';
 import { RobotController } from '../controllers/RobotController';
 import { UserController } from '../controllers/UserController';
 import { LeaderboardController } from '../controllers/LeaderboardController';
-import { InMemoryLeaderboardController } from '../controllers/InMemoryLeaderboardController'; // NEW
 import { LandingController } from '../controllers/LandingController';
 
 
@@ -15,6 +14,8 @@ import { MaintenanceController } from '../controllers/MaintenanceController';
 import { context } from '@devvit/web/server';
 import { reddit, redis } from '@devvit/web/server';
 import { CONFIG } from '../../shared/constants';
+import { parseShareRequest } from '../core/scoreSubmission';
+import { Logger } from '../Logger';
 
 const router = Router();
 
@@ -45,16 +46,10 @@ router.get('/leaderboard/global', LeaderboardController.listGlobal);
 router.get('/leaderboard/:slug', LeaderboardController.listTopicLeaderboard); // Added alias to match frontend
 router.get('/stats/:quizId', LeaderboardController.getQuizStats); // NEW: Stats for custom splash
 router.post('/leaderboard/:slug/submit', LeaderboardController.submitScore);
-router.post('/leaderboard/submit', LeaderboardController.submitScore); // Fallback for any legacy calls
 router.get('/topics/:slug/leaderboard', LeaderboardController.listTopicLeaderboard);
-
-// --- Memory Leaderboard (Server-Only, No Firestore) ---
-router.post('/leaderboard/memory/:slug/submit', InMemoryLeaderboardController.submitScore);
-router.get('/leaderboard/memory/:slug', InMemoryLeaderboardController.getLeaderboard);
 
 // --- History ---
 router.get('/history/global', HistoryController.getGlobalHistory);
-router.post('/history/save', HistoryController.savePlay);
 
 // --- Robot ---
 router.get('/robot/dialogues/today', RobotController.getDialogues);
@@ -154,77 +149,39 @@ router.get('/init', async (_req, res) => {
 });
 
 router.post('/share/comment', async (req, res) => {
-    let targetPostId = req.body.postId;
-    const { text } = req.body;
-
-    // [FALLBACK] If client didn't send postId, try to get it from context
-    if (!targetPostId) {
-        const ctx: any = context;
-        targetPostId = ctx.postId;
-        console.log(`[SHARE] Client postId missing. Falling back to context.postId: ${targetPostId}`);
-    }
-
-    if (!targetPostId || !text) {
-        return res.status(400).json({ error: 'Missing postId or text' });
-    }
-
-
-    // Ideally we ensure we are commenting on the same post we are running on, or generally allow it if authorized.
-    // The prompt says "Use context.reddit.submitComment" and "Use the actual Reddit post ID".
-
-    // Check for duplicate comment for this user/quiz
-    // We need to resolve the user. context.userId?
     try {
+        const parsed = parseShareRequest(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({ error: 'INVALID_SHARE_REQUEST' });
+        }
+
+        const { postId, quizId, text } = parsed.data;
+        if (postId !== context.postId) {
+            return res.status(403).json({ error: 'POST_CONTEXT_MISMATCH' });
+        }
+
         const username = await reddit.getCurrentUsername();
         if (!username) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
 
-        // Block anonymous "Player" users from sharing
-        if (username === 'Player') {
-            return res.status(403).json({ error: 'Anonymous users cannot share scores' });
-        }
-
-        // We need quizId to track state. It's not in the body but we can infer or pass it.
-        // Let's pass quizId from client. The client knows it.
-        const { quizId } = req.body;
-
-        if (!quizId) {
-            return res.status(400).json({ error: 'Missing quizId' });
-        }
-
-        console.log("[SHARE] Attempting comment post", {
-            postId: targetPostId,
-            quizId,
-            userId: username,
-        });
-
-        // Check Firestore state
         const fs = new FirestoreRestService();
         const userStats = await fs.getUserTopicStats(username, quizId);
-
-        console.log("[SHARE] Resolved userStats:", userStats);
-        console.log("[SHARE] hasShared =", userStats?.hasShared);
-
-        // [REMOVED] Daily Leaderboard Submission to Memory. 
-        // Now fully Firestore-based via QuizController.submitDailyScore.
-        // We still check userStats for duplicate share check below.
-
-        // Allow DEV users to bypass limit
         const isDev = CONFIG.DEV.USERNAMES.includes(username);
-        if (isDev) {
-            console.log(`[SHARE] User ${username} is DEV. Bypassing share limit.`);
-        } else if (userStats?.hasShared === true) {
-            console.log("[SHARE] User already shared score for this quiz.");
-            // Even if already shared, we updated the leaderboard above, so we can return success or 409.
-            // Returning 409 is fine as long as leaderboard is updated.
+        if (!isDev && userStats?.hasShared === true) {
             return res.status(409).json({ error: 'Already shared' });
         }
 
-        res.json({ success: true });
-    } catch (error: any) {
-        console.error("[SHARE] Comment post failed", error);
-        res.status(500).json({ error: 'Failed to post comment' });
+        const comment = await reddit.submitComment({ id: postId, text });
+        const markedShared = await fs.updateUserTopicStats(username, quizId, { hasShared: true });
+        if (!markedShared) {
+            Logger.error('[Share] Comment posted but share state failed to persist', { username, quizId, commentId: comment.id });
+        }
+
+        return res.json({ success: true, commentId: comment.id });
+    } catch (error) {
+        Logger.error('[Share] Comment post failed', error);
+        return res.status(500).json({ error: 'Failed to post comment' });
     }
 });
 

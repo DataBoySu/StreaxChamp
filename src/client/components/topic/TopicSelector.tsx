@@ -179,7 +179,7 @@ export const TopicSelector: React.FC<{
   const handleHighlightTopic = (name: string) => {
     const topic = topics.find((t) => t.name.toLowerCase() === name.toLowerCase());
     if (topic) {
-      requestQuiz(topic);
+      void requestQuiz(topic);
     }
   };
 
@@ -423,7 +423,7 @@ export const TopicSelector: React.FC<{
           {/* Action Buttons - NES Style */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => fetchTopics(true)}
+              onClick={() => { void fetchTopics(true); }}
               className="nes-btn"
               style={{
                 fontFamily: "'Press Start 2P', cursive",

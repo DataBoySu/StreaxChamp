@@ -43,7 +43,7 @@ export function useDailyLeaderboard(date: string | undefined, enabled = true) {
     }, [date, enabled]);
 
     useEffect(() => {
-        fetchLeaderboard();
+        void fetchLeaderboard();
     }, [fetchLeaderboard]);
 
     return {
